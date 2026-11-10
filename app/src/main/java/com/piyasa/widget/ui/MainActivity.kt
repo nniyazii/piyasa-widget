@@ -174,7 +174,7 @@ private fun MainScreen() {
             AddInstrumentDialog(
                 state = s,
                 onDismiss = { showAdd = false },
-                onAdd = { ins -> scope.launch { Actions.addInstrument(context, ins) }; showAdd = false },
+                onAdd = { ins -> scope.launch { Actions.addInstrument(context, ins) } },
             )
         }
         editing?.let { target ->
@@ -184,6 +184,7 @@ private fun MainScreen() {
                 onDismiss = { editing = null },
                 onSave = { f -> scope.launch { Actions.upsertFormula(context, f, target.formula?.key) }; editing = null },
                 onDelete = { key -> scope.launch { Actions.deleteFormula(context, key) }; editing = null },
+                onAddInstrument = { ins -> scope.launch { Actions.addInstrument(context, ins) } },
             )
         }
     }

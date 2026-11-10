@@ -67,8 +67,56 @@ private class YIndicators(val quote: List<YSeries>? = null)
 @Serializable
 private class YSeries(val close: List<Double?>? = null)
 
+@Serializable
+private class YSearchResponse(val quotes: List<YSearchQuote> = emptyList())
+
+@Serializable
+private class YSearchQuote(
+    val symbol: String? = null,
+    val shortname: String? = null,
+    val longname: String? = null,
+    val quoteType: String? = null,
+    val exchange: String? = null,
+    val exchDisp: String? = null,
+    val typeDisp: String? = null,
+)
+
+/** Yahoo sembol araması sonucu. */
+data class SearchHit(
+    val symbol: String,
+    val name: String,
+    val quoteType: String?,
+    val exchange: String?,
+    val typeLabel: String?,
+)
+
 object YahooSource {
     private val hosts = listOf("query1.finance.yahoo.com", "query2.finance.yahoo.com")
+
+    /** Serbest metinle sembol araması (ör. "aselsan", "apple", "gümüş"). */
+    suspend fun search(query: String): List<SearchHit> {
+        val q = URLEncoder.encode(query.trim(), "UTF-8")
+        var last: IOException? = null
+        for (host in hosts) {
+            try {
+                val body = Http.get("https://$host/v1/finance/search?q=$q&quotesCount=12&newsCount=0&listsCount=0&enableFuzzyQuery=true")
+                return AppJson.decodeFromString(YSearchResponse.serializer(), body).quotes
+                    .filter { !it.symbol.isNullOrBlank() && it.quoteType != "OPTION" }
+                    .map {
+                        SearchHit(
+                            symbol = it.symbol!!,
+                            name = it.shortname ?: it.longname ?: it.symbol,
+                            quoteType = it.quoteType,
+                            exchange = it.exchDisp ?: it.exchange,
+                            typeLabel = it.typeDisp,
+                        )
+                    }
+            } catch (e: IOException) {
+                last = e
+            }
+        }
+        throw last ?: IOException("Arama yapılamadı")
+    }
 
     suspend fun fetch(symbol: String): Quote {
         val enc = URLEncoder.encode(symbol, "UTF-8")

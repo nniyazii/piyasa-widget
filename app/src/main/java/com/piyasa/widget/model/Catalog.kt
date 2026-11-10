@@ -1,6 +1,7 @@
 package com.piyasa.widget.model
 
 import com.piyasa.widget.model.Category.COMMODITY
+import com.piyasa.widget.model.Category.CRYPTO
 import com.piyasa.widget.model.Category.FX
 import com.piyasa.widget.model.Category.TR
 import com.piyasa.widget.model.Category.US
@@ -67,7 +68,76 @@ object Catalog {
         y("DXY", "Dolar Endeksi", "DX-Y.NYB", FX, decimals = 2),
         Instrument("TCMB_USD", "TCMB Dolar", "USD:ForexSelling", TCMB, FX, 4, note = "TCMB satış"),
         Instrument("TCMB_EUR", "TCMB Euro", "EUR:ForexSelling", TCMB, FX, 4, note = "TCMB satış"),
+
+        // --- Kripto
+        y("BTC", "Bitcoin", "BTC-USD", CRYPTO, decimals = 0, prefix = "$"),
+        y("ETH", "Ethereum", "ETH-USD", CRYPTO, decimals = 0, prefix = "$"),
+        y("SOL", "Solana", "SOL-USD", CRYPTO, prefix = "$"),
     )
+
+    /**
+     * Sembolden enstrüman üretir: kategori, ondalık ve birim tahmin edilir.
+     * [quoteType] Yahoo aramasından gelir (EQUITY, INDEX, CURRENCY, FUTURE, CRYPTOCURRENCY, ETF ...).
+     */
+    fun fromSymbol(
+        symbol: String,
+        source: Source,
+        name: String?,
+        existingKeys: Collection<String>,
+        quoteType: String? = null,
+        currency: String? = null,
+    ): Instrument {
+        val sym = if (source == YAHOO) symbol.trim().uppercase() else symbol.trim()
+        val type = quoteType?.uppercase()
+        val category = when {
+            source == GOLD_API -> COMMODITY
+            source == TCMB -> FX
+            type == "CRYPTOCURRENCY" || Regex("^[A-Z0-9]+-(USD|USDT|EUR|TRY)$").matches(sym) -> CRYPTO
+            type == "CURRENCY" || sym.endsWith("=X") -> FX
+            type == "FUTURE" || sym.endsWith("=F") -> COMMODITY
+            sym.endsWith(".IS") -> TR
+            else -> Category.US
+        }
+        val isFx = category == FX
+        val isTrEquity = sym.endsWith(".IS") && !sym.startsWith("XU") && type != "INDEX"
+        val isIndex = type == "INDEX" || sym.startsWith("^") || (sym.startsWith("XU") && sym.endsWith(".IS"))
+        val decimals = when {
+            isFx -> 4
+            category == CRYPTO && !sym.startsWith("BTC") && !sym.startsWith("ETH") -> 4
+            category == CRYPTO -> 0
+            else -> 2
+        }
+        val prefix = when {
+            isFx || isIndex || isTrEquity -> ""
+            currency == "TRY" -> ""
+            category == TR -> ""
+            else -> "$"
+        }
+        val suffix = if (isTrEquity || (currency == "TRY" && !isFx && !isIndex)) "₺" else ""
+        val base = sym.substringBefore('.').substringBefore('=').substringBefore('-').removePrefix("^")
+            .let { if (source == TCMB) "TCMB_" + it.substringBefore(':') else it }
+        var key = com.piyasa.widget.formula.Formulas.suggestKey(base)
+        if (key in existingKeys) {
+            var n = 2
+            while ("${key}_$n" in existingKeys) n++
+            key = "${key}_$n"
+        }
+        return Instrument(
+            key = key,
+            name = name?.trim()?.takeIf { it.isNotEmpty() } ?: base,
+            symbol = sym,
+            source = source,
+            category = category,
+            decimals = decimals,
+            prefix = prefix,
+            suffix = suffix,
+            note = when {
+                source == GOLD_API -> "Spot"
+                category == COMMODITY && source == YAHOO -> "Vadeli"
+                else -> null
+            },
+        )
+    }
 
     private val defaultKeys = listOf(
         "SPX", "NASDAQ", "DOW",

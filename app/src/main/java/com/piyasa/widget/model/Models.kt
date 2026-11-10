@@ -8,6 +8,7 @@ enum class Category(val label: String, val short: String) {
     TR("Türkiye", "TR"),
     COMMODITY("Emtia", "EMT"),
     FX("Döviz", "FX"),
+    CRYPTO("Kripto", "KRP"),
 }
 
 @Serializable

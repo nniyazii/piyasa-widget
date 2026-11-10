@@ -23,6 +23,7 @@ object TradingView {
         "USDTRY" to "FX:USDTRY", "EURTRY" to "FX:EURTRY", "GBPTRY" to "FX:GBPTRY", "CHFTRY" to "FX_IDC:CHFTRY",
         "EURUSD" to "FX:EURUSD", "GBPUSD" to "FX:GBPUSD", "USDJPY" to "FX:USDJPY", "DXY" to "TVC:DXY",
         "TCMB_USD" to "FX:USDTRY", "TCMB_EUR" to "FX:EURTRY",
+        "BTC" to "BITSTAMP:BTCUSD", "ETH" to "BITSTAMP:ETHUSD", "SOL" to "COINBASE:SOLUSD",
     )
 
     /** Kullanıcının verdiği sembol > katalog eşlemesi > kaynak sembolünden tahmin. */
@@ -35,6 +36,7 @@ object TradingView {
                 s.endsWith(".IS", ignoreCase = true) -> "BIST:" + s.dropLast(3).uppercase()
                 s.endsWith("=X", ignoreCase = true) -> "FX_IDC:" + s.dropLast(2).uppercase()
                 s.endsWith("=F", ignoreCase = true) -> s.dropLast(2).uppercase() + "1!"
+                Regex("^[A-Za-z0-9]+-[A-Za-z]+$").matches(s) -> "CRYPTO:" + s.replace("-", "").uppercase()
                 s.startsWith("^") -> null
                 else -> s.uppercase()
             }

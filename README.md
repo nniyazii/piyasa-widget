@@ -30,6 +30,17 @@ Uygulamanın kendi ekranı yalnızca ayar içindir. Veriler widget'ta gösterili
 - ⟳ simgesi verileri hemen yeniler. Arka planda 15, 30, 60 veya 120 dakikada bir otomatik yenilenir.
 - Gece ve gündüz temaları sistemi izler.
 
+## Gösterge ekleme
+
+- **Canlı arama:** “aselsan”, “apple”, “gümüş” gibi bir şey yazınca hem katalogda hem tüm piyasalarda (Yahoo Finance) aranır. Sembol kodunu bilmek gerekmez.
+- Kategori filtreleri: Amerika, Türkiye, Emtia, Döviz, Kripto. Her satırda kategori rozeti ve borsa bilgisi bulunur.
+- **Tek dokunuşla “+ Ekle”.** Ekran açık kalır, art arda birçok gösterge eklenebilir; ekli olanlar “✓ Ekli” görünür.
+- Kategori, ondalık, birim (₺ / $) ve formül anahtarı sembolden otomatik çıkarılır: `ASELS.IS` → Türkiye, ₺, `ASELS`.
+- *Listede yok mu?* bölümünden Yahoo, spot metal veya TCMB sembolü elle girilebilir; kategori ve TradingView sembolü de değiştirilebilir.
+- Formül kurucudaki arama da aynı şekilde çalışır. Listede olmayan bir sembole dokununca sembol hem izleme listesine eklenir hem formüle girer.
+
+![gösterge ekle](docs/gosterge-ekle.png)
+
 ## Formül kurucu
 
 Formül yazmak gerekmez:

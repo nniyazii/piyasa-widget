@@ -39,6 +39,8 @@ class BuilderPreviewTest {
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
         activity.setContent { PiyasaTheme { content() } }
         ShadowLooper.idleMainLooper()
+        // Arama gecikmesi (delay) gerçek saatle çalışır: gerçekten bekle, sonra ana döngüyü işlet.
+        repeat(8) { Thread.sleep(100); ShadowLooper.idleMainLooper(100, java.util.concurrent.TimeUnit.MILLISECONDS) }
         val root = activity.window.decorView
         val w = root.width.takeIf { it > 0 } ?: 1200
         val h = root.height.takeIf { it > 0 } ?: 4500
@@ -65,5 +67,36 @@ class BuilderPreviewTest {
         render("builder_template") {
             FormulaBuilderScreen(state, null, {}, {}, {}, initialTemplate = 2)
         }
+    }
+
+    @Test
+    fun builderSearchAddsNew() {
+        assumeTrue(System.getProperty("previews") == "true")
+        val hits = listOf(
+            com.piyasa.widget.data.source.SearchHit("ASELS.IS", "ASELSAN", "EQUITY", "Istanbul", "Equity"),
+            com.piyasa.widget.data.source.SearchHit("ASML", "ASML Holding N.V.", "EQUITY", "NASDAQ", "Equity"),
+        )
+        render("builder_search") {
+            FormulaBuilderScreen(state, null, {}, {}, {}, initialSearch = "as", searcher = { hits })
+        }
+    }
+
+    @Test
+    fun addInstrumentSearch() {
+        assumeTrue(System.getProperty("previews") == "true")
+        val hits = listOf(
+            com.piyasa.widget.data.source.SearchHit("ASELS.IS", "ASELSAN", "EQUITY", "Istanbul", "Equity"),
+            com.piyasa.widget.data.source.SearchHit("ASTOR.IS", "ASTOR ENERJI", "EQUITY", "Istanbul", "Equity"),
+            com.piyasa.widget.data.source.SearchHit("ASML", "ASML Holding N.V.", "EQUITY", "NASDAQ", "Equity"),
+        )
+        render("add_search") {
+            com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}, initialQuery = "as", searcher = { hits })
+        }
+    }
+
+    @Test
+    fun addInstrumentBrowse() {
+        assumeTrue(System.getProperty("previews") == "true")
+        render("add_browse") { com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}) }
     }
 }

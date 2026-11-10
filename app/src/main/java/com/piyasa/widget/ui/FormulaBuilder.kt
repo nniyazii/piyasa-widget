@@ -78,6 +78,10 @@ import com.piyasa.widget.model.Fmt
 import com.piyasa.widget.model.Formula
 import com.piyasa.widget.model.FormulaEngine
 import com.piyasa.widget.model.TradingView
+import com.piyasa.widget.model.Catalog
+import com.piyasa.widget.model.Instrument
+import com.piyasa.widget.data.source.SearchHit
+import com.piyasa.widget.data.source.YahooSource
 import java.util.Locale
 
 private val trLocale = Locale.forLanguageTag("tr-TR")
@@ -132,7 +136,7 @@ private fun tokenLabel(state: AppState, t: String): String = when {
 
 private enum class Filter(val label: String, val category: Category?) {
     ALL("Tümü", null), FORMULA("Formüller", null),
-    US("ABD", Category.US), TR("TR", Category.TR), COMMODITY("Emtia", Category.COMMODITY), FX("Döviz", Category.FX),
+    US("ABD", Category.US), TR("TR", Category.TR), COMMODITY("Emtia", Category.COMMODITY), FX("Döviz", Category.FX), CRYPTO("Kripto", Category.CRYPTO),
 }
 
 @Composable
@@ -142,10 +146,11 @@ fun FormulaBuilderDialog(
     onDismiss: () -> Unit,
     onSave: (Formula) -> Unit,
     onDelete: (String) -> Unit,
+    onAddInstrument: (Instrument) -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            FormulaBuilderScreen(state, original, onDismiss, onSave, onDelete)
+            FormulaBuilderScreen(state, original, onDismiss, onSave, onDelete, onAddInstrument = onAddInstrument)
         }
     }
 }
@@ -154,13 +159,22 @@ fun FormulaBuilderDialog(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun FormulaBuilderScreen(
-    state: AppState,
+    baseState: AppState,
     original: Formula?,
     onDismiss: () -> Unit,
     onSave: (Formula) -> Unit,
     onDelete: (String) -> Unit,
     initialTemplate: Int? = null,
+    initialSearch: String = "",
+    onAddInstrument: (Instrument) -> Unit = {},
+    searcher: suspend (String) -> List<SearchHit> = { YahooSource.search(it) },
 ) {
+    // Bu ekrandan yeni eklenen göstergeler, depo güncellenene kadar da formülde kullanılabilsin.
+    val justAdded = remember { mutableStateListOf<Instrument>() }
+    val state = remember(baseState, justAdded.toList()) {
+        val missing = justAdded.filter { a -> baseState.instruments.none { it.key == a.key } }
+        if (missing.isEmpty()) baseState else baseState.copy(instruments = baseState.instruments + missing)
+    }
     var name by remember { mutableStateOf(original?.name ?: "") }
     var key by remember { mutableStateOf(original?.key ?: "") }
     var keyTouched by remember { mutableStateOf(original != null) }
@@ -177,7 +191,7 @@ fun FormulaBuilderScreen(
     var pending by remember { mutableStateOf(initialTemplate?.let { templates(state).getOrNull(it) }) }
     val filled = remember { mutableStateListOf<String>() }
     var numberInput by remember { mutableStateOf("") }
-    var search by remember { mutableStateOf("") }
+    var search by remember { mutableStateOf(initialSearch) }
     var filter by remember { mutableStateOf(Filter.ALL) }
     var fnMenu by remember { mutableStateOf(false) }
 
@@ -248,6 +262,7 @@ fun FormulaBuilderScreen(
     ) { padding ->
         val engine = remember(state) { FormulaEngine(state) }
         val needle = search.trim().lowercase(trLocale)
+        val liveSearch = rememberSymbolSearch(if (filter == Filter.FORMULA) "" else search, searcher)
         val candidates: List<String> = buildList {
             if (filter == Filter.ALL || filter == Filter.FORMULA) addAll(state.formulas.map { it.key }.filter { it != original?.key })
             if (filter != Filter.FORMULA) addAll(state.instruments.filter { filter.category == null || it.category == filter.category }.map { it.key })
@@ -510,11 +525,44 @@ fun FormulaBuilderScreen(
                         direction = d?.direction ?: 0,
                     ) { pick(k) }
                 }
-                if (candidates.isEmpty()) {
-                    item {
-                        Text("Eşleşen sembol yok. Piyasalar sekmesindeki + ile yeni sembol ekleyebilirsiniz.",
-                            Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // ---- Listede olmayanlar: katalog + canlı arama; dokununca hem listeye eklenir hem formüle girer
+                if (needle.length >= 2) {
+                    val cat = filter.category
+                    val fromCatalog = if (filter == Filter.FORMULA) emptyList() else Catalog.all
+                        .filter { !state.isTracked(it) && state.instrument(it.key) == null }
+                        .filter { cat == null || it.category == cat }
+                        .filter { ins -> listOfNotNull(ins.name, ins.key, ins.symbol, ins.note).any { it.lowercase(trLocale).contains(needle) } }
+                    val hits = if (filter == Filter.FORMULA) emptyList()
+                    else searchHitsToInstruments(liveSearch, state, cat).filter { !state.isTracked(it) }
+                    item { SectionHeader("Listende olmayanlar · dokun: ekle ve formüle koy") }
+                    items(fromCatalog + hits, key = { "n_${it.source}_${it.symbol}" }) { ins ->
+                        PickRow(ins, added = false) {
+                            justAdded += ins
+                            onAddInstrument(ins)
+                            pick(ins.key)
+                        }
                     }
+                    if ((fromCatalog.isNotEmpty() || hits.isNotEmpty()) && liveSearch !is SearchState.Done && liveSearch !is SearchState.Failed) {
+                        item { Hint("Tüm piyasalarda aranıyor…") }
+                    }
+                    if (fromCatalog.isEmpty() && hits.isEmpty()) {
+                        item {
+                            when (val ls = liveSearch) {
+                                SearchState.Idle, SearchState.Loading -> Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    androidx.compose.material3.CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
+                                    Spacer(Modifier.width(10.dp))
+                                    Text("Tüm piyasalarda aranıyor…", style = MaterialTheme.typography.bodySmall)
+                                }
+                                is SearchState.Failed -> Hint(ls.message)
+                                is SearchState.Done -> Hint(
+                                    "“${search.trim()}” bulunamadı. Yahoo Finance'te olmayan semboller (ör. yalnızca TradingView'da olan " +
+                                        "ekonomik göstergeler) eklenemez. Sembolü biliyorsanız Piyasalar → + → “Listede yok mu?” ile elle girin.",
+                                )
+                            }
+                        }
+                    }
+                } else if (candidates.isEmpty()) {
+                    item { Hint("Eşleşen sembol yok. Aramak için en az 2 harf yazın.") }
                 }
             }
 
