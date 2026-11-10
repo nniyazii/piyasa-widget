@@ -124,4 +124,27 @@ class WidgetPreviewTest {
         config(WidgetConfig(keys = five + listOf("EURTRY", "NASDAQ", "BRENT", "GRAM_GUMUS", "EURUSD")))
         render("dark_5x3_two_columns", 400, 230)
     }
+
+    private val sectioned = listOf(
+        WidgetConfig.section("Altın"), "GRAM_ALTIN", "ONS",
+        WidgetConfig.section("Döviz"), "USDTRY", "EURTRY",
+        WidgetConfig.section("Borsa"), "XU100", "SPX",
+    )
+
+    @Test
+    fun renderStyles() {
+        assumeTrue(System.getProperty("previews") == "true")
+        seed()
+        config(WidgetConfig(keys = sectioned, showSpark = true))
+        render("style_sections", 320, 300)
+        config(WidgetConfig(keys = sectioned + listOf("NASDAQ", "BRENT")))
+        render("style_sections_two_columns", 400, 260)
+        config(WidgetConfig(keys = five.take(4), textScale = 1.3f, density = com.piyasa.widget.model.RowDensity.COMFORTABLE))
+        render("style_large_text", 320, 260)
+        config(WidgetConfig(keys = sectioned, textScale = 0.85f, density = com.piyasa.widget.model.RowDensity.COMPACT,
+            changeStyle = com.piyasa.widget.model.ChangeStyle.TEXT, showHeader = false, showSpark = false))
+        render("style_small_compact_text", 320, 200)
+        config(WidgetConfig(keys = sectioned, theme = com.piyasa.widget.model.WidgetTheme.DARK, opacity = 0.55f))
+        render("style_dark_transparent", 320, 300)
+    }
 }

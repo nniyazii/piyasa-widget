@@ -23,7 +23,15 @@ Uygulamanın kendi ekranı yalnızca ayar içindir. Veriler widget'ta gösterili
 ## Widget
 
 - **Boyuta göre düzen**: 1 satır yükseklikte yatay bant, 2 hücre genişlikte iki satırlı dar liste, standart genişlikte mini grafikli liste, 5+ hücre genişlikte çift sütun.
-- **Her widget ayrı yapılandırılır**: başlık, gösterilecek kalemler ve sıraları, mini grafik, alt satır. Widget'ı eklerken açılan ekrandan veya widget'a uzun basıp *Yeniden yapılandır* ile ayarlanır.
+- **Her widget ayrı yapılandırılır.** Widget'ı eklerken açılan ekrandan veya widget'a uzun basıp *Yeniden yapılandır* ile ayarlanır. Ekranın üstünde, widget'ın gerçek boyutunda **canlı önizleme** vardır; her değişiklik anında görünür.
+  - **İçerik:** göstergeler, formüller ve **bölümler** (ör. Altın · Döviz · Borsa). *+ Bölüm* hazır başlık önerileri sunar. *Otomatik bölümle* göstergeleri kategoriye göre gruplar. Oklarla sıralanır; bölüm başlıkları çift sütunda da satırı keser.
+  - **Görünüm:** yazı boyutu (Küçük / Normal / Büyük / Çok büyük), satır aralığı (Sıkı / Normal / Rahat), günlük değişim (Rozet / Yazı / Gizli), tema (Sistem / Açık / Koyu), arka plan opaklığı (%20–100), başlık satırı, güncelleme saati, mini grafik ve alt satır. Büyük yazıda yer kalmazsa mini grafik otomatik gizlenir.
+
+![widget düzenleyici](docs/widget-duzenleyici.png)
+
+| Bölümler | Büyük yazı · Sıkı ve küçük · Koyu, yarı saydam |
+|---|---|
+| ![bölümler](docs/widget-bolumler.png) | ![stiller](docs/widget-stiller.png) |
 - **Satıra dokununca TradingView açılır.** Telefonda TradingView uygulaması yüklüyse grafik orada açılır. Formüller TradingView'un spread sözdizimine çevrilir:
   `GRAM_ALTIN` → `OANDA:XAUUSD*FX:USDTRY/31.1034768`, `BIST_USD` → `BIST:XU100/FX:USDTRY`.
   TradingView'da karşılığı olmayan fonksiyonlar (`pct`, `chg`, `prev`, `min`…) içeren formüllerde, formüldeki ilk enstrüman açılır.

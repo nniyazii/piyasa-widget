@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.unit.dp
+import com.piyasa.widget.data.appStore
 import com.piyasa.widget.model.AppState
 import com.piyasa.widget.model.Quote
 import com.piyasa.widget.ui.FormulaBuilderScreen
@@ -107,5 +109,36 @@ class BuilderPreviewTest {
     fun addInstrumentBrowse() {
         assumeTrue(System.getProperty("previews") == "true")
         render("add_browse") { com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}, autoFocus = false) }
+    }
+
+    private val editorConfig = com.piyasa.widget.model.WidgetConfig(
+        keys = listOf(
+            com.piyasa.widget.model.WidgetConfig.section("Altın"), "GRAM_ALTIN", "ONS",
+            com.piyasa.widget.model.WidgetConfig.section("Döviz"), "USDTRY", "EURTRY",
+        ),
+        textScale = 1.15f,
+    )
+
+    private fun seedStore() = kotlinx.coroutines.runBlocking {
+        val app = org.robolectric.RuntimeEnvironment.getApplication()
+        app.appStore.updateData { state.copy(lastRefresh = System.currentTimeMillis()) }
+    }
+
+    @Test
+    fun widgetEditorContent() {
+        assumeTrue(System.getProperty("previews") == "true")
+        seedStore()
+        render("editor_content") {
+            com.piyasa.widget.config.WidgetEditor(state, editorConfig, androidx.compose.ui.unit.DpSize(320.dp, 230.dp), {}, {})
+        }
+    }
+
+    @Test
+    fun widgetEditorAppearance() {
+        assumeTrue(System.getProperty("previews") == "true")
+        seedStore()
+        render("editor_appearance") {
+            com.piyasa.widget.config.WidgetEditor(state, editorConfig, androidx.compose.ui.unit.DpSize(320.dp, 230.dp), {}, {}, initialTab = 1)
+        }
     }
 }

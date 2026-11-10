@@ -72,15 +72,44 @@ data class Quote(
 )
 
 @Serializable
+enum class WidgetTheme(val label: String) { SYSTEM("Sistem"), LIGHT("Açık"), DARK("Koyu") }
+
+@Serializable
+enum class RowDensity(val label: String, val padding: Int) { COMPACT("Sıkı", 3), NORMAL("Normal", 5), COMFORTABLE("Rahat", 8) }
+
+@Serializable
+enum class ChangeStyle(val label: String) { PILL("Rozet"), TEXT("Yazı"), HIDDEN("Gizli") }
+
+@Serializable
 data class WidgetConfig(
     val title: String = "Piyasalar",
+    /** Gösterge / formül anahtarları ve bölüm başlıkları ("#:Başlık"), sırasıyla. */
     val keys: List<String> = DEFAULT_WIDGET_KEYS,
     val showSpark: Boolean = true,
     val showSubtitle: Boolean = false,
+    /** Yazı ölçeği: 0.85 küçük … 1.3 çok büyük. */
+    val textScale: Float = 1.0f,
+    val density: RowDensity = RowDensity.NORMAL,
+    val theme: WidgetTheme = WidgetTheme.SYSTEM,
+    /** Arka plan opaklığı 0.2 … 1.0 */
+    val opacity: Float = 0.95f,
+    val changeStyle: ChangeStyle = ChangeStyle.PILL,
+    val showHeader: Boolean = true,
+    val showTime: Boolean = true,
 ) {
     companion object {
         val DEFAULT_WIDGET_KEYS = listOf("GRAM_ALTIN", "ONS", "USDTRY", "EURTRY", "XU100", "SPX")
+        const val SECTION_PREFIX = "#:"
+
+        fun isSection(entry: String) = entry.startsWith(SECTION_PREFIX)
+        fun sectionTitle(entry: String) = entry.removePrefix(SECTION_PREFIX)
+        fun section(title: String) = SECTION_PREFIX + title.trim()
+
+        val TEXT_SCALES = listOf(0.85f to "Küçük", 1.0f to "Normal", 1.15f to "Büyük", 1.3f to "Çok büyük")
     }
+
+    /** Bölüm başlıkları hariç gösterge anahtarları. */
+    val itemKeys: List<String> get() = keys.filterNot { isSection(it) }
 }
 
 @Serializable

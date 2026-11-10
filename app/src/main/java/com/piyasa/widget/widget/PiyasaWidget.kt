@@ -54,6 +54,7 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.compose.ui.graphics.Color
 import androidx.glance.color.ColorProvider
+import androidx.glance.unit.ColorProvider as GColor
 import com.piyasa.widget.R
 import com.piyasa.widget.config.WidgetConfigActivity
 import com.piyasa.widget.data.Actions
@@ -62,6 +63,9 @@ import com.piyasa.widget.model.AppState
 import com.piyasa.widget.model.Display
 import com.piyasa.widget.model.DisplayItem
 import com.piyasa.widget.model.WidgetConfig
+import com.piyasa.widget.model.WidgetTheme
+import com.piyasa.widget.model.ChangeStyle
+import com.piyasa.widget.model.FormulaEngine
 import com.piyasa.widget.ui.MainActivity
 import com.piyasa.widget.work.RefreshWorker
 import kotlinx.coroutines.CoroutineScope
@@ -116,17 +120,55 @@ class RefreshAction : ActionCallback {
     }
 }
 
-// ------------------------------------------------------------------ renkler
+// ------------------------------------------------------------------ stil
 
-private object WColors {
-    // Gündüz / gece renkleri (res/values*/colors.xml ile aynı)
-    val text = ColorProvider(day = Color(0xFF0E141B), night = Color(0xFFF1F4F7))
-    val muted = ColorProvider(day = Color(0xFF6B7785), night = Color(0xFF8B95A1))
-    val divider = ColorProvider(day = Color(0x120E141B), night = Color(0x14FFFFFF))
-    val up = ColorProvider(day = Color(0xFF0E9F6E), night = Color(0xFF34D399))
-    val down = ColorProvider(day = Color(0xFFE02D3C), night = Color(0xFFFB7185))
+/** Bir widget örneğinin görünümü: renkler (tema + opaklık), yazı ölçeği, satır aralığı. */
+private class WStyle(private val cfg: WidgetConfig) {
+    private fun pick(day: Long, night: Long, alpha: Float = 1f): GColor {
+        val d = Color(day).let { if (alpha < 1f) it.copy(alpha = it.alpha * alpha) else it }
+        val n = Color(night).let { if (alpha < 1f) it.copy(alpha = it.alpha * alpha) else it }
+        return when (cfg.theme) {
+            WidgetTheme.SYSTEM -> ColorProvider(day = d, night = n)
+            WidgetTheme.LIGHT -> ColorProvider(day = d, night = d)
+            WidgetTheme.DARK -> ColorProvider(day = n, night = n)
+        }
+    }
 
+    val bg = pick(0xFFFAFBFC, 0xFF111519, cfg.opacity.coerceIn(0.2f, 1f))
+    val text = pick(0xFF0E141B, 0xFFF1F4F7)
+    val muted = pick(0xFF6B7785, 0xFF8B95A1)
+    val divider = pick(0x120E141B, 0x14FFFFFF)
+    val up = pick(0xFF0E9F6E, 0xFF34D399)
+    val down = pick(0xFFE02D3C, 0xFFFB7185)
+    val pillUp = pick(0x1F0E9F6E, 0x2634D399)
+    val pillDown = pick(0x1FE02D3C, 0x26FB7185)
+    val pillFlat = pick(0x146B7785, 0x1A8B95A1)
+    val section = pick(0xFF3B5BDB, 0xFF91A7FF)
+
+    val scale = cfg.textScale.coerceIn(0.7f, 1.6f)
+    val pad = cfg.density.padding
+    val changeStyle = cfg.changeStyle
+    val theme = cfg.theme
+
+    fun sp(v: Float) = (v * scale).sp
     fun forDirection(d: Int) = when (d) { 1 -> up; -1 -> down; else -> muted }
+    fun pillFor(d: Int) = when (d) { 1 -> pillUp; -1 -> pillDown; else -> pillFlat }
+
+    /** Mini grafik rengi (bitmap için düz renk): tema zorlanmışsa o, değilse sistem gece modu. */
+    fun sparkColor(context: Context, d: Int): Int {
+        val night = when (theme) {
+            WidgetTheme.DARK -> true
+            WidgetTheme.LIGHT -> false
+            WidgetTheme.SYSTEM -> (context.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
+        val argb = when (d) {
+            1 -> if (night) 0xFF34D399 else 0xFF0E9F6E
+            -1 -> if (night) 0xFFFB7185 else 0xFFE02D3C
+            else -> if (night) 0xFF8B95A1 else 0xFF6B7785
+        }
+        return argb.toInt()
+    }
 }
 
 /** Satıra dokununca TradingView (uygulama yüklüyse uygulamada) açılır; çevrilemeyen kalemde uygulama açılır. */
@@ -136,10 +178,32 @@ private fun rowAction(item: DisplayItem, fallback: Action): Action {
     return androidx.glance.appwidget.action.actionStartActivity(intent)
 }
 
-private fun pillFor(d: Int) = when (d) {
-    1 -> R.drawable.pill_up
-    -1 -> R.drawable.pill_down
-    else -> R.drawable.pill_flat
+/** Widget satırları: bölüm başlığı ya da (çift sütunda iki) gösterge. */
+private sealed interface Line {
+    data class Header(val title: String) : Line
+    data class Items(val items: List<DisplayItem>) : Line
+}
+
+private fun buildLines(state: AppState, cfg: WidgetConfig, twoColumns: Boolean): List<Line> {
+    val engine = FormulaEngine(state)
+    val out = mutableListOf<Line>()
+    val pending = mutableListOf<DisplayItem>()
+    fun flush() {
+        if (pending.isEmpty()) return
+        if (twoColumns) pending.chunked(2).forEach { out += Line.Items(it) } else pending.forEach { out += Line.Items(listOf(it)) }
+        pending.clear()
+    }
+    for (k in cfg.keys) {
+        if (WidgetConfig.isSection(k)) {
+            flush()
+            out += Line.Header(WidgetConfig.sectionTitle(k))
+        } else {
+            Display.item(state, engine, k)?.let { pending += it }
+        }
+    }
+    flush()
+    // Arkasında gösterge olmayan başlıkları at
+    return out.filterIndexed { i, l -> l !is Line.Header || (out.getOrNull(i + 1) is Line.Items) }
 }
 
 // ------------------------------------------------------------------ içerik
@@ -148,7 +212,7 @@ private fun pillFor(d: Int) = when (d) {
 private fun WidgetContent(state: AppState, cfg: WidgetConfig, appWidgetId: Int) {
     val context = LocalContext.current
     val size = LocalSize.current
-    val items = Display.build(state, cfg.keys)
+    val st = WStyle(cfg)
 
     val configIntent = Intent(context, WidgetConfigActivity::class.java)
         .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
@@ -156,36 +220,41 @@ private fun WidgetContent(state: AppState, cfg: WidgetConfig, appWidgetId: Int) 
     val openConfig = androidx.glance.appwidget.action.actionStartActivity(configIntent)
     val openApp = actionStartActivity<MainActivity>()
 
+    val stripMode = size.height.value < 100f * st.scale.coerceAtLeast(1f)
+    val twoColumns = !stripMode && size.width.value >= 330f * st.scale && cfg.itemKeys.size > 3
+    val lines = buildLines(state, cfg, twoColumns)
+
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(ImageProvider(R.drawable.widget_bg))
+            // Yuvarlak köşeli maske, seçilen renk ve opaklıkla boyanır (tüm Android sürümlerinde yuvarlak).
+            .background(ImageProvider(R.drawable.widget_mask), colorFilter = ColorFilter.tint(st.bg))
             .cornerRadius(20.dp),
     ) {
         when {
-            items.isEmpty() -> EmptyState(openConfig)
-            size.height < 100.dp -> Strip(items, size.width.value, openApp)
-            else -> ListLayout(state, cfg, items, size.width.value, size.height.value, openApp)
+            lines.none { it is Line.Items } -> EmptyState(st, openConfig)
+            stripMode -> Strip(st, lines.filterIsInstance<Line.Items>().flatMap { it.items }, size.width.value, openApp)
+            else -> ListLayout(st, state, cfg, lines, twoColumns, size.width.value, size.height.value, openApp)
         }
     }
 }
 
 @Composable
-private fun EmptyState(onClick: Action) {
+private fun EmptyState(st: WStyle, onClick: Action) {
     Column(
         modifier = GlanceModifier.fillMaxSize().padding(12.dp).clickable(onClick),
         verticalAlignment = Alignment.CenterVertically,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Piyasa", style = TextStyle(color = WColors.text, fontSize = 13.sp, fontWeight = FontWeight.Bold))
-        Text("Göstergeleri seçmek için dokun", style = TextStyle(color = WColors.muted, fontSize = 10.sp))
+        Text("Piyasa", style = TextStyle(color = st.text, fontSize = st.sp(13f), fontWeight = FontWeight.Bold))
+        Text("Göstergeleri seçmek için dokun", style = TextStyle(color = st.muted, fontSize = st.sp(10f)))
     }
 }
 
 /** 1 satır yüksekliğinde: yan yana kutucuklar (kayan bant görünümü). */
 @Composable
-private fun Strip(items: List<DisplayItem>, widthDp: Float, onClick: Action) {
-    val count = (widthDp / 105f).toInt().coerceIn(1, items.size)
+private fun Strip(st: WStyle, items: List<DisplayItem>, widthDp: Float, onClick: Action) {
+    val count = (widthDp / (105f * st.scale)).toInt().coerceIn(1, items.size)
     Row(
         modifier = GlanceModifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -193,27 +262,29 @@ private fun Strip(items: List<DisplayItem>, widthDp: Float, onClick: Action) {
         items.take(count).forEachIndexed { i, item ->
             if (i > 0) {
                 Spacer(GlanceModifier.width(8.dp))
-                Box(GlanceModifier.width(1.dp).height(26.dp).background(WColors.divider)) {}
+                Box(GlanceModifier.width(1.dp).height(26.dp).background(st.divider)) {}
                 Spacer(GlanceModifier.width(8.dp))
             }
             Column(modifier = GlanceModifier.defaultWeight().clickable(rowAction(item, onClick))) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         item.title,
-                        style = TextStyle(color = WColors.muted, fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                        style = TextStyle(color = st.muted, fontSize = st.sp(10f), fontWeight = FontWeight.Medium),
                         maxLines = 1,
                         modifier = GlanceModifier.defaultWeight(),
                     )
-                    Spacer(GlanceModifier.width(4.dp))
-                    Text(
-                        item.changeText,
-                        style = TextStyle(color = WColors.forDirection(item.direction), fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                        maxLines = 1,
-                    )
+                    if (st.changeStyle != ChangeStyle.HIDDEN) {
+                        Spacer(GlanceModifier.width(4.dp))
+                        Text(
+                            item.changeText,
+                            style = TextStyle(color = st.forDirection(item.direction), fontSize = st.sp(10f), fontWeight = FontWeight.Bold),
+                            maxLines = 1,
+                        )
+                    }
                 }
                 Text(
                     item.valueText,
-                    style = TextStyle(color = WColors.text, fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                    style = TextStyle(color = st.text, fontSize = st.sp(15f), fontWeight = FontWeight.Bold),
                     maxLines = 1,
                 )
             }
@@ -223,52 +294,75 @@ private fun Strip(items: List<DisplayItem>, widthDp: Float, onClick: Action) {
 
 @Composable
 private fun ListLayout(
+    st: WStyle,
     state: AppState,
     cfg: WidgetConfig,
-    items: List<DisplayItem>,
+    lines: List<Line>,
+    twoColumns: Boolean,
     widthDp: Float,
     heightDp: Float,
     openApp: Action,
 ) {
-    val compact = widthDp < 200f
-    val twoColumns = widthDp >= 330f && items.size > 3
-    val showSpark = cfg.showSpark && !compact && !twoColumns
+    val compact = widthDp < 200f * st.scale
+    // Büyük yazıda yer kalmazsa mini grafik otomatik gizlenir (isimler kesilmesin).
+    val showSpark = cfg.showSpark && !compact && !twoColumns && widthDp >= 290f * st.scale
     val showSubtitle = cfg.showSubtitle && !compact
-    val rows: List<List<DisplayItem>> = if (twoColumns) items.chunked(2) else items.map { listOf(it) }
+    val items = lines.filterIsInstance<Line.Items>().flatMap { it.items }
 
     // Sığıyorsa düz Column (kaydırma yok, daha hızlı); sığmıyorsa kaydırılabilir liste.
-    val rowHeight = when {
-        compact -> 42f
-        showSubtitle -> 36f
-        else -> 29f
-    }
-    val capacity = ((heightDp - 8f - 4f - 26f) / rowHeight).toInt()
-    val fits = rows.size <= capacity && rows.size <= 10
+    val itemHeight = when {
+        compact -> 34f * st.scale + 2 * st.pad
+        showSubtitle -> 28f * st.scale + 2 * st.pad
+        else -> 17f * st.scale + 2 * st.pad + 1
+    }.let { it.coerceAtLeast(if (st.changeStyle == ChangeStyle.PILL) 19f * st.scale + 2 * st.pad else 0f) }
+    val headerHeight = 20f * st.scale
+    val topHeight = if (cfg.showHeader) 26f * st.scale.coerceAtLeast(1f) + 2f else 0f
+    val needed = lines.sumOf { (if (it is Line.Header) headerHeight else itemHeight).toDouble() }
+    val fits = needed <= heightDp - 12f - topHeight && lines.size <= 10
     // Değer sütunu sabit genişlikte ve sağa hizalı: grafikler ve rozetler alt alta hizalanır.
-    val charDp = if (twoColumns) 6.4f else 7.6f
-    val valueWidth = (items.maxOf { it.valueText.length } * charDp + 4f).coerceIn(40f, 110f)
+    val charDp = (if (twoColumns) 6.4f else 7.6f) * st.scale
+    val valueWidth = (items.maxOfOrNull { it.valueText.length } ?: 4) * charDp + 4f
 
     Column(modifier = GlanceModifier.fillMaxSize().padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)) {
-        Header(state, cfg.title, openApp)
-        Spacer(GlanceModifier.height(2.dp))
+        if (cfg.showHeader) {
+            Header(st, state, cfg, openApp)
+            Spacer(GlanceModifier.height(2.dp))
+        }
+        val body: @Composable (Int, Line) -> Unit = { index, line ->
+            when (line) {
+                is Line.Header -> SectionTitle(st, line.title, first = index == 0)
+                is Line.Items -> RowLine(
+                    st, line.items, last = index == lines.lastIndex || lines.getOrNull(index + 1) is Line.Header,
+                    twoColumns, showSpark, showSubtitle, compact, valueWidth, openApp,
+                )
+            }
+        }
         if (fits) {
             Column(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                rows.forEachIndexed { index, row ->
-                    RowLine(row, index == rows.lastIndex, twoColumns, showSpark, showSubtitle, compact, valueWidth, openApp)
-                }
+                lines.forEachIndexed { i, l -> body(i, l) }
             }
         } else {
             LazyColumn(modifier = GlanceModifier.fillMaxWidth().defaultWeight()) {
-                itemsIndexed(rows, itemId = { i, _ -> i.toLong() }) { index, row ->
-                    RowLine(row, index == rows.lastIndex, twoColumns, showSpark, showSubtitle, compact, valueWidth, openApp)
-                }
+                itemsIndexed(lines, itemId = { i, _ -> i.toLong() }) { i, l -> body(i, l) }
             }
         }
     }
 }
 
 @Composable
+private fun SectionTitle(st: WStyle, title: String, first: Boolean) {
+    Column(modifier = GlanceModifier.fillMaxWidth().padding(top = if (first) 0.dp else 6.dp, bottom = 1.dp, end = 4.dp)) {
+        Text(
+            title.uppercase(Locale.forLanguageTag("tr-TR")),
+            style = TextStyle(color = st.section, fontSize = st.sp(9.5f), fontWeight = FontWeight.Bold),
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
 private fun RowLine(
+    st: WStyle,
     row: List<DisplayItem>,
     last: Boolean,
     twoColumns: Boolean,
@@ -283,21 +377,14 @@ private fun RowLine(
             row.forEachIndexed { i, item ->
                 if (i > 0) {
                     Spacer(GlanceModifier.width(8.dp))
-                    Box(GlanceModifier.width(1.dp).height(22.dp).background(WColors.divider)) {}
+                    Box(GlanceModifier.width(1.dp).height((20f * st.scale).dp).background(st.divider)) {}
                     Spacer(GlanceModifier.width(8.dp))
                 }
                 val click = GlanceModifier.defaultWeight().clickable(rowAction(item, openApp))
                 if (compact && !twoColumns) {
-                    NarrowRow(item, click)
+                    NarrowRow(st, item, click)
                 } else {
-                    ItemRow(
-                        item = item,
-                        showSpark = showSpark,
-                        showSubtitle = showSubtitle,
-                        compact = twoColumns,
-                        valueWidth = valueWidth,
-                        modifier = click,
-                    )
+                    ItemRow(st, item, showSpark, showSubtitle, compact = twoColumns, valueWidth = valueWidth, modifier = click)
                 }
             }
             if (twoColumns && row.size == 1) {
@@ -306,31 +393,33 @@ private fun RowLine(
             }
         }
         if (!last) {
-            Box(GlanceModifier.fillMaxWidth().height(1.dp).background(WColors.divider)) {}
+            Box(GlanceModifier.fillMaxWidth().height(1.dp).background(st.divider)) {}
         }
     }
 }
 
 @Composable
-private fun Header(state: AppState, title: String, openApp: Action) {
+private fun Header(st: WStyle, state: AppState, cfg: WidgetConfig, openApp: Action) {
     val status = when {
         state.refreshing -> "Güncelleniyor…"
         state.lastRefresh == 0L -> "—"
         else -> SimpleDateFormat("HH:mm", Locale.forLanguageTag("tr-TR")).format(Date(state.lastRefresh))
     }
     val warn = state.lastError != null && !state.refreshing
-    Row(modifier = GlanceModifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier = GlanceModifier.fillMaxWidth().height((24f * st.scale.coerceAtLeast(1f)).dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
-            title.uppercase(Locale.forLanguageTag("tr-TR")),
-            style = TextStyle(color = WColors.muted, fontSize = 10.sp, fontWeight = FontWeight.Bold),
+            cfg.title.uppercase(Locale.forLanguageTag("tr-TR")),
+            style = TextStyle(color = st.muted, fontSize = st.sp(10f), fontWeight = FontWeight.Bold),
             maxLines = 1,
             modifier = GlanceModifier.defaultWeight().clickable(openApp),
         )
-        Text(
-            if (warn) "! $status" else status,
-            style = TextStyle(color = if (warn) WColors.down else WColors.muted, fontSize = 10.sp),
-            maxLines = 1,
-        )
+        if (cfg.showTime) {
+            Text(
+                if (warn) "! $status" else status,
+                style = TextStyle(color = if (warn) st.down else st.muted, fontSize = st.sp(10f)),
+                maxLines = 1,
+            )
+        }
         Box(
             modifier = GlanceModifier.size(26.dp, 24.dp).clickable(actionRunCallback<RefreshAction>()),
             contentAlignment = Alignment.Center,
@@ -338,8 +427,8 @@ private fun Header(state: AppState, title: String, openApp: Action) {
             Image(
                 provider = ImageProvider(R.drawable.ic_refresh),
                 contentDescription = "Yenile",
-                modifier = GlanceModifier.size(14.dp),
-                colorFilter = ColorFilter.tint(WColors.muted),
+                modifier = GlanceModifier.size((14f * st.scale).dp),
+                colorFilter = ColorFilter.tint(st.muted),
             )
         }
     }
@@ -347,25 +436,27 @@ private fun Header(state: AppState, title: String, openApp: Action) {
 
 /** Dar widget (2 hücre): ad + değişim üstte, değer altta. */
 @Composable
-private fun NarrowRow(item: DisplayItem, modifier: GlanceModifier) {
-    Column(modifier = modifier.padding(vertical = 3.dp)) {
+private fun NarrowRow(st: WStyle, item: DisplayItem, modifier: GlanceModifier) {
+    Column(modifier = modifier.padding(vertical = (st.pad - 2).coerceAtLeast(1).dp)) {
         Row(modifier = GlanceModifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 item.title,
-                style = TextStyle(color = WColors.muted, fontSize = 10.sp, fontWeight = FontWeight.Medium),
+                style = TextStyle(color = st.muted, fontSize = st.sp(10f), fontWeight = FontWeight.Medium),
                 maxLines = 1,
                 modifier = GlanceModifier.defaultWeight(),
             )
-            Spacer(GlanceModifier.width(4.dp))
-            Text(
-                item.changeText,
-                style = TextStyle(color = WColors.forDirection(item.direction), fontSize = 10.sp, fontWeight = FontWeight.Bold),
-                maxLines = 1,
-            )
+            if (st.changeStyle != ChangeStyle.HIDDEN) {
+                Spacer(GlanceModifier.width(4.dp))
+                Text(
+                    item.changeText,
+                    style = TextStyle(color = st.forDirection(item.direction), fontSize = st.sp(10f), fontWeight = FontWeight.Bold),
+                    maxLines = 1,
+                )
+            }
         }
         Text(
             item.valueText,
-            style = TextStyle(color = WColors.text, fontSize = 14.sp, fontWeight = FontWeight.Bold),
+            style = TextStyle(color = st.text, fontSize = st.sp(14f), fontWeight = FontWeight.Bold),
             maxLines = 1,
         )
     }
@@ -373,6 +464,7 @@ private fun NarrowRow(item: DisplayItem, modifier: GlanceModifier) {
 
 @Composable
 private fun ItemRow(
+    st: WStyle,
     item: DisplayItem,
     showSpark: Boolean,
     showSubtitle: Boolean,
@@ -382,62 +474,77 @@ private fun ItemRow(
 ) {
     val context = LocalContext.current
     Row(
-        modifier = modifier.padding(vertical = if (showSubtitle) 4.dp else 5.dp),
+        modifier = modifier.padding(vertical = (if (showSubtitle) st.pad - 1 else st.pad).coerceAtLeast(1).dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = GlanceModifier.defaultWeight()) {
             Text(
                 item.title,
-                style = TextStyle(color = WColors.text, fontSize = if (compact) 11.sp else 12.sp, fontWeight = FontWeight.Medium),
+                style = TextStyle(color = st.text, fontSize = st.sp(if (compact) 11f else 12f), fontWeight = FontWeight.Medium),
                 maxLines = 1,
             )
             if (showSubtitle) {
                 Text(
                     item.error ?: item.subtitle,
-                    style = TextStyle(color = WColors.muted, fontSize = 9.sp),
+                    style = TextStyle(color = st.muted, fontSize = st.sp(9f)),
                     maxLines = 1,
                 )
             }
         }
         if (showSpark) {
             // Grafiği olmayan satırlarda (formüller) da yer ayrılır ki sütunlar kaymasın.
-            val bmp = if (item.spark.size >= 2) Sparkline.render(context, item.spark, 40, 16, item.direction) else null
+            val sw = (40f * st.scale).toInt()
+            val sh = (16f * st.scale).toInt()
+            val bmp = if (item.spark.size >= 2) Sparkline.render(context, item.spark, sw, sh, st.sparkColor(context, item.direction)) else null
             if (bmp != null) {
-                Image(provider = ImageProvider(bmp), contentDescription = null, modifier = GlanceModifier.size(40.dp, 16.dp))
+                Image(provider = ImageProvider(bmp), contentDescription = null, modifier = GlanceModifier.size(sw.dp, sh.dp))
             } else {
-                Spacer(GlanceModifier.size(40.dp, 16.dp))
+                Spacer(GlanceModifier.size(sw.dp, sh.dp))
             }
             Spacer(GlanceModifier.width(4.dp))
         }
         Text(
             item.valueText,
             style = TextStyle(
-                color = WColors.text,
-                fontSize = if (compact) 12.sp else 13.sp,
+                color = st.text,
+                fontSize = st.sp(if (compact) 12f else 13f),
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.End,
             ),
             maxLines = 1,
             modifier = GlanceModifier.width(valueWidth.dp),
         )
-        Spacer(GlanceModifier.width(6.dp))
-        Box(
-            modifier = GlanceModifier
-                .width(if (compact) 48.dp else 56.dp)
-                .background(ImageProvider(pillFor(item.direction)))
-                .padding(vertical = 2.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                item.changeText,
-                style = TextStyle(
-                    color = WColors.forDirection(item.direction),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                ),
-                maxLines = 1,
-            )
+        when (st.changeStyle) {
+            ChangeStyle.PILL -> {
+                Spacer(GlanceModifier.width(6.dp))
+                Box(
+                    modifier = GlanceModifier
+                        .width(((if (compact) 48f else 56f) * st.scale).dp)
+                        .background(ImageProvider(R.drawable.pill_mask), colorFilter = ColorFilter.tint(st.pillFor(item.direction)))
+                        .padding(vertical = 2.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        item.changeText,
+                        style = TextStyle(
+                            color = st.forDirection(item.direction),
+                            fontSize = st.sp(10f),
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                        ),
+                        maxLines = 1,
+                    )
+                }
+            }
+            ChangeStyle.TEXT -> {
+                Text(
+                    item.changeText,
+                    style = TextStyle(color = st.forDirection(item.direction), fontSize = st.sp(10.5f), fontWeight = FontWeight.Bold, textAlign = TextAlign.End),
+                    maxLines = 1,
+                    modifier = GlanceModifier.width(((if (compact) 48f else 54f) * st.scale).dp),
+                )
+            }
+            ChangeStyle.HIDDEN -> Unit
         }
     }
 }
@@ -445,14 +552,11 @@ private fun ItemRow(
 // ------------------------------------------------------------------ mini grafik
 
 object Sparkline {
-    fun render(context: Context, values: List<Double>, widthDp: Int, heightDp: Int, direction: Int): Bitmap? {
+    fun render(context: Context, values: List<Double>, widthDp: Int, heightDp: Int, color: Int): Bitmap? {
         if (values.size < 2) return null
         val density = context.resources.displayMetrics.density
         val w = (widthDp * density).toInt().coerceAtLeast(2)
         val h = (heightDp * density).toInt().coerceAtLeast(2)
-        val color = context.getColor(
-            when (direction) { 1 -> R.color.widget_up; -1 -> R.color.widget_down; else -> R.color.widget_muted },
-        )
         val min = values.min()
         val max = values.max()
         val range = (max - min).takeIf { it > 0 } ?: 1.0
