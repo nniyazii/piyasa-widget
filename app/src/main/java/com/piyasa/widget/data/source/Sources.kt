@@ -150,7 +150,7 @@ object YahooSource {
         var last: IOException? = null
         for (host in hosts) {
             try {
-                return parseHistory(Http.get("https://$host/v8/finance/chart/$enc?range=5y&interval=1mo"))
+                return parseHistory(Http.get("https://$host/v8/finance/chart/$enc?range=6y&interval=1mo"))
             } catch (e: IOException) {
                 last = e
             }

@@ -2,19 +2,23 @@ package com.piyasa.widget.model
 
 /** Kayıtlı durumu güncel şemaya taşır. */
 object Migrations {
-    const val CURRENT = 4
+    const val CURRENT = 5
 
     fun apply(state: AppState): AppState {
         var s = state
         if (state.schema < 2) s = toTradingView(s)
         if (state.schema < 3) s = refreshCatalogDefinitions(s)
         if (state.schema < 4) s = addDefaultScreens(s)
+        if (state.schema < 5) s = addDefaultScreens(s, ScreenTemplates.addedInV5)
         return if (s.schema == CURRENT) s else s.copy(schema = CURRENT)
     }
 
-    /** v3 -> v4: Hazır dinamik listeler eklenir (kullanıcının kendi listeleri korunur, önce gelir). */
-    private fun addDefaultScreens(s: AppState): AppState {
-        val missing = ScreenTemplates.defaults.filter { d -> s.screens.none { it.id == d.id } }
+    /**
+     * v3 -> v4: Hazır dinamik listeler eklenir (kullanıcının kendi listeleri korunur, önce gelir).
+     * v4 -> v5: Yalnızca yeni gelen temel analiz listeleri eklenir (silinmiş eski hazırlar geri gelmez).
+     */
+    private fun addDefaultScreens(s: AppState, only: Set<String>? = null): AppState {
+        val missing = ScreenTemplates.defaults.filter { d -> (only == null || d.id in only) && s.screens.none { it.id == d.id } }
         return if (missing.isEmpty()) s else s.copy(screens = s.screens + missing)
     }
 

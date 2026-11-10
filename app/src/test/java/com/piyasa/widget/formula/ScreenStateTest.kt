@@ -50,6 +50,16 @@ class ScreenStateTest {
         assertTrue(Migrations.apply(deleted).screens.none { it.id == "d_bist_movers" })
     }
 
+    @Test fun upgradeFromV4AddsOnlyNewFundamentalScreens() {
+        // v4 kullanıcısı bir eski hazır listeyi silmiş: geri gelmez, 0.7.0 listeleri eklenir
+        val v4 = AppState(schema = 4, screens = ScreenTemplates.defaults.filterNot { it.id == "d_bist_movers" || it.id in ScreenTemplates.addedInV5 })
+        val s = Migrations.apply(v4)
+        assertTrue(s.screens.none { it.id == "d_bist_movers" })
+        assertTrue(ScreenTemplates.addedInV5.all { id -> s.screens.any { it.id == id } })
+        assertEquals(s.screens.size, s.screens.map { it.id }.toSet().size)
+        assertEquals(Migrations.CURRENT, s.schema)
+    }
+
     @Test fun widgetEntriesAreNotItems() {
         val cfg = state.widgetConfig(3)
         assertEquals(listOf("GRAM_ALTIN"), cfg.itemKeys)

@@ -19,14 +19,18 @@ object ScreenEngine {
         val currency: String?,
         val pricescale: Double?,
         val values: Map<Field, Double?>,
+        /** Yıllık seyreltilmiş EPS, en yeni önce (5 yıllık ortalama F/K için). */
+        val epsFy: List<Double?> = emptyList(),
+        /** Son mali yıl sonu (epoch saniye). */
+        val fyEnd: Long? = null,
     ) {
         val close: Double? get() = values[Field.PRICE]
         val change: Double? get() = values[Field.CHANGE]
         val marketCap: Double? get() = values[Field.MCAP]
     }
 
-    /** 5 yıllık en düşük / en yüksek (istenen para biriminde). */
-    data class HistoryStats(val low: Double?, val high: Double?)
+    /** 5 yıllık en düşük / en yüksek (istenen para biriminde) ve 5 yıllık ortalama F/K. */
+    data class HistoryStats(val low: Double?, val high: Double?, val peAvg: Double? = null)
 
     /** Aylık çubuk (zaman: epoch saniye). */
     data class Bar(val time: Long, val low: Double?, val high: Double?, val close: Double?)
@@ -35,17 +39,52 @@ object ScreenEngine {
      * Aylık çubuklardan 5 yıllık en düşük/en yüksek. [fx] verilirse her ay o ayın kur kapanışına
      * bölünerek USD'ye çevrilir (ör. THYAO ₺ / USDTRY → THYAO $). Kur bulunamayan ay atlanır.
      */
-    fun historyStats(bars: List<Bar>, fx: List<Bar>? = null): HistoryStats {
+    fun historyStats(bars: List<Bar>, fx: List<Bar>? = null, since: Long? = null): HistoryStats {
         if (bars.isEmpty()) return HistoryStats(null, null)
         val fxByMonth: Map<YearMonth, Double>? = fx?.mapNotNull { b -> b.close?.takeIf { it > 0 }?.let { month(b.time) to it } }?.toMap()
         var low: Double? = null
         var high: Double? = null
         for (b in bars) {
+            if (since != null && b.time < since) continue
             val div = if (fxByMonth == null) 1.0 else (fxByMonth[month(b.time)] ?: continue)
             b.low?.takeIf { it > 0 }?.let { v -> val x = v / div; if (low == null || x < low!!) low = x }
             b.high?.takeIf { it > 0 }?.let { v -> val x = v / div; if (high == null || x > high!!) high = x }
         }
         return HistoryStats(low, high)
+    }
+
+    /**
+     * 5 yıllık ortalama F/K: her mali yıl için (yıl sonu ayının kapanış fiyatı ÷ o yılın EPS'i).
+     * Zararlı (EPS ≤ 0), kârı sıfıra yakın olduğu için F/K'sı anlamsız (> [maxPe]) ya da fiyatı
+     * bulunamayan yıllar atlanır (tek bir yıl ortalamayı şişirmesin); en az [minYears] yıl gerekir.
+     * F/K birimsizdir: fiyat ve EPS aynı (yerel) para biriminde olmalı, kur çevrimi yapılmaz.
+     */
+    fun peAverage(bars: List<Bar>, epsFy: List<Double?>, fyEnd: Long?, years: Int = 5, minYears: Int = 3, maxPe: Double = 100.0): Double? {
+        if (fyEnd == null || epsFy.isEmpty()) return null
+        val closeByMonth = bars.mapNotNull { b -> b.close?.takeIf { it > 0 }?.let { month(b.time) to it } }.toMap()
+        val end = month(fyEnd)
+        val pes = (0 until years).mapNotNull { k ->
+            val eps = epsFy.getOrNull(k)?.takeIf { it > 0 } ?: return@mapNotNull null
+            val price = closeByMonth[end.minusYears(k.toLong())] ?: return@mapNotNull null
+            (price / eps).takeIf { it <= maxPe }
+        }
+        return if (pes.size >= minYears) pes.average() else null
+    }
+
+    /**
+     * TradingView'un yıllık dizilerinden türetilen alanlar (diziler en yeni önce).
+     * Büyüme oranları yalnızca taban yıl kârlı/pozitifse anlamlıdır; değilse alan boş kalır.
+     */
+    fun derived(close: Double?, epsFy: List<Double?>, revenueFy: List<Double?>, epsForecast: Double?): Map<Field, Double?> {
+        fun growth(now: Double?, base: Double?) = if (now != null && base != null && base > 0) (now / base - 1) * 100 else null
+        val e0 = epsFy.getOrNull(0)
+        val e5 = epsFy.getOrNull(5)
+        return mapOf(
+            Field.EPS_GROWTH_1Y to growth(e0, epsFy.getOrNull(1)),
+            Field.EPS_CAGR_5Y to if (e0 != null && e5 != null && e0 > 0 && e5 > 0) (Math.pow(e0 / e5, 1.0 / 5) - 1) * 100 else null,
+            Field.REV_GROWTH_1Y to growth(revenueFy.getOrNull(0), revenueFy.getOrNull(1)),
+            Field.FWD_PE to if (close != null && epsForecast != null && epsForecast > 0) close / epsForecast else null,
+        )
     }
 
     private fun month(epochSeconds: Long): YearMonth =
@@ -62,9 +101,10 @@ object ScreenEngine {
         val raw = when (field) {
             Field.LOW_5Y -> history[row.symbol]?.low
             Field.HIGH_5Y -> history[row.symbol]?.high
+            Field.PE_5Y_AVG -> history[row.symbol]?.peAvg
             else -> row.values[field]
         } ?: return null
-        // Geçmiş alanları zaten istenen para biriminde hesaplanır
+        // Geçmiş alanları zaten istenen para biriminde hesaplanır (ortalama F/K birimsiz)
         if (field.needsHistory) return raw
         if (screen.currency == ScreenCurrency.USD && field.kind == FieldKind.PRICE && row.currency == "TRY") {
             return if (usdTry != null && usdTry > 0) raw / usdTry else null
@@ -127,6 +167,12 @@ object ScreenEngine {
                 // Referans alana en yakın önce (dibe/ortalamaya/zirveye en yakın)
                 first.right != null -> matched.sortedBy { it.second?.let { s -> abs(s - 1.0) } ?: Double.MAX_VALUE }
                 // Sayıyla karşılaştırmada en uç değer önce (RSI < 30 → en düşük RSI)
+                first.op == Op.GT || first.op == Op.GTE -> matched.sortedByDescending { it.second ?: -Double.MAX_VALUE }
+                else -> matched.sortedBy { it.second ?: Double.MAX_VALUE }
+            }
+            // En uç önce: "<" koşulunda en küçük oran/değer (F/K ortalamasının en çok altında olan), ">" koşulunda en büyük
+            ScreenSort.EXTREME -> when {
+                first == null -> matched
                 first.op == Op.GT || first.op == Op.GTE -> matched.sortedByDescending { it.second ?: -Double.MAX_VALUE }
                 else -> matched.sortedBy { it.second ?: Double.MAX_VALUE }
             }

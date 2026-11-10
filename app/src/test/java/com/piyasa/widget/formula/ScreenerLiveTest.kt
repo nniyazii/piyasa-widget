@@ -36,10 +36,31 @@ class ScreenerLiveTest {
             val r = ScreenerSource.run(s, state)
             print(s.name, r)
             assertNull("${s.name}: ${r.error}", r.error)
-            if (r.rows.isEmpty()) empty += s.name
+            // "Listem" taramaları kullanıcının listesine bağlı; varsayılan listede boş çıkabilir
+            if (r.rows.isEmpty() && s.universe != Universe.MY_LIST) empty += s.name
         }
         println("Boş çıkanlar: $empty")
         assertTrue("En fazla bir varsayılan liste boş olabilir: $empty", empty.size <= 1)
+    }
+
+    /** 5 yıllık ortalama F/K: bilinen hisselerde makul değerler ve kullanıcının listesi örneği. */
+    @Test fun fiveYearAveragePe() = runBlocking {
+        assumeTrue(live)
+        val symbols = listOf("BIST:THYAO", "BIST:ASELS", "BIST:FROTO", "BIST:BIMAS", "BIST:TUPRS", "NASDAQ:AAPL", "NASDAQ:MSFT", "NYSE:UNH", "NASDAQ:NVDA", "NASDAQ:PYPL", "NYSE:NKE")
+        val extra = symbols.map { com.piyasa.widget.model.Instrument(key = it, name = it.substringAfter(':'), symbol = it, source = com.piyasa.widget.model.Source.TRADINGVIEW, category = Category.TR) }
+        val state = AppState().let { it.copy(instruments = it.instruments + extra) }
+        // Herkesi gösteren bir tarama: F/K > 0 ve F/K ≤ ortalama × 100 (her zaman doğru), sıralama en ucuz önce
+        val probe = Screen("p", "probe", Universe.MY_LIST, conditions = listOf(Condition(Field.PE, Op.LTE, Field.PE_5Y_AVG, 10000.0), Condition(Field.PE, Op.GT, null, 0.0)), sort = com.piyasa.widget.model.ScreenSort.EXTREME, onlyStocks = true)
+        val r = ScreenerSource.run(probe, state)
+        print("F/K ÷ 5Y ort. F/K", r)
+        r.rows.forEach { println("   ${it.symbol.padEnd(14)} F/K / ortalama = ${"%.2f".format(it.score)}") }
+        assertNull(r.error)
+        assertTrue("çoğu hissede ortalama F/K hesaplanmalı: ${r.rows.size}", r.rows.size >= 7)
+        r.rows.forEach { assertTrue("${it.symbol} oran makul: ${it.score}", it.score!! in 0.05..20.0) }
+        val half = ScreenerSource.run(ScreenTemplates.all.first { it.id == "d_my_pe_half" }, state)
+        print("listem · F/K ≤ 5Y ort. −%50", half)
+        assertNull(half.error)
+        half.rows.forEach { assertTrue(it.score!! <= 0.5) }
     }
 
     @Test fun myUsStocksNearOrBelowSma200() = runBlocking {

@@ -71,6 +71,7 @@ import com.piyasa.widget.model.Catalog
 import com.piyasa.widget.model.Category
 import com.piyasa.widget.model.Condition
 import com.piyasa.widget.model.Field
+import com.piyasa.widget.model.FieldSource
 import com.piyasa.widget.model.Fmt
 import com.piyasa.widget.model.Instrument
 import com.piyasa.widget.model.Op
@@ -312,17 +313,28 @@ private fun FieldPicker(field: Field, modifier: Modifier = Modifier, onPick: (Fi
             }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            Field.entries.forEach { f ->
-                DropdownMenuItem(
-                    text = {
-                        Column {
-                            Text(f.label)
-                            if (f.needsHistory) Text("Geçmiş veriden (Yahoo)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    },
-                    onClick = { open = false; onPick(f) },
-                    trailingIcon = { if (f == field) Icon(Icons.Default.Check, null) },
+            Field.entries.groupBy { it.group }.forEach { (group, fields) ->
+                Text(
+                    group.uppercase(), Modifier.padding(start = 16.dp, top = 10.dp, bottom = 4.dp),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold,
                 )
+                fields.forEach { f ->
+                    val hint = when (f.source) {
+                        FieldSource.HISTORY -> "Geçmiş fiyatlardan (Yahoo)"
+                        FieldSource.DERIVED -> "Yıllık bilançodan hesaplanır"
+                        FieldSource.DIRECT -> null
+                    }
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(f.label)
+                                if (hint != null) Text(hint, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        },
+                        onClick = { open = false; onPick(f) },
+                        trailingIcon = { if (f == field) Icon(Icons.Default.Check, null) },
+                    )
+                }
             }
         }
     }

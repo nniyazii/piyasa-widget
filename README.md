@@ -91,7 +91,7 @@ Formüller başka formülleri kullanabilir (`CEYREK = GRAM_ALTIN * 1.6067`). Dö
 
 Kendiliğinden güncellenen listeler: koşulları bir kez kurarsın, her yenilemede yeniden taranır. **+ → Dinamik liste oluştur** ile açılır; listede uzun basıp *Düzenle* ile değiştirilir. Widget düzenleyicisinde *Ekle → Dinamik listeler* ile widget'a da konur; widget'ta başlık ve ilk 3–10 sonuç görünür.
 
-Uygulamaya **7 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; silersen geri gelmez, *Varsayılan listeye dön* geri getirir). Hepsi yeni liste için şablon olarak da kullanılabilir.
+Uygulamaya **15 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; silersen geri gelmez, *Varsayılan listeye dön* geri getirir). Hepsi yeni liste için şablon olarak da kullanılabilir.
 
 | Hazır liste | Kurulum | 10 Kas 2026'da |
 |---|---|---|
@@ -102,21 +102,32 @@ Uygulamaya **7 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; siler
 | Trendde ve ucuz (BIST) | `0 < F/K < 10` · `Fiyat > 200 günlük ort.` · `50 günlük ort. > 200 günlük ort.` · `Piyasa değeri > 10 mlr` | Tüpraş, Halkbank, Alarko … (6) |
 | Zirveye yakın BIST hisseleri | `Fiyat ≥ 52 hafta en yüksek −%5` · `Piyasa değeri > 20 mlr` | 3 hisse |
 | Düşüşteki ABD devleri | ABD · `Fiyat ≤ 52 hafta en düşük +%15` · `Piyasa değeri > 100 mlr $` | Netflix, Nvidia, Boeing, Alphabet … (19) |
+| **F/K'sı 5 yıllık ortalamasının yarısına inenler (listem)** | Listem · yalnızca hisseler · `F/K ≤ 5 yıllık ortalama F/K −%50` · `F/K > 0` · en uç önce | listene eklediğin hisselerden (ör. PayPal, Nvidia, Tüpraş) |
+| Tarihine göre ucuzlamış BIST devleri | `F/K ≤ 5 yıllık ort. F/K −%40` · `F/K > 0` · `Piyasa değeri > 50 mlr` | Coca-Cola İçecek, Aygaz, Tüpraş, Sabancı … (9) |
+| Tarihine göre ucuzlamış ABD devleri | ABD · `F/K ≤ 5 yıllık ort. F/K −%25` · `F/K > 0` · `Piyasa değeri > 100 mlr $` | Nvidia, Netflix, Amazon, Oracle … (8) |
+| Kârı artması beklenen ucuz BIST | `Beklenen F/K ≤ F/K −%30` · `0 < F/K < 15` · `Beklenen F/K > 0` · `Piyasa değeri > 20 mlr` | Doğuş Otomotiv, Ülker, Torunlar, Türk Telekom … (8) |
+| Defter değerinin altında, kârlı BIST | `0 < PD/DD < 1` · `Özsermaye kârlılığı > %10` · `Piyasa değeri > 10 mlr` | Halk GYO, Rönesans GYO, THY … (18) |
+| Yüksek temettü verimli BIST | `Temettü verimi ≥ %6` · `Piyasa değeri > 20 mlr` | Doğuş Otomotiv, Nuh Çimento, Ford Otosan … (12) |
+| Kaliteli ve makul fiyatlı ABD devleri | ABD · `ÖK kârlılığı > %20` · `Net marj > %15` · `Borç/Özsermaye < 1` · `0 < F/K < 25` · `Piyasa değeri > 100 mlr $` | Nvidia, Alphabet, Amazon, Meta … (13) |
+| Büyüyen ama geri çekilen ABD devleri | ABD · `Fiyat < 200 günlük ort.` · `EPS büyümesi (5 yıl, yıllık) > %15` · `Piyasa değeri > 50 mlr $` | American Express, Blackstone, Tesla … (20) |
 
-İlk ikisi kullanıcının istediği örnekler. Diğerlerinde piyasa değeri eşiği küçük ve sığ hisseleri eler (BIST ₺, ABD $; düzenleyicide milyar cinsinden girilir). Listedeki *yalnızca hisseler* açılırsa endeksler hariç tutulur.
+İlk ikisi ve *F/K'sı 5 yıllık ortalamasının yarısına inenler* kullanıcının istediği örnekler; eski kurulumlara 0.7.0 ile yalnızca yeni temel analiz listeleri eklenir. Diğerlerinde piyasa değeri eşiği küçük ve sığ hisseleri eler (BIST ₺, ABD $; düzenleyicide milyar cinsinden girilir). Listedeki *yalnızca hisseler* açılırsa endeksler hariç tutulur.
 
 - **Nerede:** Listem (istersen tek kategori, istersen yalnızca hisseler), tüm BIST hisseleri, ABD hisseleri (piyasa değeri 2 milyar $ üstü).
 - **Koşul:** `[alan] [< ≤ > ≥] [sayı]` ya da `[alan] [< ≤ > ≥] [başka alan ± %]`. Birden çok koşul *tümü* ya da *herhangi biri* olarak birleşir.
 - **Alanlar:** fiyat, günlük değişim, 20/50/100/200 günlük ortalama, 200 günlük üssel ortalama, 52 hafta en düşük/yüksek, **5 yıl en düşük/yüksek**, tüm zamanların en düşük/yükseği, RSI (14), 1 ay / 3 ay / yılbaşından beri / 1 yıl / 5 yıl getiri, piyasa değeri, F/K.
+  - **Değerleme:** **5 yıllık ortalama F/K**, beklenen F/K (gelecek yıl kâr tahminiyle), PEG, PD/DD, Fiyat/Satış, FD/FAVÖK, temettü verimi.
+  - **Kârlılık ve büyüme:** özsermaye kârlılığı, net kâr marjı, borç/özsermaye, EPS büyümesi (1 yıl ve 5 yıllık yıllık ortalama), gelir büyümesi (1 yıl).
+- **5 yıllık ortalama F/K:** son 5 mali yılın her biri için *yıl sonu kapanış fiyatı ÷ o yılın EPS'i* (Eylül'de biten mali yılda Eylül kapanışı). Zararlı yıllar ve kârın sıfıra yakın olduğu için F/K'sı 100'ü aşan yıllar ortalamayı bozmasın diye atlanır; en az 3 geçerli yıl gerekir. Not: BIST'te yüksek enflasyon nominal kârı büyüttüğü için bugünkü F/K tarihsel ortalamanın altında kalmaya yatkındır; eşik bu yüzden BIST'te daha sıkıdır.
 - **USD cinsinden:** TL fiyatlar Dolar/TL'ye bölünür. 5 yıllık dip ve zirve, her ay o ayın kuruyla USD'ye çevrilmiş aylık geçmişten hesaplanır; böylece "dolar bazında dip" gerçekten dolar bazındadır. Ortalamalar ve 52 hafta değerleri bugünkü kurla çevrilir (oranları değişmez).
-- **Sıralama:** koşula en yakın (dibe, ortalamaya ya da zirveye en yakın önce; RSI gibi sayılarda en uç önce), en çok yükselen/düşen, piyasa değeri, ad. En fazla 10–50 sonuç.
+- **Sıralama:** koşula en yakın (dibe, ortalamaya ya da zirveye en yakın önce; RSI gibi sayılarda en uç önce), **en uç değer** (ör. F/K'sı ortalamasının en çok altında olan önce), en çok yükselen/düşen, piyasa değeri, ad. En fazla 10–50 sonuç.
 - Düzenlerken **canlı önizleme** gösterilir. Sonuç ekranında her satırda koşula uzaklık yazar ("5 yıl en düşük: %4,2 üstünde"); dokununca TradingView açılır, + ile listene eklenir.
 
 ![dinamik listeler](docs/dinamik-listeler.png)
 
 ![widget'ta dinamik liste](docs/widget-dinamik-liste.png)
 
-**Nasıl çalışır:** Tarama TradingView'un tarayıcı servisiyle yapılır: evren ve sayısal koşullar mümkün olduğunda sunucuda ön elenir, kalanlar uygulamada değerlendirilir. TradingView 5 yıllık dip/zirve vermediği için bu alanlar Yahoo Finance aylık geçmişinden, yalnızca ön elemeden geçen ilk 60 aday için hesaplanır ve gün boyunca önbellekte tutulur.
+**Nasıl çalışır:** Tarama TradingView'un tarayıcı servisiyle yapılır: evren ve sayısal koşullar mümkün olduğunda sunucuda ön elenir, kalanlar uygulamada değerlendirilir. TradingView 5 yıllık dip/zirve ve geçmiş F/K vermediği için bu alanlar Yahoo Finance aylık geçmişinden, yalnızca ön elemeden geçen ilk 60 aday için hesaplanır ve gün boyunca önbellekte tutulur. EPS ve gelir büyümesi, beklenen F/K TradingView'un yıllık bilanço dizilerinden uygulamada hesaplanır. Listemdeki BIST hisseleri TradingView'un Türkiye ucundan sorgulanır (genel uç piyasa değerini ve tahminleri USD'ye çeviriyor); böylece "Piyasa değeri > 50 mlr" her yerde ₺ demektir.
 
 ## Varsayılan liste
 

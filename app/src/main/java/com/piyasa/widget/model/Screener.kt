@@ -25,12 +25,25 @@ enum class ScreenCurrency(val label: String) { LOCAL("Yerel"), USD("USD") }
 /** Alan türü: fiyat cinsinden mi (para birimine çevrilir), yüzde mi, sayı mı. */
 enum class FieldKind { PRICE, PERCENT, NUMBER, MONEY }
 
+/** Alanın verisi nereden gelir. */
+enum class FieldSource {
+    /** TradingView sütunu, doğrudan. */
+    DIRECT,
+    /** TradingView'un yıllık dizilerinden uygulamada hesaplanır (EPS/gelir büyümesi, beklenen F/K). */
+    DERIVED,
+    /** Yahoo aylık fiyat geçmişi gerekir (5 yıl dip/zirve, 5 yıllık ortalama F/K). */
+    HISTORY,
+}
+
 @Serializable
 enum class Field(
     val label: String,
     val kind: FieldKind,
-    /** TradingView tarayıcı sütunu; null ise uygulamada hesaplanır (geçmiş veriden). */
+    /** TradingView tarayıcı sütunu (yalnızca [FieldSource.DIRECT]). */
     val column: String?,
+    val source: FieldSource = if (column != null) FieldSource.DIRECT else FieldSource.HISTORY,
+    /** Seçicide gruplama. */
+    val group: String = "Fiyat",
 ) {
     PRICE("Fiyat", FieldKind.PRICE, "close"),
     CHANGE("Günlük değişim %", FieldKind.PERCENT, "change"),
@@ -51,11 +64,30 @@ enum class Field(
     PERF_YTD("Yılbaşından beri %", FieldKind.PERCENT, "Perf.YTD"),
     PERF_1Y("1 yıl getiri %", FieldKind.PERCENT, "Perf.Y"),
     PERF_5Y("5 yıl getiri %", FieldKind.PERCENT, "Perf.5Y"),
-    MCAP("Piyasa değeri", FieldKind.MONEY, "market_cap_basic"),
-    PE("F/K", FieldKind.NUMBER, "price_earnings_ttm"),
+    MCAP("Piyasa değeri", FieldKind.MONEY, "market_cap_basic", group = "Değerleme"),
+
+    // --- Değerleme
+    PE("F/K", FieldKind.NUMBER, "price_earnings_ttm", group = "Değerleme"),
+    /** Son 5 mali yılın (yıl sonu fiyatı ÷ o yılın EPS'i) ortalaması; zararlı yıllar hariç, en az 3 yıl. */
+    PE_5Y_AVG("5 yıllık ortalama F/K", FieldKind.NUMBER, null, FieldSource.HISTORY, "Değerleme"),
+    /** Fiyat ÷ gelecek mali yıl EPS tahmini. */
+    FWD_PE("Beklenen F/K", FieldKind.NUMBER, null, FieldSource.DERIVED, "Değerleme"),
+    PEG("PEG", FieldKind.NUMBER, "price_earnings_growth_ttm", group = "Değerleme"),
+    PB("PD/DD", FieldKind.NUMBER, "price_book_fq", group = "Değerleme"),
+    PS("Fiyat/Satış", FieldKind.NUMBER, "price_sales_current", group = "Değerleme"),
+    EV_EBITDA("FD/FAVÖK", FieldKind.NUMBER, "enterprise_value_ebitda_ttm", group = "Değerleme"),
+    DIV_YIELD("Temettü verimi %", FieldKind.PERCENT, "dividends_yield_current", group = "Değerleme"),
+
+    // --- Kârlılık ve büyüme
+    ROE("Özsermaye kârlılığı %", FieldKind.PERCENT, "return_on_equity_fq", group = "Kârlılık"),
+    NET_MARGIN("Net kâr marjı %", FieldKind.PERCENT, "net_margin_ttm", group = "Kârlılık"),
+    DEBT_EQ("Borç/Özsermaye", FieldKind.NUMBER, "debt_to_equity_fq", group = "Kârlılık"),
+    EPS_GROWTH_1Y("EPS büyümesi (1 yıl) %", FieldKind.PERCENT, null, FieldSource.DERIVED, "Kârlılık"),
+    EPS_CAGR_5Y("EPS büyümesi (5 yıl, yıllık) %", FieldKind.PERCENT, null, FieldSource.DERIVED, "Kârlılık"),
+    REV_GROWTH_1Y("Gelir büyümesi (1 yıl) %", FieldKind.PERCENT, null, FieldSource.DERIVED, "Kârlılık"),
     ;
 
-    val needsHistory: Boolean get() = column == null
+    val needsHistory: Boolean get() = source == FieldSource.HISTORY
 }
 
 @Serializable
@@ -82,6 +114,7 @@ data class Condition(
 @Serializable
 enum class ScreenSort(val label: String) {
     CLOSEST("Koşula en yakın"),
+    EXTREME("En uç değer"),
     CHANGE_DESC("En çok yükselen"),
     CHANGE_ASC("En çok düşen"),
     MCAP_DESC("Piyasa değeri"),
@@ -188,8 +221,88 @@ object ScreenTemplates {
             listOf(Condition(Field.PRICE, Op.LTE, Field.LOW_52W, 15.0), Condition(Field.MCAP, Op.GT, null, 100 * MLR)),
             limit = 20,
         ),
+
+        // --- Temel analiz (bilanço): 0.7.0
+        Screen(
+            // Kullanıcının örneği: bugünkü F/K, son 5 mali yılın ortalama F/K'sının en az %50 altında
+            "d_my_pe_half", "F/K'sı 5 yıllık ortalamasının yarısına inenler (listem)", Universe.MY_LIST, null, ScreenCurrency.LOCAL,
+            listOf(Condition(Field.PE, Op.LTE, Field.PE_5Y_AVG, -50.0), Condition(Field.PE, Op.GT, null, 0.0)),
+            sort = ScreenSort.EXTREME, onlyStocks = true,
+        ),
+        Screen(
+            "d_bist_pe_hist_cheap", "Tarihine göre ucuzlamış BIST devleri", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.PE, Op.LTE, Field.PE_5Y_AVG, -40.0),
+                Condition(Field.PE, Op.GT, null, 0.0),
+                Condition(Field.MCAP, Op.GT, null, 50 * MLR),
+            ),
+            sort = ScreenSort.EXTREME, limit = 20,
+        ),
+        Screen(
+            "d_us_pe_hist_cheap", "Tarihine göre ucuzlamış ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.PE, Op.LTE, Field.PE_5Y_AVG, -25.0),
+                Condition(Field.PE, Op.GT, null, 0.0),
+                Condition(Field.MCAP, Op.GT, null, 100 * MLR),
+            ),
+            sort = ScreenSort.EXTREME, limit = 20,
+        ),
+        Screen(
+            // Analist tahmini: gelecek yılın kârıyla F/K bugünkünün en az %30 altına iniyor
+            "d_bist_fwd_growth", "Kârı artması beklenen ucuz BIST", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.FWD_PE, Op.LTE, Field.PE, -30.0),
+                Condition(Field.FWD_PE, Op.GT, null, 0.0),
+                Condition(Field.PE, Op.GT, null, 0.0),
+                Condition(Field.PE, Op.LT, null, 15.0),
+                Condition(Field.MCAP, Op.GT, null, 20 * MLR),
+            ),
+            sort = ScreenSort.EXTREME, limit = 20,
+        ),
+        Screen(
+            "d_bist_below_book", "Defter değerinin altında, kârlı BIST", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.PB, Op.LT, null, 1.0),
+                Condition(Field.PB, Op.GT, null, 0.0),
+                Condition(Field.ROE, Op.GT, null, 10.0),
+                Condition(Field.MCAP, Op.GT, null, 10 * MLR),
+            ),
+            limit = 20,
+        ),
+        Screen(
+            "d_bist_dividend", "Yüksek temettü verimli BIST", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(Condition(Field.DIV_YIELD, Op.GTE, null, 6.0), Condition(Field.MCAP, Op.GT, null, 20 * MLR)),
+            limit = 20,
+        ),
+        Screen(
+            "d_us_quality", "Kaliteli ve makul fiyatlı ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.ROE, Op.GT, null, 20.0),
+                Condition(Field.NET_MARGIN, Op.GT, null, 15.0),
+                Condition(Field.DEBT_EQ, Op.LT, null, 1.0),
+                Condition(Field.PE, Op.GT, null, 0.0),
+                Condition(Field.PE, Op.LT, null, 25.0),
+                Condition(Field.MCAP, Op.GT, null, 100 * MLR),
+            ),
+            sort = ScreenSort.MCAP_DESC, limit = 20,
+        ),
+        Screen(
+            "d_us_growth_dip", "Büyüyen ama geri çekilen ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.PRICE, Op.LT, Field.SMA200, 0.0),
+                Condition(Field.EPS_CAGR_5Y, Op.GT, null, 15.0),
+                Condition(Field.MCAP, Op.GT, null, 50 * MLR),
+            ),
+            limit = 20,
+        ),
     )
 
     /** Uygulamaya varsayılan olarak gelenler (şu an hepsi). */
     val defaults: List<Screen> get() = all
+
+    /** 0.7.0 (şema 5) ile gelen hazır listeler: güncelleyen kullanıcılara da eklenir. */
+    val addedInV5: Set<String> = setOf(
+        "d_my_pe_half", "d_bist_pe_hist_cheap", "d_us_pe_hist_cheap", "d_bist_fwd_growth",
+        "d_bist_below_book", "d_bist_dividend", "d_us_quality", "d_us_growth_dip",
+    )
 }
