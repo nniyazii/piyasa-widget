@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
@@ -298,10 +299,16 @@ fun ComposerScreen(
             results.firstOrNull()?.let { if (!state.isTracked(it.instrument)) addSymbol(it) }
             return
         }
-        if (!commitPending()) return
+        if (!commitPending()) {
+            scope.launch { snackbar.showSnackbar("“${pending.trim()}” bulunamadı") }
+            return
+        }
         if (runCatching { Parser.parse(Tokens.render(tokens)) }.isSuccess) {
             focusManager.clearFocus(); keyboard?.hide()
             showSave = true
+        } else {
+            // Sessizce hiçbir şey yapmamak yerine söyle
+            scope.launch { snackbar.showSnackbar("Formül tamamlanmadı: bir değer ya da parantez eksik") }
         }
     }
 
@@ -371,7 +378,12 @@ fun ComposerScreen(
                     if (editing != null) "Formülü düzenle" else "Ekle",
                     Modifier.weight(1f), style = MaterialTheme.typography.titleLarge,
                 )
-                TextButton(onClick = onClose) { Text("Bitti") }
+                // Formül yazılırken "Kaydet" (formülü kaydeder), değilse "Bitti" (kapatır)
+                if (formulaMode) {
+                    Button(onClick = ::submit) { Text("Kaydet") }
+                } else {
+                    TextButton(onClick = onClose) { Text("Bitti") }
+                }
             }
 
             // ---- hesap makinesi ekranı
@@ -574,12 +586,8 @@ fun ComposerScreen(
             onSave = { f ->
                 showSave = false
                 onSaveFormula(f, editing?.key, needed.toList())
-                if (editing != null) {
-                    onClose()
-                } else {
-                    tokens.clear(); needed.clear(); setPending("")
-                    scope.launch { snackbar.showSnackbar("✓ ${f.name} kaydedildi", duration = SnackbarDuration.Short) }
-                }
+                // Kaydedince listeye dön: formül orada, "Hesaplamalar" altında görünür
+                onClose()
             },
         )
     }
@@ -742,6 +750,7 @@ private fun SaveFormulaDialog(
     var prefix by remember { mutableStateOf(editing?.prefix ?: sp) }
     var suffix by remember { mutableStateOf(editing?.suffix ?: ss) }
     var decimals by remember { mutableIntStateOf(editing?.decimals ?: 2) }
+    var editingName by remember { mutableStateOf(false) }
     val expression = Tokens.render(tokens)
     val otherKeys = state.allKeys.filter { it != editing?.key }
     val key = remember(name) {
@@ -765,7 +774,20 @@ private fun SaveFormulaDialog(
                 )
                 Text(tokens.joinToString(" ") { tokenLabel(state, it) }, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedTextField(name, { name = it.take(32) }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Ad") })
+                // Önerilen ad çoğu zaman doğrudur: metin kutusu (ve klavye) yalnızca istenirse açılır
+                if (editingName) {
+                    val nameFocus = remember { FocusRequester() }
+                    OutlinedTextField(
+                        name, { name = it.take(32) }, Modifier.fillMaxWidth().focusRequester(nameFocus),
+                        singleLine = true, label = { Text("Ad") },
+                    )
+                    LaunchedEffect(Unit) { runCatching { nameFocus.requestFocus() } }
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(name, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        TextButton(onClick = { editingName = true }) { Text("Değiştir") }
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf("" to "", "" to "₺", "$" to "", "€" to "", "" to "%").forEachIndexed { i, (p, s) ->
                         FilterChip(
