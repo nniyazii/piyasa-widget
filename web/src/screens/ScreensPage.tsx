@@ -10,10 +10,12 @@ import {
   type Condition, type FieldId, type Screen, type ScreenResult,
 } from '../core/screener'
 import { chartUrl } from '../core/tradingview'
+import { useReliability } from '../data/reliability'
 import { actions, allKeys, getState, refreshScreen, useApp, useLive } from '../data/store'
 import { Icon } from '../ui/Icon'
 import { ChangeBadge } from '../ui/market'
 import { Dialog, MoreButton, Segmented, Switch, useToast } from '../ui/overlay'
+import { ReliabilityBadge } from '../ui/reliability'
 import { navigate } from '../ui/router'
 import { sensorsConfig } from './Watchlist'
 
@@ -59,11 +61,12 @@ export function ScreensIndex({ onNew }: { onNew: () => void }) {
 function ScreenItem({ screen, result, running }: { screen: Screen; result?: ScreenResult; running: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: screen.id })
   const top = result?.rows.slice(0, 4).map((r) => r.name).join(', ')
+  const rel = useReliability(screen)
   return (
     <li ref={setNodeRef} className={'screen-item' + (isDragging ? ' dragging' : '')} style={{ transform: CSS.Translate.toString(transform), transition }}
       {...attributes} {...listeners} role="link" tabIndex={0}
       onClick={() => navigate(`listeler/${screen.id}`)} onKeyDown={(e) => e.key === 'Enter' && navigate(`listeler/${screen.id}`)}>
-      <h3>{screen.name}</h3>
+      <h3>{screen.name}{rel && <> <ReliabilityBadge entry={rel} /></>}</h3>
       <div className="cond">{screen.conditions.map(describe).join('; ')}</div>
       <div className="top">{running && !result ? 'Taranıyor…' : result?.error && !result.rows.length ? result.error : top || 'Şu an eşleşen yok'}</div>
       <div className="tally">
@@ -74,6 +77,12 @@ function ScreenItem({ screen, result, running }: { screen: Screen; result?: Scre
   )
 }
 
+const pctText = (v: number) => (v >= 0 ? '+' : '−') + '%' + Fmt.number(Math.abs(v * 100), 0)
+const bestPortfolio = (e: { portfolios?: { list?: number; hold1m?: number; hold3m?: number } }) => {
+  const v = [e.portfolios?.list, e.portfolios?.hold1m, e.portfolios?.hold3m].filter((x): x is number => x != null)
+  return v.length ? Math.max(...v) : undefined
+}
+
 export function ScreenView({ id, onEdit }: { id: string; onEdit: (s: Screen) => void }) {
   const state = useApp()
   const live = useLive()
@@ -81,6 +90,7 @@ export function ScreenView({ id, onEdit }: { id: string; onEdit: (s: Screen) => 
   const screen = state.screens.find((s) => s.id === id)
   const result = live.screenResults[id]
   const running = !!live.screensRunning[id]
+  const rel = useReliability(screen)
   useEffect(() => {
     if (screen && (!result || Date.now() - result.time > 5 * 60_000)) void refreshScreen(screen.id)
   }, [id])
@@ -107,6 +117,16 @@ export function ScreenView({ id, onEdit }: { id: string; onEdit: (s: Screen) => 
       </div>
       {result?.error && <p className="note" style={{ color: 'var(--down)' }}>{result.error}</p>}
       {result?.note && <p className="note">{result.note}</p>}
+      {rel && (
+        <p className="rel-line">
+          <ReliabilityBadge entry={rel} />
+          <span>
+            {rel.source === 'published' ? `Son ${rel.years} yılın testine göre` : `Senin ${rel.years === 0.5 ? 'son 6 ay' : `son ${rel.years} yıl`} testine göre, ${Fmt.dateTime(rel.at)}`}
+            {rel.portfolios?.bench != null && bestPortfolio(rel) != null && <>; en iyi portföy {pctText(bestPortfolio(rel)!)}, endeks {pctText(rel.portfolios.bench)}</>}.
+          </span>
+          <a href={`#/listeler/${screen.id}/test`}>Ayrıntı</a>
+        </p>
+      )}
       <div className="detail-actions" style={{ marginTop: 14 }}>
         <button className="btn" onClick={() => void refreshScreen(screen.id)} disabled={running}><Icon name="refresh" className={running ? 'spin' : undefined} />Yeniden tara</button>
         <button className="btn" onClick={() => onEdit(screen)}><Icon name="edit" />Düzenle</button>

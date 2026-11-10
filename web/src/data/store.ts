@@ -8,7 +8,7 @@ import {
   defaultBoard, reorderSubset, screenEntry, sectionEntry, isScreenEntry, screenIdOf,
   type AppState, type Board, type Category, type Formula, type Instrument, type LiveData, type Quote, type Settings,
 } from '../core/models'
-import { defaultScreens, type Screen, type ScreenResult } from '../core/screener'
+import { defaultScreens, TEMPLATES_REVISION, upgradeTemplates, type Screen, type ScreenResult } from '../core/screener'
 import { runScreen } from './screens'
 import { quotes as fetchQuotes } from './tv'
 
@@ -40,6 +40,7 @@ export function defaultState(): AppState {
     boards: defaultBoards(),
     settings: defaultSettings(),
     welcomed: false,
+    templates: TEMPLATES_REVISION,
   }
 }
 
@@ -67,10 +68,11 @@ export function sanitize(raw: unknown): AppState {
     version: STATE_VERSION,
     instruments: Array.isArray(s.instruments) ? s.instruments.filter((i) => i?.key && i?.symbol) : d.instruments,
     formulas: Array.isArray(s.formulas) ? s.formulas.filter((f) => f?.key && f?.expression) : d.formulas,
-    screens: Array.isArray(s.screens) ? s.screens.filter((x) => x?.id && Array.isArray(x.conditions)) : d.screens,
+    screens: Array.isArray(s.screens) ? upgradeTemplates(s.screens.filter((x) => x?.id && Array.isArray(x.conditions)), s.templates ?? 1) : d.screens,
     boards: Array.isArray(s.boards) ? s.boards.map((b) => ({ ...defaultBoard(), ...b })) : d.boards,
     settings: { ...d.settings, ...(s.settings ?? {}) },
     welcomed: !!s.welcomed,
+    templates: TEMPLATES_REVISION,
   }
 }
 

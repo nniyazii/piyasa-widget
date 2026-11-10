@@ -40,7 +40,10 @@ describe('durum dosyası', () => {
     expect(s.instruments).toHaveLength(1)
     expect(s.settings.theme).toBe('dark')
     expect(s.settings.refreshSeconds).toBe(30)
-    expect(s.screens.length).toBe(15)
+    expect(s.screens.length).toBe(defaultState().screens.length)
+    // Eski sürümden kalan kayıt: yeni hazır listeler eklenir
+    const v1 = sanitize({ screens: defaultState().screens.filter((x) => x.id !== 'd_us_pb_trend' && x.id !== 'd_bist_pb_trend' && x.id !== 'd_bist_usd_high') })
+    expect(v1.screens.map((x) => x.id)).toContain('d_us_pb_trend')
   })
   it('web dışa aktarımı ve Android durum dosyası içe aktarılır', () => {
     const web = fromImport({ app: 'piyasa', format: 1, state: defaultState() })

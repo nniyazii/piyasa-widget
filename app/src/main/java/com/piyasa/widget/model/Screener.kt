@@ -195,8 +195,8 @@ object ScreenTemplates {
             sort = ScreenSort.CHANGE_DESC, limit = 10,
         ),
         Screen(
-            "d_bist_oversold_big", "Aşırı satılmış BIST devleri", Universe.BIST, null, ScreenCurrency.LOCAL,
-            listOf(Condition(Field.RSI, Op.LT, null, 35.0), Condition(Field.MCAP, Op.GT, null, 50 * MLR)),
+            "d_bist_oversold_big", "Yükselen trendde aşırı satılmış BIST devleri", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(Condition(Field.RSI, Op.LT, null, 35.0), Condition(Field.MCAP, Op.GT, null, 50 * MLR), Condition(Field.PRICE, Op.GT, Field.SMA200, 0.0)),
             limit = 20,
         ),
         Screen(
@@ -218,7 +218,7 @@ object ScreenTemplates {
         ),
         Screen(
             "d_us_megacap_dip", "Düşüşteki ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
-            listOf(Condition(Field.PRICE, Op.LTE, Field.LOW_52W, 15.0), Condition(Field.MCAP, Op.GT, null, 100 * MLR)),
+            listOf(Condition(Field.PRICE, Op.LTE, Field.LOW_52W, 25.0), Condition(Field.MCAP, Op.GT, null, 100 * MLR)),
             limit = 20,
         ),
 
@@ -239,11 +239,12 @@ object ScreenTemplates {
             sort = ScreenSort.EXTREME, limit = 20,
         ),
         Screen(
-            "d_us_pe_hist_cheap", "Tarihine göre ucuzlamış ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
+            "d_us_pe_hist_cheap", "Tarihine göre ucuz, trendi yukarı ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
             listOf(
                 Condition(Field.PE, Op.LTE, Field.PE_5Y_AVG, -25.0),
                 Condition(Field.PE, Op.GT, null, 0.0),
-                Condition(Field.MCAP, Op.GT, null, 100 * MLR),
+                Condition(Field.MCAP, Op.GT, null, 50 * MLR),
+                Condition(Field.PRICE, Op.GT, Field.SMA200, 0.0),
             ),
             sort = ScreenSort.EXTREME, limit = 20,
         ),
@@ -265,33 +266,61 @@ object ScreenTemplates {
                 Condition(Field.PB, Op.LT, null, 1.0),
                 Condition(Field.PB, Op.GT, null, 0.0),
                 Condition(Field.ROE, Op.GT, null, 10.0),
-                Condition(Field.MCAP, Op.GT, null, 10 * MLR),
+                Condition(Field.MCAP, Op.GT, null, 30 * MLR),
             ),
             limit = 20,
         ),
         Screen(
             "d_bist_dividend", "Yüksek temettü verimli BIST", Universe.BIST, null, ScreenCurrency.LOCAL,
-            listOf(Condition(Field.DIV_YIELD, Op.GTE, null, 6.0), Condition(Field.MCAP, Op.GT, null, 20 * MLR)),
+            listOf(Condition(Field.DIV_YIELD, Op.GTE, null, 4.0), Condition(Field.MCAP, Op.GT, null, 20 * MLR)),
             limit = 20,
         ),
         Screen(
             "d_us_quality", "Kaliteli ve makul fiyatlı ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
             listOf(
-                Condition(Field.ROE, Op.GT, null, 20.0),
+                Condition(Field.ROE, Op.GT, null, 15.0),
                 Condition(Field.NET_MARGIN, Op.GT, null, 15.0),
                 Condition(Field.DEBT_EQ, Op.LT, null, 1.0),
                 Condition(Field.PE, Op.GT, null, 0.0),
-                Condition(Field.PE, Op.LT, null, 25.0),
+                Condition(Field.PE, Op.LT, null, 35.0),
                 Condition(Field.MCAP, Op.GT, null, 100 * MLR),
             ),
             sort = ScreenSort.MCAP_DESC, limit = 20,
         ),
         Screen(
-            "d_us_growth_dip", "Büyüyen ama geri çekilen ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
+            "d_us_growth_dip", "Büyüyen, trendde geri çekilen ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
             listOf(
-                Condition(Field.PRICE, Op.LT, Field.SMA200, 0.0),
-                Condition(Field.EPS_CAGR_5Y, Op.GT, null, 15.0),
+                Condition(Field.RSI, Op.LT, null, 40.0),
+                Condition(Field.PRICE, Op.GT, Field.SMA200, 0.0),
+                Condition(Field.EPS_CAGR_5Y, Op.GT, null, 20.0),
                 Condition(Field.MCAP, Op.GT, null, 50 * MLR),
+            ),
+            limit = 20,
+        ),
+
+        // --- Geçmişte test edilerek bulunanlar (web/README: Hazır listelerin araştırması): 0.9.0
+        Screen(
+            "d_bist_usd_high", "Dolar bazında zirvesindeki BIST", Universe.BIST, null, ScreenCurrency.USD,
+            listOf(Condition(Field.PRICE, Op.GTE, Field.HIGH_52W, -5.0), Condition(Field.MCAP, Op.GT, null, 5 * MLR)),
+            limit = 20,
+        ),
+        Screen(
+            "d_bist_pb_trend", "Defter değerine yakın, yükselen BIST", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.PB, Op.LT, null, 1.5),
+                Condition(Field.PB, Op.GT, null, 0.0),
+                Condition(Field.PRICE, Op.GT, Field.SMA50, 0.0),
+                Condition(Field.MCAP, Op.GT, null, 30 * MLR),
+            ),
+            limit = 20,
+        ),
+        Screen(
+            "d_us_pb_trend", "Defter değerine göre makul, trendde ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.PB, Op.LT, null, 2.0),
+                Condition(Field.PB, Op.GT, null, 0.0),
+                Condition(Field.PRICE, Op.GT, Field.SMA200, 0.0),
+                Condition(Field.MCAP, Op.GT, null, 100 * MLR),
             ),
             limit = 20,
         ),
@@ -304,5 +333,31 @@ object ScreenTemplates {
     val addedInV5: Set<String> = setOf(
         "d_my_pe_half", "d_bist_pe_hist_cheap", "d_us_pe_hist_cheap", "d_bist_fwd_growth",
         "d_bist_below_book", "d_bist_dividend", "d_us_quality", "d_us_growth_dip",
+    )
+
+    /** 0.9.0 (şema 6) ile gelen, geçmişte test edilerek bulunan listeler. */
+    val addedInV6: Set<String> = setOf("d_bist_usd_high", "d_bist_pb_trend", "d_us_pb_trend")
+
+    /**
+     * 0.9.0'da geçmişte testle iyileştirilen hazır listelerin önceki koşulları ve adları: kullanıcı koşulları
+     * değiştirmediyse yenisine geçer (verdiği ad korunur).
+     */
+    val previousV5: Map<String, Pair<String, List<Condition>>> = mapOf(
+        "d_bist_oversold_big" to ("Aşırı satılmış BIST devleri" to listOf(Condition(Field.RSI, Op.LT, null, 35.0), Condition(Field.MCAP, Op.GT, null, 50 * MLR))),
+        "d_us_megacap_dip" to ("Düşüşteki ABD devleri" to listOf(Condition(Field.PRICE, Op.LTE, Field.LOW_52W, 15.0), Condition(Field.MCAP, Op.GT, null, 100 * MLR))),
+        "d_us_pe_hist_cheap" to ("Tarihine göre ucuzlamış ABD devleri" to listOf(
+            Condition(Field.PE, Op.LTE, Field.PE_5Y_AVG, -25.0), Condition(Field.PE, Op.GT, null, 0.0), Condition(Field.MCAP, Op.GT, null, 100 * MLR),
+        )),
+        "d_bist_below_book" to ("Defter değerinin altında, kârlı BIST" to listOf(
+            Condition(Field.PB, Op.LT, null, 1.0), Condition(Field.PB, Op.GT, null, 0.0), Condition(Field.ROE, Op.GT, null, 10.0), Condition(Field.MCAP, Op.GT, null, 10 * MLR),
+        )),
+        "d_bist_dividend" to ("Yüksek temettü verimli BIST" to listOf(Condition(Field.DIV_YIELD, Op.GTE, null, 6.0), Condition(Field.MCAP, Op.GT, null, 20 * MLR))),
+        "d_us_quality" to ("Kaliteli ve makul fiyatlı ABD devleri" to listOf(
+            Condition(Field.ROE, Op.GT, null, 20.0), Condition(Field.NET_MARGIN, Op.GT, null, 15.0), Condition(Field.DEBT_EQ, Op.LT, null, 1.0),
+            Condition(Field.PE, Op.GT, null, 0.0), Condition(Field.PE, Op.LT, null, 25.0), Condition(Field.MCAP, Op.GT, null, 100 * MLR),
+        )),
+        "d_us_growth_dip" to ("Büyüyen ama geri çekilen ABD devleri" to listOf(
+            Condition(Field.PRICE, Op.LT, Field.SMA200, 0.0), Condition(Field.EPS_CAGR_5Y, Op.GT, null, 15.0), Condition(Field.MCAP, Op.GT, null, 50 * MLR),
+        )),
     )
 }

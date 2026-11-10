@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { backtestSupport, runBacktest, supportSummary, type BtSymbol, type Series } from './backtest'
+import { asOfRatios, backtestSupport, runBacktest, supportSummary, type BtSymbol, type Series } from './backtest'
 import type { Screen } from './screener'
 
 const START = 19000 // epoch gün
@@ -20,7 +20,7 @@ describe('geçmişte test', () => {
     const r = runBacktest({
       screen: screen({ conditions: [{ left: 'PRICE', op: 'LTE', right: 'SMA50', value: -10 }] }),
       symbols: [sym('BIST:AAA', dip), sym('BIST:BBB', Array(411).fill(50))],
-      startDay: START + 200, endDay: START + 410,
+      startDay: START + 200, endDay: START + 410, costPerSide: 0,
     })
     expect(r.tested).toBe(2)
     expect(r.episodes).toHaveLength(1)
@@ -40,6 +40,12 @@ describe('geçmişte test', () => {
     // Eşit ağırlıklı portföy: düşüşte alınır, toparlanmada +%25 ile çıkılır
     expect(r.curve.at(-1)!.list).toBeCloseTo(1.25, 12)
     expect(r.portfolio.total).toBeCloseTo(0.25, 12)
+    // İşlem maliyetiyle: bir alım, bir satım (%0,15'er)
+    const withCost = runBacktest({
+      screen: screen({ conditions: [{ left: 'PRICE', op: 'LTE', right: 'SMA50', value: -10 }] }),
+      symbols: [sym('BIST:AAA', dip)], startDay: START + 200, endDay: START + 410,
+    })
+    expect(withCost.curve.at(-1)!.list).toBeCloseTo(1.25 * 0.9985 * 0.9985, 12)
   })
 
   it('endekse göre fark ve hâlâ listede olanlar', () => {
@@ -65,8 +71,8 @@ describe('geçmişte test', () => {
     // Bugün 100 (MCAP 10 mlr); fiyat 40'tan 100'e çıktı → başta 4 mlr, eşik 5 mlr
     const closes = Array.from({ length: 200 }, (_, i) => 40 + (60 * i) / 199)
     const r = runBacktest({
-      screen: screen({ conditions: [{ left: 'MCAP', op: 'GT', right: null, value: 5e9 }, { left: 'ROE', op: 'GT', right: null, value: 10 }] }),
-      symbols: [sym('BIST:M', closes, { MCAP: 10e9, ROE: 20 })],
+      screen: screen({ conditions: [{ left: 'MCAP', op: 'GT', right: null, value: 5e9 }, { left: 'PEG', op: 'LT', right: null, value: 2 }] }),
+      symbols: [sym('BIST:M', closes, { MCAP: 10e9, PEG: 1 })],
       startDay: START, endDay: START + 199,
     })
     const e = r.episodes[0]
@@ -103,7 +109,45 @@ describe('geçmişte test', () => {
   it('alanların geçmişte nasıl hesaplandığı', () => {
     expect(backtestSupport('SMA200').level).toBe('exact')
     expect(backtestSupport('LOW_5Y').level).toBe('approx')
-    expect(backtestSupport('ROE').level).toBe('constant')
+    expect(backtestSupport('PEG').level).toBe('constant')
+    expect(backtestSupport('ROE').level).toBe('approx')
+    expect(backtestSupport('FWD_PE').level).toBe('constant')
     expect(supportSummary(screen({ conditions: [{ left: 'PE', op: 'LTE', right: 'PE_5Y_AVG', value: -50 }] })).map((x) => x.id)).toEqual(['PE', 'PE_5Y_AVG'])
+  })
+})
+
+describe('asOfRatios', () => {
+  // THYAO'nun gerçek rakamları (milyar TL): piyasa değeri 427,8; firma değeri 1048,1; PD/DD 0,4227
+  const sym = {
+    symbol: 'BIST:THYAO', name: 'THY', currency: 'TRY', series: { days: new Int32Array(), close: new Float64Array() },
+    now: { MCAP: 427.8e9, PB: 0.42275 }, fyEnd: 0,
+    revenueFy: [955.472e9, 745.43e9],
+    fund: { ebitdaFy: [158.136e9, 135.435e9], dpsFy: [0, 6.884058, 0], netIncomeFy: [118.208e9, 113.378e9], debtFy: [500e9, 400e9], ev: 1048.114e9, currency: 'TRY' },
+  }
+  const used = new Set(['PB', 'PS', 'EV_EBITDA', 'DIV_YIELD', 'ROE', 'NET_MARGIN', 'DEBT_EQ'] as const)
+  it('son yıl: bugünkü değerlerle tutarlı', () => {
+    const r = asOfRatios(sym, 0, 313.75, 313.75, used)
+    expect(r.PS).toBeCloseTo(427.8 / 955.472, 4)
+    expect(r.EV_EBITDA).toBeCloseTo(1048.114 / 158.136, 4)
+    expect(r.DIV_YIELD).toBeCloseTo(6.884058 / 313.75 * 100, 4) // son yılın temettüsü henüz yazılmamış → bir önceki
+    expect(r.PB).toBeCloseTo(0.42275, 4)
+  })
+  it('bir önceki yıl: o yılın rakamı, özkaynaktan sonraki yılın kârı düşülür', () => {
+    const price = 200, mcap = 427.8e9 / 313.75 * price
+    const r = asOfRatios(sym, 1, price, 313.75, used)
+    expect(r.PS).toBeCloseTo(mcap / 745.43e9, 4)
+    expect(r.EV_EBITDA).toBeCloseTo((mcap + 1048.114e9 - 427.8e9) / 135.435e9, 4)
+    expect(r.DIV_YIELD).toBeCloseTo(6.884058 / 200 * 100, 4)
+    const equity = 427.8e9 / 0.42275 - 118.208e9
+    expect(r.PB).toBeCloseTo(mcap / equity, 4)
+    expect(r.ROE).toBeCloseTo(113.378e9 / equity * 100, 4)
+    expect(r.DEBT_EQ).toBeCloseTo(400e9 / equity, 4)
+    expect(r.NET_MARGIN).toBeCloseTo(113.378 / 745.43 * 100, 4)
+  })
+  it('bilanço başka para birimindeyse hesaplanmaz', () => {
+    const r = asOfRatios({ ...sym, fund: { ...sym.fund, currency: 'USD' } }, 0, 313.75, 313.75, used)
+    expect(r.PB).toBeUndefined()
+    expect(r.PS).toBeUndefined()
+    expect(r.NET_MARGIN).toBeCloseTo(118.208 / 955.472 * 100, 4) // aynı bilançonun iki kalemi
   })
 })

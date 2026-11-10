@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "vitest run",
     "start": "node server.mjs",
-    "snapshot": "node scripts/snapshot.mjs"
+    "snapshot": "node scripts/snapshot.mjs",
+    "scores": "vitest run -c vitest.research.config.ts research/scores.research.ts",
+    "research": "vitest run -c vitest.research.config.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

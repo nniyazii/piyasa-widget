@@ -16,6 +16,13 @@ const BASE_COLUMNS = BASE_SCAN_COLUMNS
 const STOCK_TYPES = new Set(['stock', 'dr'])
 const HISTORY_CANDIDATES = 60
 export const FUNDAMENTAL_COLUMNS = ['earnings_per_share_diluted_fy_h', 'total_revenue_fy_h', 'earnings_per_share_forecast_next_fy', 'fiscal_period_end_fy', 'fundamental_currency_code']
+/** Geçmişte test için yıllık bilanço dizileri: oranlar o gün açıklanmış yılın rakamıyla hesaplanır. */
+export const BACKTEST_FUNDAMENTAL_COLUMNS = ['ebitda_fy_h', 'dps_common_stock_prim_issue_fy_h', 'net_income_fy_h', 'total_debt_fy_h', 'enterprise_value_current']
+const COL_EBITDA_FY = 'ebitda_fy_h'
+const COL_DPS_FY = 'dps_common_stock_prim_issue_fy_h'
+const COL_NI_FY = 'net_income_fy_h'
+const COL_EV = 'enterprise_value_current'
+const COL_DEBT_FY = 'total_debt_fy_h'
 const COL_EPS_FY = 'earnings_per_share_diluted_fy_h'
 const COL_REV_FY = 'total_revenue_fy_h'
 const COL_EPS_FWD = 'earnings_per_share_forecast_next_fy'
@@ -168,5 +175,8 @@ export function parseRow(r: ScanRow, screen: Screen, ctx: Ctx, fields: FieldId[]
     epsFy,
     fyEnd: num(at(COL_FY_END)),
     revenueFy: columns.includes(COL_REV_FY) ? arr(at(COL_REV_FY)) : undefined,
+    ...(columns.includes(COL_EBITDA_FY) ? {
+      fund: { ebitdaFy: arr(at(COL_EBITDA_FY)), dpsFy: arr(at(COL_DPS_FY)), netIncomeFy: arr(at(COL_NI_FY)), debtFy: arr(at(COL_DEBT_FY)), ev: num(at(COL_EV)), currency: str(at(COL_FUND_CCY)) },
+    } : {}),
   }
 }

@@ -116,6 +116,18 @@ await step('geçmişte test: aşırı satılmış BIST devleri, 1 yıl', async (
   if (!/kez listeye girdi/.test(lead ?? '')) throw new Error('özet yok: ' + lead)
   if ((await page.locator('.bt-table').first().locator('tbody tr').count()) !== 4) throw new Error('ufuk tablosu eksik')
   await page.locator('.bt-chart svg path.list').waitFor()
+  await page.locator('.rel-panel .rel-score').waitFor()
+  // Portföy biçimi: 3 ay tut
+  const before = await page.locator('.bt-chart svg path.list').getAttribute('d')
+  await page.locator('.segmented button', { hasText: '3 ay tut' }).click()
+  if ((await page.locator('.bt-chart svg path.list').getAttribute('d')) === before) throw new Error('3 ay tut eğrisi değişmedi')
+})
+
+await step('güvenilirlik: kendi testin listede rozet olarak görünür', async () => {
+  await page.goto(BASE + '/#/listeler/d_bist_oversold_big')
+  await page.locator('.rel-line .rel-badge').waitFor({ timeout: 10000 })
+  await page.goto(BASE + '/#/listeler')
+  await page.locator('.screen-item', { hasText: 'aşırı satılmış' }).first().locator('.rel-badge').waitFor()
 })
 
 await step('ayarlar: koyu tema', async () => {

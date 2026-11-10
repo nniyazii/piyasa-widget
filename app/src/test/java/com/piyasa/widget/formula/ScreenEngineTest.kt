@@ -209,8 +209,9 @@ class ScreenEngineTest {
 
     @Test fun defaultScreensAreSane() {
         val d = com.piyasa.widget.model.ScreenTemplates.defaults
-        assertEquals(15, d.size)
+        assertEquals(18, d.size)
         assertTrue(com.piyasa.widget.model.ScreenTemplates.addedInV5.all { id -> d.any { it.id == id } })
+        assertTrue(com.piyasa.widget.model.ScreenTemplates.addedInV6.all { id -> d.any { it.id == id } })
         assertEquals(d.size, d.map { it.id }.toSet().size)
         assertTrue(d.all { it.conditions.isNotEmpty() && it.name.isNotBlank() })
         // Tüm BIST / ABD taramalarında (kullanıcının 5Y örneği hariç) küçük şirketler elenir
@@ -229,5 +230,22 @@ class ScreenEngineTest {
         // Ortalama F/K ile karşılaştıran her listede zararlı şirketler (F/K ≤ 0) elenir
         d.filter { s -> s.conditions.any { Field.PE_5Y_AVG in it.fields } }
             .forEach { s -> assertTrue(s.name, s.conditions.contains(Condition(Field.PE, Op.GT, null, 0.0))) }
+    }
+
+    @Test fun v6UpgradesUntouchedTemplatesOnly() {
+        val t = com.piyasa.widget.model.ScreenTemplates
+        val prev = t.previousV5
+        val oversold = t.all.first { it.id == "d_bist_oversold_big" }.copy(name = prev.getValue("d_bist_oversold_big").first, conditions = prev.getValue("d_bist_oversold_big").second)
+        val quality = t.all.first { it.id == "d_us_quality" }.copy(name = "Kalite", conditions = prev.getValue("d_us_quality").second)
+        val edited = t.all.first { it.id == "d_bist_dividend" }.copy(conditions = listOf(Condition(Field.DIV_YIELD, Op.GTE, null, 9.0)))
+        val state = com.piyasa.widget.model.AppState(schema = 5, screens = listOf(oversold, quality, edited))
+        val s = com.piyasa.widget.model.Migrations.apply(state)
+        val by = s.screens.associateBy { it.id }
+        assertEquals(t.all.first { it.id == "d_bist_oversold_big" }.conditions, by.getValue("d_bist_oversold_big").conditions)
+        assertEquals("Yükselen trendde aşırı satılmış BIST devleri", by.getValue("d_bist_oversold_big").name)
+        assertEquals("Kalite", by.getValue("d_us_quality").name)
+        assertEquals(15.0, by.getValue("d_us_quality").conditions.first { it.left == Field.ROE }.value, 0.0)
+        assertEquals(listOf(Condition(Field.DIV_YIELD, Op.GTE, null, 9.0)), by.getValue("d_bist_dividend").conditions)
+        assertTrue(t.addedInV6.all { it in by })
     }
 }

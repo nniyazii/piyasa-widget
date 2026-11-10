@@ -7,7 +7,7 @@
  */
 import {
   conditionFields, derived, field, historyStats, matches, peAverage,
-  type Bar, type FieldId, type HistoryStats, type Row, type Screen,
+  type Bar, type FieldId, type Fundamentals, type HistoryStats, type Row, type Screen,
 } from './screener'
 
 export interface Series { days: Int32Array; close: Float64Array }
@@ -25,6 +25,8 @@ export interface BtSymbol {
   epsFy?: (number | undefined)[]
   revenueFy?: (number | undefined)[]
   fyEnd?: number
+  /** FAVÖK, hisse başı temettü, net kâr dizileri ve bugünkü firma değeri */
+  fund?: Fundamentals
 }
 
 export interface BtInput {
@@ -38,6 +40,8 @@ export interface BtInput {
   usdTry?: Series
   /** İleri getiri ufukları (işlem günü) */
   horizons?: number[]
+  /** Portföyde alım ya da satım başına maliyet (oran; varsayılan 0,0015 = %0,15) */
+  costPerSide?: number
 }
 
 export interface Episode {
@@ -84,9 +88,11 @@ export interface BtResult {
   stay: { mean?: number; median?: number; max?: number; completed: number; ongoing: number }
   distinct: number
   currentMembers: string[]
-  /** Eşit ağırlıklı liste portföyü ve endeks: gün, değer (1 = başlangıç), üye sayısı */
-  curve: { day: number; list: number; bench?: number; members: number }[]
-  portfolio: { total?: number; bench?: number; maxDrawdown?: number; avgMembers?: number; daysInvested: number }
+  /** Eşit ağırlıklı portföyler ve endeks: gün, değer (1 = başlangıç), listedeki hisse sayısı */
+  curve: { day: number; list: number; hold1m?: number; hold3m?: number; bench?: number; members: number }[]
+  /** Portföy türlerine göre özet: listede kaldıkça / girince 1 ay / girince 3 ay tut */
+  portfolios?: Record<'list' | 'hold1m' | 'hold3m', { total?: number; maxDrawdown?: number; avgMembers?: number; daysInvested: number; costPaid?: number }>
+  portfolio: { total?: number; bench?: number; maxDrawdown?: number; avgMembers?: number; daysInvested: number; costPaid?: number }
   tested: number
   skipped: number
   startDay: number
@@ -106,6 +112,13 @@ export function backtestSupport(id: FieldId): { level: Support; how: string } {
     case 'ATL': case 'ATH': return { level: 'approx', how: 'eldeki ~4 yıllık geçmişten' }
     case 'LOW_5Y': case 'HIGH_5Y': case 'PERF_5Y': return { level: 'approx', how: 'aylık çubuklardan' }
     case 'MCAP': return { level: 'approx', how: 'bugünkü hisse sayısıyla, o günün fiyatından' }
+    case 'PS': return { level: 'approx', how: 'o gün açıklanmış yıllık satışla, o günün fiyatından' }
+    case 'EV_EBITDA': return { level: 'approx', how: 'o gün açıklanmış yıllık FAVÖK ve bugünkü net borçla' }
+    case 'DIV_YIELD': return { level: 'approx', how: 'o gün açıklanmış yılın hisse başı temettüsüyle' }
+    case 'PB': case 'ROE': case 'DEBT_EQ':
+      return { level: 'approx', how: 'o günkü özkaynakla: bugünkünden sonraki yılların kârı ve temettüsü düşülerek' }
+    case 'NET_MARGIN': return { level: 'approx', how: 'o gün açıklanmış yıllık kâr ve satıştan' }
+    case 'FWD_PE': return { level: 'constant', how: 'geçmiş tahminler bilinmiyor; bugünkü tahmin, o günün fiyatıyla' }
     case 'PE': return { level: 'approx', how: 'son açıklanan yıllık kârla (yıl sonundan 75 gün sonra)' }
     case 'PE_5Y_AVG': case 'EPS_GROWTH_1Y': case 'EPS_CAGR_5Y': case 'REV_GROWTH_1Y':
       return { level: 'approx', how: 'o gün açıklanmış yıllık bilançolardan' }
@@ -118,6 +131,56 @@ export const horizonLabel = (h: number) => (h === 5 ? '1 hafta' : h === 21 ? '1 
 
 const REPORT_LAG_DAYS = 75
 const DAY = 86400
+
+/** O gün açıklanmış son yıllık bilançodan hesaplanan alanlar. */
+export const AS_OF_FIELDS = ['PB', 'PS', 'EV_EBITDA', 'DIV_YIELD', 'ROE', 'NET_MARGIN', 'DEBT_EQ'] as const satisfies readonly FieldId[]
+
+/**
+ * Bilanço oranları o gün açıklanmış son yıllık bilançoyla (k0: en yeni önce dizideki sıra):
+ *   F/S = piyasa değeri / yıllık satış; FD/FAVÖK = (piyasa değeri + bugünkü net borç) / yıllık FAVÖK;
+ *   temettü verimi = hisse başı temettü / fiyat (son yılın temettüsü henüz yazılmadıysa bir önceki);
+ *   özkaynak = bugünkü − sonraki yılların (net kâr − dağıtılan temettü) → PD/DD, özsermaye kârlılığı, borç/özsermaye;
+ *   net kâr marjı = yıllık net kâr / yıllık satış.
+ * Piyasa değeri bugünkü hisse sayısıyla bulunur. Geri alımlar ve kâr dışı özkaynak hareketleri hesaba
+ * katılmaz (özkaynak yaklaşık). Bilanço başka para birimindeyse para tutarı içeren oranlar hesaplanmaz.
+ */
+export function asOfRatios(sym: BtSymbol, k0: number, price: number, lastClose: number, used: Set<FieldId>): Partial<Record<FieldId, number | undefined>> {
+  const out: Partial<Record<FieldId, number | undefined>> = {}
+  for (const f of AS_OF_FIELDS) if (used.has(f)) out[f] = undefined
+  const f = sym.fund
+  const rev = sym.revenueFy?.[k0]
+  const ni = f?.netIncomeFy?.[k0]
+  // Para biriminden bağımsız: aynı bilançonun iki kalemi
+  if (used.has('NET_MARGIN') && ni != null && rev != null && rev > 0) out.NET_MARGIN = (ni / rev) * 100
+  if (!f || !(lastClose > 0) || (f.currency && sym.currency && f.currency !== sym.currency)) return out
+  const mcapNow = sym.now.MCAP
+  const shares = mcapNow != null && mcapNow > 0 ? mcapNow / lastClose : undefined
+  const mcap = shares != null ? shares * price : undefined
+  if (used.has('PS') && mcap != null && rev != null && rev > 0) out.PS = mcap / rev
+  if (used.has('EV_EBITDA') && mcap != null && f.ev != null) {
+    const e = f.ebitdaFy?.[k0]
+    if (e != null && e > 0) out.EV_EBITDA = (mcap + (f.ev - mcapNow!)) / e
+  }
+  if (used.has('DIV_YIELD') && f.dpsFy?.length) {
+    let dps = f.dpsFy[k0]
+    if (!dps && f.dpsFy[k0 + 1]) dps = f.dpsFy[k0 + 1]
+    if (dps != null) out.DIV_YIELD = (dps / price) * 100
+  }
+  if ((used.has('PB') || used.has('ROE') || used.has('DEBT_EQ')) && shares != null && sym.now.PB != null && sym.now.PB > 0) {
+    let equity: number | undefined = mcapNow! / sym.now.PB
+    for (let j = 0; j < k0 && equity != null; j++) {
+      const n = f.netIncomeFy?.[j]
+      equity = n == null ? undefined : equity - (n - (f.dpsFy?.[j] ?? 0) * shares)
+    }
+    if (equity != null && equity > 0) {
+      if (used.has('PB') && mcap != null) out.PB = mcap / equity
+      if (used.has('ROE') && ni != null) out.ROE = (ni / equity) * 100
+      const debt = f.debtFy?.[k0]
+      if (used.has('DEBT_EQ') && debt != null) out.DEBT_EQ = debt / equity
+    }
+  }
+  return out
+}
 
 // ------------------------------------------------------------------ göstergeler
 
@@ -229,7 +292,8 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
     if (need('HIGH_52W')) ind.HIGH_52W = rolling(c, 252, true)
     const lastClose = c[n - 1]
     const needHist = need('LOW_5Y', 'HIGH_5Y', 'PE_5Y_AVG')
-    const fundamentals = need('PE', 'PE_5Y_AVG', 'EPS_GROWTH_1Y', 'EPS_CAGR_5Y', 'REV_GROWTH_1Y')
+    const ratios = need(...AS_OF_FIELDS)
+    const fundamentals = ratios || need('PE', 'PE_5Y_AVG', 'EPS_GROWTH_1Y', 'EPS_CAGR_5Y', 'REV_GROWTH_1Y')
     const constants: Partial<Record<FieldId, number>> = {}
     for (const f of used) if (backtestSupport(f).level === 'constant') constants[f] = sym.now[f]
     let runMin = Infinity, runMax = -Infinity
@@ -261,24 +325,27 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
         if (b?.close) values.PERF_5Y = (c[i] / b.close - 1) * 100
       }
       if (used.has('MCAP') && sym.now.MCAP && lastClose > 0) values.MCAP = sym.now.MCAP * (c[i] / lastClose)
+      // Bugünkü tahmin (geçmişi yok): o günün fiyatıyla ölçeklenir
+      if (used.has('FWD_PE') && sym.now.FWD_PE != null && lastClose > 0) values.FWD_PE = sym.now.FWD_PE * (c[i] / lastClose)
 
       // Temel analiz: o gün açıklanmış olan yıllık bilançolar
       let k0 = -1
-      if (fundamentals && sym.fyEnd != null && sym.epsFy?.length) {
-        for (let k = 0; k < sym.epsFy.length; k++) {
+      if (fundamentals && sym.fyEnd != null) {
+        const len = Math.max(sym.epsFy?.length ?? 0, sym.revenueFy?.length ?? 0, sym.fund?.ebitdaFy?.length ?? 0, sym.fund?.dpsFy?.length ?? 0)
+        for (let k = 0; k < len; k++) {
           const end = sym.fyEnd - k * 365.25 * DAY
           if (end / DAY + REPORT_LAG_DAYS <= day) { k0 = k; break }
         }
       }
       if (k0 >= 0) {
-        const eps = sym.epsFy!.slice(k0)
+        const eps = (sym.epsFy ?? []).slice(k0)
         if (used.has('PE') && eps[0] != null && eps[0] !== 0) values.PE = c[i] / eps[0]
         const d = derived(c[i], eps, (sym.revenueFy ?? []).slice(k0), undefined)
         if (used.has('EPS_GROWTH_1Y')) values.EPS_GROWTH_1Y = d.EPS_GROWTH_1Y
         if (used.has('EPS_CAGR_5Y')) values.EPS_CAGR_5Y = d.EPS_CAGR_5Y
         if (used.has('REV_GROWTH_1Y')) values.REV_GROWTH_1Y = d.REV_GROWTH_1Y
+        if (ratios) Object.assign(values, asOfRatios(sym, k0, c[i], lastClose, used))
       }
-
       // 5 yıllık dip/zirve ve ortalama F/K: ay değişince yeniden
       if (needHist && sym.monthly?.length) {
         const m = monthOf(day)
@@ -368,19 +435,35 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
   const stays = episodes.map((e) => e.tradingDays).sort((a, b) => a - b)
   const currentMembers = [...memberships.values()].filter((m) => m.member[m.to] && m.sym.series.days[m.to] >= endDay - 7).map((m) => m.sym.symbol)
 
-  // Eşit ağırlıklı portföy: o gün listede olanlar ertesi güne taşınır
+  // Portföyler: (a) listede kaldıkça tut, (b) girince 1 ay tut, (c) girince 3 ay tut — eşit ağırlık, işlem maliyetli
+  const cost = input.costPerSide ?? 0.0015
   const cal = bench ?? pickCalendar(input.symbols, startDay, endDay)
-  const curve: BtResult['curve'] = []
-  let maxDd = 0, peak = 1, memberSum = 0, invested = 0
-  if (cal) {
+  const holdings = (hold: number | null) => {
+    const out = new Map<string, Uint8Array>()
+    for (const m of memberships.values()) {
+      if (hold == null) { out.set(m.sym.symbol, m.member); continue }
+      const h = new Uint8Array(m.member.length)
+      for (let i = m.from; i <= m.to; i++) {
+        // giriş günü: üye ve bir önceki gün üye değil
+        if (m.member[i] && !(i > m.from && m.member[i - 1])) for (let k = i; k < Math.min(h.length, i + hold); k++) h[k] = 1
+      }
+      out.set(m.sym.symbol, h)
+    }
+    return out
+  }
+  const simulate = (held: Map<string, Uint8Array>) => {
+    const pts: { day: number; value: number; members: number }[] = []
+    let maxDd = 0, peak = 1, memberSum = 0, invested = 0, costPaid = 0
+    if (!cal) return { pts, maxDd, memberSum, invested, costPaid }
     const a = Math.max(0, indexAtOrBefore(cal.days, startDay - 1) + 1)
     const b = indexAtOrBefore(cal.days, endDay)
     let value = 1
-    const b0 = bench ? bench.close[a] : undefined
     const idx = new Map<string, number>()
+    let weights = new Map<string, number>()
     for (let j = a; j <= b; j++) {
       const day = cal.days[j]
-      let rSum = 0, cnt = 0, members = 0
+      let rSum = 0, wSum = 0
+      const today: string[] = []
       for (const m of memberships.values()) {
         const ds = m.sym.series.days
         const prev = idx.get(m.sym.symbol) ?? -1
@@ -388,19 +471,35 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
         while (k + 1 < ds.length && ds[k + 1] <= day) k++
         idx.set(m.sym.symbol, k)
         if (k < 0) continue
-        if (m.member[k] && ds[k] === day) members++
-        // Dünkü üyelik → bugünkü getiri
-        if (j > a && prev >= 0 && m.member[prev] && k > prev) { rSum += m.sym.series.close[k] / m.sym.series.close[prev] - 1; cnt++ }
+        const w = weights.get(m.sym.symbol)
+        if (w && prev >= 0 && k > prev) { rSum += w * (m.sym.series.close[k] / m.sym.series.close[prev] - 1); wSum += w }
+        if (held.get(m.sym.symbol)![k] && ds[k] === day) today.push(m.sym.symbol)
       }
-      if (j > a) {
-        if (cnt) { value *= 1 + rSum / cnt; invested++ }
-        peak = Math.max(peak, value)
-        maxDd = Math.min(maxDd, value / peak - 1)
-      }
-      memberSum += members
-      curve.push({ day, list: value, bench: b0 ? bench!.close[j] / b0 : undefined, members })
+      if (j > a && wSum > 0) { value *= 1 + rSum / wSum; invested++ }
+      const next = new Map(today.map((s) => [s, 1 / today.length]))
+      let turnover = 0
+      for (const [s, w] of next) turnover += Math.abs(w - (weights.get(s) ?? 0))
+      for (const [s, w] of weights) if (!next.has(s)) turnover += w
+      if (turnover > 0 && cost > 0) { value *= 1 - cost * turnover; costPaid += cost * turnover }
+      weights = next
+      if (j > a) { peak = Math.max(peak, value); maxDd = Math.min(maxDd, value / peak - 1) }
+      memberSum += today.length
+      pts.push({ day, value, members: today.length })
     }
+    return { pts, maxDd, memberSum, invested, costPaid }
   }
+  const sims = { list: simulate(holdings(null)), hold1m: simulate(holdings(21)), hold3m: simulate(holdings(63)) }
+  const b0 = cal && bench ? bench.close[Math.max(0, indexAtOrBefore(cal.days, startDay - 1) + 1)] : undefined
+  const curve: BtResult['curve'] = sims.list.pts.map((p, i) => ({
+    day: p.day, list: p.value, hold1m: sims.hold1m.pts[i]?.value, hold3m: sims.hold3m.pts[i]?.value, members: p.members,
+    bench: b0 && cal ? bench!.close[indexAtOrBefore(cal.days, p.day)] / b0 : undefined,
+  }))
+  const stats = (k: keyof typeof sims) => {
+    const s = sims[k]
+    const lastV = s.pts.at(-1)?.value
+    return { total: lastV != null ? lastV - 1 : undefined, maxDrawdown: s.pts.length ? s.maxDd : undefined, avgMembers: s.pts.length ? s.memberSum / s.pts.length : undefined, daysInvested: s.invested, costPaid: s.costPaid }
+  }
+  const maxDd = sims.list.maxDd, memberSum = sims.list.memberSum, invested = sims.list.invested, costPaid = sims.list.costPaid
   const last = curve[curve.length - 1]
   if (used.size && [...used].some((f) => backtestSupport(f).level === 'constant')) {
     notes.push('Geçmişi bilinmeyen oranlar bugünkü değerleriyle sabit alındı; sonuçlar iyimser olabilir (ileriye bakma).')
@@ -424,7 +523,9 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
       maxDrawdown: curve.length ? maxDd : undefined,
       avgMembers: curve.length ? memberSum / curve.length : undefined,
       daysInvested: invested,
+      costPaid,
     },
+    portfolios: { list: stats('list'), hold1m: stats('hold1m'), hold3m: stats('hold3m') },
     tested, skipped, startDay, endDay, notes,
   }
 }
@@ -462,4 +563,75 @@ const median = (sorted: number[]) => {
 export function supportSummary(screen: Screen) {
   const used = [...new Set(screen.conditions.flatMap(conditionFields))]
   return used.map((id) => ({ id, label: field(id).label, ...backtestSupport(id) }))
+}
+
+// ------------------------------------------------------------------ güvenilirlik skoru
+
+export type ReliabilityLabel = 'Güçlü' | 'Orta' | 'Zayıf' | 'Güvenilmez' | 'Yetersiz veri'
+
+export interface Reliability {
+  /** 0–100; yetersiz veride undefined */
+  score?: number
+  label: ReliabilityLabel
+  /** Giriş olan ay sayısı ve toplam giriş */
+  months: number
+  episodes: number
+  /** Girişten 1 ay / 3 ay sonra endekse göre aylık ortalama fark (oran) */
+  edge1m?: number
+  edge3m?: number
+  t1m?: number
+  t3m?: number
+  /** Ayların kaçında 3 ay sonraki fark pozitif (0–1) */
+  consistency?: number
+  /** Geçmişi bilinmeyen alan kullanımı cezası */
+  lookahead: boolean
+}
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v))
+
+/**
+ * Geçmişte testten güvenilirlik skoru. Girişler ay ay gruplanır (aynı gün çok giriş tek ayı şişirmesin),
+ * her ayın girişten sonraki ortalama endeks farkı alınır; aylar arası ortalama, t değeri ve pozitif ay oranı:
+ *   skor = 100 × (0,5·güç + 0,3·tutarlılık + 0,2·örnek) × (sabit alan varsa 0,75)
+ *   güç: t −0,5 → 0, +2,5 → 1 (1 ve 3 ay ortalaması; 3 aylık pencereler örtüştüğü için etkin örnek ⅓)
+ *   tutarlılık: pozitif ay oranı %35 → 0, %70 → 1      örnek: ay sayısı 30'a, giriş sayısı 60'a göre
+ */
+export function reliability(r: BtResult, screen: Screen): Reliability {
+  const k1 = (r.afterEntry.findIndex((s) => s.horizon === 21))
+  const k3 = (r.afterEntry.findIndex((s) => s.horizon === 63))
+  const lookahead = screen.conditions.flatMap(conditionFields).some((f) => backtestSupport(f).level === 'constant')
+  const monthly = (k: number) => {
+    if (k < 0) return [] as number[]
+    const by = new Map<number, number[]>()
+    for (const e of r.episodes) {
+      const a = e.afterEntry[k]
+      if (a == null) continue
+      const ex = a - (e.benchAfterEntry[k] ?? 0)
+      const m = monthOf(e.entryDay)
+      by.set(m, [...(by.get(m) ?? []), ex])
+    }
+    return [...by.values()].map((v) => v.reduce((x, y) => x + y, 0) / v.length)
+  }
+  const m1 = monthly(k1), m3 = monthly(k3)
+  const tstat = (v: number[], eff = 1) => {
+    if (v.length < 3) return undefined
+    const mu = v.reduce((a, b) => a + b, 0) / v.length
+    const sd = Math.sqrt(v.reduce((a, b) => a + (b - mu) ** 2, 0) / (v.length - 1))
+    return sd > 0 ? mu / (sd / Math.sqrt(Math.max(1, v.length * eff))) : undefined
+  }
+  const mean = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : undefined)
+  const months = Math.max(m1.length, m3.length)
+  const episodes = r.episodes.length
+  const base = { months, episodes, edge1m: mean(m1), edge3m: mean(m3), t1m: tstat(m1), t3m: tstat(m3, 1 / 3), lookahead }
+  const pos = m3.length ? m3 : m1
+  const consistency = pos.length ? pos.filter((x) => x > 0).length / pos.length : undefined
+  if (months < 6 || episodes < 15) return { ...base, consistency, label: 'Yetersiz veri' }
+  const ts = [base.t1m, base.t3m].filter((x): x is number => x != null)
+  const t = ts.length ? ts.reduce((a, b) => a + b, 0) / ts.length : 0
+  const strength = clamp01((t + 0.5) / 3)
+  const cons = clamp01(((consistency ?? 0) - 0.35) / 0.35)
+  const sample = clamp01(Math.log(months) / Math.log(30)) * Math.sqrt(clamp01(episodes / 60))
+  const score = Math.round(100 * (0.5 * strength + 0.3 * cons + 0.2 * sample) * (lookahead ? 0.75 : 1))
+  const label: ReliabilityLabel = score >= 70 ? 'Güçlü' : score >= 50 ? 'Orta' : score >= 30 ? 'Zayıf' : 'Güvenilmez'
+  return { ...base, consistency, score, label }
 }

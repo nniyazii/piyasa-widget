@@ -164,35 +164,88 @@ export const SCREEN_TEMPLATES: Screen[] = [
   S('d_bist_5y_usd', '5 yıllık dibe yakın BIST ($)', 'BIST', [C('PRICE', 'LTE', 'LOW_5Y', 10)], { currency: 'USD' }),
   S('d_my_us_sma200', '200 günlük ortalama civarı (listemdeki ABD)', 'MY_LIST', [C('PRICE', 'LT', 'SMA200', 5)], { category: 'US' }),
   S('d_bist_movers', 'Günün yıldızları (BIST)', 'BIST', [C('CHANGE', 'GTE', null, 4), C('MCAP', 'GT', null, 5 * MLR)], { sort: 'CHANGE_DESC', limit: 10 }),
-  S('d_bist_oversold_big', 'Aşırı satılmış BIST devleri', 'BIST', [C('RSI', 'LT', null, 35), C('MCAP', 'GT', null, 50 * MLR)], { limit: 20 }),
+  S('d_bist_oversold_big', 'Yükselen trendde aşırı satılmış BIST devleri', 'BIST', [
+    C('RSI', 'LT', null, 35), C('MCAP', 'GT', null, 50 * MLR), C('PRICE', 'GT', 'SMA200', 0),
+  ], { limit: 20 }),
   S('d_bist_trend_cheap', 'Trendde ve ucuz (BIST)', 'BIST', [
     C('PE', 'LT', null, 10), C('PE', 'GT', null, 0), C('PRICE', 'GT', 'SMA200', 0), C('SMA50', 'GT', 'SMA200', 0), C('MCAP', 'GT', null, 10 * MLR),
   ], { sort: 'MCAP_DESC', limit: 20 }),
   S('d_bist_52w_high', 'Zirveye yakın BIST hisseleri', 'BIST', [C('PRICE', 'GTE', 'HIGH_52W', -5), C('MCAP', 'GT', null, 20 * MLR)], { limit: 20 }),
-  S('d_us_megacap_dip', 'Düşüşteki ABD devleri', 'US', [C('PRICE', 'LTE', 'LOW_52W', 15), C('MCAP', 'GT', null, 100 * MLR)], { limit: 20 }),
+  S('d_us_megacap_dip', 'Düşüşteki ABD devleri', 'US', [C('PRICE', 'LTE', 'LOW_52W', 25), C('MCAP', 'GT', null, 100 * MLR)], { limit: 20 }),
   S('d_my_pe_half', 'F/K’sı 5 yıllık ortalamasının yarısına inenler (listem)', 'MY_LIST', [
     C('PE', 'LTE', 'PE_5Y_AVG', -50), C('PE', 'GT', null, 0),
   ], { sort: 'EXTREME', onlyStocks: true }),
   S('d_bist_pe_hist_cheap', 'Tarihine göre ucuzlamış BIST devleri', 'BIST', [
     C('PE', 'LTE', 'PE_5Y_AVG', -40), C('PE', 'GT', null, 0), C('MCAP', 'GT', null, 50 * MLR),
   ], { sort: 'EXTREME', limit: 20 }),
-  S('d_us_pe_hist_cheap', 'Tarihine göre ucuzlamış ABD devleri', 'US', [
-    C('PE', 'LTE', 'PE_5Y_AVG', -25), C('PE', 'GT', null, 0), C('MCAP', 'GT', null, 100 * MLR),
+  S('d_us_pe_hist_cheap', 'Tarihine göre ucuz, trendi yukarı ABD devleri', 'US', [
+    C('PE', 'LTE', 'PE_5Y_AVG', -25), C('PE', 'GT', null, 0), C('MCAP', 'GT', null, 50 * MLR), C('PRICE', 'GT', 'SMA200', 0),
   ], { sort: 'EXTREME', limit: 20 }),
   S('d_bist_fwd_growth', 'Kârı artması beklenen ucuz BIST', 'BIST', [
     C('FWD_PE', 'LTE', 'PE', -30), C('FWD_PE', 'GT', null, 0), C('PE', 'GT', null, 0), C('PE', 'LT', null, 15), C('MCAP', 'GT', null, 20 * MLR),
   ], { sort: 'EXTREME', limit: 20 }),
   S('d_bist_below_book', 'Defter değerinin altında, kârlı BIST', 'BIST', [
-    C('PB', 'LT', null, 1), C('PB', 'GT', null, 0), C('ROE', 'GT', null, 10), C('MCAP', 'GT', null, 10 * MLR),
+    C('PB', 'LT', null, 1), C('PB', 'GT', null, 0), C('ROE', 'GT', null, 10), C('MCAP', 'GT', null, 30 * MLR),
   ], { limit: 20 }),
-  S('d_bist_dividend', 'Yüksek temettü verimli BIST', 'BIST', [C('DIV_YIELD', 'GTE', null, 6), C('MCAP', 'GT', null, 20 * MLR)], { limit: 20 }),
+  S('d_bist_dividend', 'Yüksek temettü verimli BIST', 'BIST', [C('DIV_YIELD', 'GTE', null, 4), C('MCAP', 'GT', null, 20 * MLR)], { limit: 20 }),
   S('d_us_quality', 'Kaliteli ve makul fiyatlı ABD devleri', 'US', [
-    C('ROE', 'GT', null, 20), C('NET_MARGIN', 'GT', null, 15), C('DEBT_EQ', 'LT', null, 1), C('PE', 'GT', null, 0), C('PE', 'LT', null, 25), C('MCAP', 'GT', null, 100 * MLR),
+    C('ROE', 'GT', null, 15), C('NET_MARGIN', 'GT', null, 15), C('DEBT_EQ', 'LT', null, 1), C('PE', 'GT', null, 0), C('PE', 'LT', null, 35), C('MCAP', 'GT', null, 100 * MLR),
   ], { sort: 'MCAP_DESC', limit: 20 }),
-  S('d_us_growth_dip', 'Büyüyen ama geri çekilen ABD devleri', 'US', [
-    C('PRICE', 'LT', 'SMA200', 0), C('EPS_CAGR_5Y', 'GT', null, 15), C('MCAP', 'GT', null, 50 * MLR),
+  S('d_us_growth_dip', 'Büyüyen, trendde geri çekilen ABD devleri', 'US', [
+    C('RSI', 'LT', null, 40), C('PRICE', 'GT', 'SMA200', 0), C('EPS_CAGR_5Y', 'GT', null, 20), C('MCAP', 'GT', null, 50 * MLR),
+  ], { limit: 20 }),
+  // Geçmişte test edilerek bulunanlar (web/README: Hazır listelerin araştırması)
+  S('d_bist_usd_high', 'Dolar bazında zirvesindeki BIST', 'BIST', [C('PRICE', 'GTE', 'HIGH_52W', -5), C('MCAP', 'GT', null, 5 * MLR)], { currency: 'USD', limit: 20 }),
+  S('d_bist_pb_trend', 'Defter değerine yakın, yükselen BIST', 'BIST', [
+    C('PB', 'LT', null, 1.5), C('PB', 'GT', null, 0), C('PRICE', 'GT', 'SMA50', 0), C('MCAP', 'GT', null, 30 * MLR),
+  ], { limit: 20 }),
+  S('d_us_pb_trend', 'Defter değerine göre makul, trendde ABD devleri', 'US', [
+    C('PB', 'LT', null, 2), C('PB', 'GT', null, 0), C('PRICE', 'GT', 'SMA200', 0), C('MCAP', 'GT', null, 100 * MLR),
   ], { limit: 20 }),
 ]
+
+/** Hazır listelerin sürümü: bir hazır liste değiştiğinde ya da eklendiğinde artar. */
+export const TEMPLATES_REVISION = 2
+
+/** Önceki sürümlerdeki koşullar: kullanıcı değiştirmediyse yenisiyle güncellenir. */
+export const PREVIOUS_TEMPLATE_CONDITIONS: Record<string, Condition[][]> = {
+  d_bist_oversold_big: [[C('RSI', 'LT', null, 35), C('MCAP', 'GT', null, 50 * MLR)]],
+  d_us_megacap_dip: [[C('PRICE', 'LTE', 'LOW_52W', 15), C('MCAP', 'GT', null, 100 * MLR)]],
+  d_us_pe_hist_cheap: [[C('PE', 'LTE', 'PE_5Y_AVG', -25), C('PE', 'GT', null, 0), C('MCAP', 'GT', null, 100 * MLR)]],
+  d_bist_below_book: [[C('PB', 'LT', null, 1), C('PB', 'GT', null, 0), C('ROE', 'GT', null, 10), C('MCAP', 'GT', null, 10 * MLR)]],
+  d_bist_dividend: [[C('DIV_YIELD', 'GTE', null, 6), C('MCAP', 'GT', null, 20 * MLR)]],
+  d_us_quality: [[C('ROE', 'GT', null, 20), C('NET_MARGIN', 'GT', null, 15), C('DEBT_EQ', 'LT', null, 1), C('PE', 'GT', null, 0), C('PE', 'LT', null, 25), C('MCAP', 'GT', null, 100 * MLR)]],
+  d_us_growth_dip: [[C('PRICE', 'LT', 'SMA200', 0), C('EPS_CAGR_5Y', 'GT', null, 15), C('MCAP', 'GT', null, 50 * MLR)]],
+}
+/** Sürümde eklenen hazır listeler (mevcut kullanıcılara bir kez eklenir) */
+export const TEMPLATES_ADDED: Record<number, string[]> = { 2: ['d_bist_usd_high', 'd_bist_pb_trend', 'd_us_pb_trend'] }
+
+const sameConditions = (a: Condition[], b: Condition[]) =>
+  a.length === b.length && a.every((x, i) => x.left === b[i].left && x.op === b[i].op && (x.right ?? null) === (b[i].right ?? null) && x.value === b[i].value)
+
+/**
+ * Kayıtlı listeleri yeni hazır liste sürümüne taşır: koşulları değiştirilmemiş hazır listeler güncellenir
+ * (kullanıcının verdiği ad korunur), yeni hazırlar eklenir. Kullanıcının değiştirdiği listelere dokunulmaz.
+ */
+export function upgradeTemplates(screens: Screen[], fromRevision: number): Screen[] {
+  if (fromRevision >= TEMPLATES_REVISION) return screens
+  const out = screens.map((s) => {
+    const t = SCREEN_TEMPLATES.find((x) => x.id === s.id)
+    const old = PREVIOUS_TEMPLATE_CONDITIONS[s.id]
+    if (!t || !old?.some((c) => sameConditions(c, s.conditions))) return s
+    const renamed = s.name !== (OLD_NAMES[s.id] ?? t.name)
+    return { ...structuredClone(t), name: renamed ? s.name : t.name, limit: s.limit, sort: s.sort }
+  })
+  for (let r = fromRevision + 1; r <= TEMPLATES_REVISION; r++) {
+    for (const id of TEMPLATES_ADDED[r] ?? []) if (!out.some((s) => s.id === id)) out.push(structuredClone(SCREEN_TEMPLATES.find((x) => x.id === id)!))
+  }
+  return out
+}
+const OLD_NAMES: Record<string, string> = {
+  d_bist_oversold_big: 'Aşırı satılmış BIST devleri',
+  d_us_pe_hist_cheap: 'Tarihine göre ucuzlamış ABD devleri',
+  d_us_growth_dip: 'Büyüyen ama geri çekilen ABD devleri',
+}
 
 export const defaultScreens = (): Screen[] => structuredClone(SCREEN_TEMPLATES)
 
@@ -210,6 +263,18 @@ export interface Row {
   fyEnd?: number
   /** Yıllık gelir, en yeni önce (geçmişte test için). */
   revenueFy?: (number | undefined)[]
+  /** Geçmişte test için yıllık bilanço dizileri (en yeni önce) ve bugünkü firma değeri. */
+  fund?: Fundamentals
+}
+
+export interface Fundamentals {
+  ebitdaFy?: (number | undefined)[]
+  dpsFy?: (number | undefined)[]
+  netIncomeFy?: (number | undefined)[]
+  debtFy?: (number | undefined)[]
+  ev?: number
+  /** Bilanço para birimi (fiyatınkinden farklıysa oranlar hesaplanmaz) */
+  currency?: string
 }
 
 export interface HistoryStats { low?: number; high?: number; peAvg?: number }

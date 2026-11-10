@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  derived, describe as describeCondition, evaluate, historyStats, metricText, peAverage, preFilter, SCREEN_TEMPLATES,
+  derived, describe as describeCondition, evaluate, historyStats, metricText, peAverage, preFilter, PREVIOUS_TEMPLATE_CONDITIONS, SCREEN_TEMPLATES, TEMPLATES_ADDED, TEMPLATES_REVISION, upgradeTemplates,
   serverFilters, valueOf, type Bar, type Condition, type FieldId, type HistoryStats, type Row, type Screen,
 } from './screener'
 
@@ -116,9 +116,26 @@ describe('tarama motoru', () => {
   })
 
   it('hazır listeler tutarlı', () => {
-    expect(SCREEN_TEMPLATES).toHaveLength(15)
-    expect(new Set(SCREEN_TEMPLATES.map((s) => s.id)).size).toBe(15)
+    expect(SCREEN_TEMPLATES).toHaveLength(18)
+    expect(new Set(SCREEN_TEMPLATES.map((s) => s.id)).size).toBe(18)
+    for (const ids of Object.values(TEMPLATES_ADDED)) for (const id of ids) expect(SCREEN_TEMPLATES.some((s) => s.id === id), id).toBe(true)
     SCREEN_TEMPLATES.filter((s) => s.universe !== 'MY_LIST' && s.id !== 'd_bist_5y_usd').forEach((s) =>
       expect(s.conditions.some((c) => c.left === 'MCAP' && c.op === 'GT'), s.name).toBe(true))
+  })
+
+  it('hazır listeler yeni sürüme taşınır, kullanıcının değiştirdiklerine dokunulmaz', () => {
+    const old = (id: string, name: string) => ({ ...SCREEN_TEMPLATES.find((s) => s.id === id)!, name, conditions: PREVIOUS_TEMPLATE_CONDITIONS[id][0] })
+    const edited = { ...old('d_bist_dividend', 'Temettü'), conditions: [C('DIV_YIELD', 'GTE', null, 9)] }
+    const mine = { ...SCREEN_TEMPLATES[0], id: 'u1', name: 'Benim' }
+    const out = upgradeTemplates([old('d_bist_oversold_big', 'Aşırı satılmış BIST devleri'), old('d_us_quality', 'Kalite'), edited, mine], 1)
+    const by = (id: string) => out.find((s) => s.id === id)!
+    expect(by('d_bist_oversold_big').conditions).toEqual(SCREEN_TEMPLATES.find((s) => s.id === 'd_bist_oversold_big')!.conditions)
+    expect(by('d_bist_oversold_big').name).toBe('Yükselen trendde aşırı satılmış BIST devleri') // eski ad → yeni ad
+    expect(by('d_us_quality').name).toBe('Kalite') // kullanıcının verdiği ad korunur
+    expect(by('d_us_quality').conditions.find((c) => c.left === 'ROE')!.value).toBe(15)
+    expect(by('d_bist_dividend').conditions).toEqual([C('DIV_YIELD', 'GTE', null, 9)])
+    expect(by('u1').name).toBe('Benim')
+    for (const id of TEMPLATES_ADDED[2]) expect(out.some((s) => s.id === id)).toBe(true)
+    expect(upgradeTemplates(out, TEMPLATES_REVISION)).toBe(out)
   })
 })

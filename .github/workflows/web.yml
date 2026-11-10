@@ -3,6 +3,7 @@ name: Web
 # Web sürümü: test → derleme → (günlük) fiyat geçmişi kopyası → GitHub Pages (gh-pages dalı).
 # Geçmiş kopyası her iş günü BIST kapanışından sonra yenilenir: aylık çubuklar (5 yıllık dip/zirve,
 # ortalama F/K) ve günlük kapanışlar (geçmişte test). Statik yayında bu dosyalardan çalışır.
+# Ardından hazır listelerin güvenilirlik skorları aynı kopyayla yeniden hesaplanır (data/scores.json).
 on:
   push:
     branches: [main]
@@ -41,6 +42,14 @@ jobs:
         # Yeni çekilemeyen semboller yayındaki önceki kopyadan korunur
         run: node scripts/snapshot.mjs dist/data "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data"
         timeout-minutes: 12
+        continue-on-error: true
+      - name: Hazır listelerin güvenilirlik skorları (son 3 yıl)
+        # Aynı motorla, yeni kopyadan; olmazsa yayındaki önceki skorlar korunur
+        run: |
+          LAB_DATA=dist/data LAB_CACHE="$RUNNER_TEMP/fundamentals.json" OUT=dist/data/scores.json npm run scores \
+            || curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/scores.json" -o dist/data/scores.json \
+            || echo "Skor üretilemedi"
+        timeout-minutes: 10
         continue-on-error: true
       - name: 404 yönlendirmesi ve Jekyll'siz yayın
         run: |

@@ -2,3 +2,5 @@ node_modules
 dist
 e2e-fail-*.png
 .data
+research/out
+tsconfig.tsbuildinfo

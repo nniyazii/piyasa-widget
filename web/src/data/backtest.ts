@@ -2,12 +2,12 @@
  * Geçmişte testi hazırlar ve çalıştırır: evren (TradingView) → günlük kapanışlar → (gerekirse) aylık
  * geçmiş → hesap ayrı iş parçacığında (Web Worker). Ana iş parçacığı yalnızca ilerlemeyi gösterir.
  */
-import type { BtInput, BtResult, BtSymbol } from '../core/backtest'
+import { AS_OF_FIELDS, type BtInput, type BtResult, type BtSymbol } from '../core/backtest'
 import type { Instrument } from '../core/models'
 import { conditionFields, field, type FieldId, type Screen } from '../core/screener'
 import { dailyCloses } from './daily'
 import { monthlyBars } from './history'
-import { BASE_SCAN_COLUMNS, FUNDAMENTAL_COLUMNS, fetchUniverse } from './screens'
+import { BACKTEST_FUNDAMENTAL_COLUMNS, BASE_SCAN_COLUMNS, FUNDAMENTAL_COLUMNS, fetchUniverse } from './screens'
 
 export type BtStep =
   | { step: 'universe' }
@@ -30,9 +30,12 @@ function benchmarkFor(screen: Screen, symbols: string[]): { symbol: string; name
 export async function runScreenBacktest(screen: Screen, instruments: Instrument[], years: number, onStep: (s: BtStep) => void, signal?: AbortSignal): Promise<BtRun> {
   onStep({ step: 'universe' })
   const used = [...new Set(screen.conditions.flatMap(conditionFields))]
-  const direct = [...new Set<FieldId>([...used, 'PRICE', 'MCAP'])].filter((f) => field(f).column)
-  const fundamentals = used.some((f) => ['PE', 'PE_5Y_AVG', 'EPS_GROWTH_1Y', 'EPS_CAGR_5Y', 'REV_GROWTH_1Y'].includes(f))
-  const columns = [...BASE_SCAN_COLUMNS, ...direct.map((f) => field(f).column!), ...(fundamentals ? FUNDAMENTAL_COLUMNS : [])]
+  // Bugünkü değerler: TradingView sütunları ve yıllık dizilerden türetilenler (beklenen F/K gibi)
+  const direct = [...new Set<FieldId>([...used, 'PRICE', 'MCAP'])].filter((f) => field(f).source !== 'HISTORY')
+  const ratios = used.some((f) => (AS_OF_FIELDS as readonly FieldId[]).includes(f))
+  const fundamentals = ratios || used.some((f) => ['PE', 'PE_5Y_AVG', 'EPS_GROWTH_1Y', 'EPS_CAGR_5Y', 'REV_GROWTH_1Y', 'FWD_PE'].includes(f))
+  const columns = [...BASE_SCAN_COLUMNS, ...direct.map((f) => field(f).column).filter((c): c is string => !!c),
+    ...(fundamentals ? FUNDAMENTAL_COLUMNS : []), ...(ratios ? BACKTEST_FUNDAMENTAL_COLUMNS : [])]
   const rows = await fetchUniverse(screen, { instruments }, direct, columns, signal, true)
   if (!rows.length) throw new Error(screen.universe === 'MY_LIST' ? 'Listende test edilecek sembol yok.' : 'Evren alınamadı.')
 
@@ -60,7 +63,7 @@ export async function runScreenBacktest(screen: Screen, instruments: Instrument[
     symbol: r.symbol, name: r.name, currency: r.currency, pricescale: r.pricescale,
     series: daily.get(r.symbol.toUpperCase())!,
     monthly: monthly.get(r.symbol) ?? undefined,
-    now: r.values, epsFy: r.epsFy, revenueFy: r.revenueFy, fyEnd: r.fyEnd,
+    now: r.values, epsFy: r.epsFy, revenueFy: r.revenueFy, fyEnd: r.fyEnd, fund: r.fund,
   }))
   const end = today()
   const benchSeries = daily.get(bench.symbol)

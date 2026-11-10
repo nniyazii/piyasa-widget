@@ -2,7 +2,7 @@ package com.piyasa.widget.model
 
 /** Kayıtlı durumu güncel şemaya taşır. */
 object Migrations {
-    const val CURRENT = 5
+    const val CURRENT = 6
 
     fun apply(state: AppState): AppState {
         var s = state
@@ -10,6 +10,7 @@ object Migrations {
         if (state.schema < 3) s = refreshCatalogDefinitions(s)
         if (state.schema < 4) s = addDefaultScreens(s)
         if (state.schema < 5) s = addDefaultScreens(s, ScreenTemplates.addedInV5)
+        if (state.schema < 6) s = addDefaultScreens(upgradeTemplatesV6(s), ScreenTemplates.addedInV6)
         return if (s.schema == CURRENT) s else s.copy(schema = CURRENT)
     }
 
@@ -20,6 +21,20 @@ object Migrations {
     private fun addDefaultScreens(s: AppState, only: Set<String>? = null): AppState {
         val missing = ScreenTemplates.defaults.filter { d -> (only == null || d.id in only) && s.screens.none { it.id == d.id } }
         return if (missing.isEmpty()) s else s.copy(screens = s.screens + missing)
+    }
+
+    /**
+     * v5 -> v6: Geçmişte testle iyileştirilen hazır listeler, kullanıcı koşullarını değiştirmediyse yenisine geçer.
+     * Kullanıcının verdiği ad, sıralama ve sayı korunur; değiştirilmiş listelere dokunulmaz.
+     */
+    private fun upgradeTemplatesV6(s: AppState): AppState {
+        val screens = s.screens.map { sc ->
+            val old = ScreenTemplates.previousV5[sc.id] ?: return@map sc
+            val t = ScreenTemplates.all.firstOrNull { it.id == sc.id } ?: return@map sc
+            if (sc.conditions != old.second) return@map sc
+            t.copy(name = if (sc.name != old.first) sc.name else t.name, sort = sc.sort, limit = sc.limit)
+        }
+        return s.copy(screens = screens)
     }
 
     /**

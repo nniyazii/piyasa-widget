@@ -103,6 +103,8 @@ export interface AppState {
   settings: Settings
   /** İlk açılış ipucu kapatıldı mı. */
   welcomed: boolean
+  /** Hazır listelerin hangi sürümüne göre kaydedildi (yeni hazırlar ve güncellemeler bir kez uygulanır). */
+  templates?: number
 }
 
 /** Çalışma anı verisi (kalıcı değil ya da ayrı önbellek). */

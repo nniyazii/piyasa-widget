@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { horizonLabel, supportSummary, type BtResult, type Episode, type HorizonStat } from '../core/backtest'
+import { horizonLabel, reliability, supportSummary, type BtResult, type Episode, type HorizonStat } from '../core/backtest'
 import * as Fmt from '../core/format'
-import { describe } from '../core/screener'
+import { describe, type Screen } from '../core/screener'
 import { chartUrl } from '../core/tradingview'
 import { runScreenBacktest, type BtRun, type BtStep } from '../data/backtest'
 import { dailyAvailable } from '../data/daily'
+import { saveLocalScore } from '../data/reliability'
 import { useApp } from '../data/store'
 import { fold } from '../data/tv'
 import { Icon } from '../ui/Icon'
 import { Segmented } from '../ui/overlay'
+import { ReliabilityPanel } from '../ui/reliability'
 
 // Sayfadan çıkıp dönünce sonuç kaybolmasın (oturum boyunca)
 const cache = new Map<string, BtRun>()
@@ -46,6 +48,11 @@ export function BacktestView({ id }: { id: string }) {
       const r = await runScreenBacktest(screen, state.instruments, years, setStep, ac.signal)
       cache.set(key, r)
       setRun(r)
+      const p = r.result.portfolios
+      saveLocalScore(screen, {
+        rel: reliability(r.result, screen), years, at: Date.now(),
+        portfolios: { list: p?.list.total, hold1m: p?.hold1m.total, hold3m: p?.hold3m.total, bench: r.result.portfolio.bench },
+      })
     } catch (e) {
       if ((e as Error).name !== 'AbortError') setError((e as Error).message || 'Test yapılamadı')
     } finally {
@@ -77,13 +84,13 @@ export function BacktestView({ id }: { id: string }) {
             <li key={s.id}><span className={'lvl ' + s.level}>{s.level === 'exact' ? 'Tam' : s.level === 'approx' ? 'Yaklaşık' : 'Sabit'}</span><b>{s.label}</b>: {s.how}</li>
           ))}
           <li><span className="lvl approx">Not</span>Evren bugünkü hisselerden oluşur{screen.universe === 'US' ? ' (ABD’de piyasa değeri en büyük 400)' : ''}; bu sürede borsadan çıkanlar dahil değildir.</li>
-          <li><span className="lvl exact">Not</span>Giriş ve çıkış o günün kapanışıyla; getiriler işlem ücreti ve temettü içermez.</li>
+          <li><span className="lvl exact">Not</span>Giriş ve çıkış o günün kapanışıyla. Portföylerde her alım ve satışta %0,15 işlem ücreti düşülür; temettüler dahil değildir.</li>
         </ul>
       </details>
 
       {step && <Progress step={step} />}
       {error && <p className="note" style={{ color: 'var(--down)' }}>{error}</p>}
-      {run && !step && <Results run={run} />}
+      {run && !step && <Results run={run} screen={screen} />}
     </div>
   )
 }
@@ -104,8 +111,18 @@ function Progress({ step }: { step: BtStep }) {
   )
 }
 
-function Results({ run }: { run: BtRun }) {
+type Mode = 'list' | 'hold1m' | 'hold3m'
+const MODES: { value: Mode; label: string; note: string }[] = [
+  { value: 'list', label: 'Listede kaldıkça', note: 'Her gün listedekilere eşit ağırlıkla yatırım, ertesi günün kapanışına kadar. Listeden çıkan satılır; liste boşken nakitte.' },
+  { value: 'hold1m', label: '1 ay tut', note: 'Listeye giren her hisse girdiği günün kapanışında alınır ve 1 ay (21 işlem günü) tutulur; eldekilere eşit ağırlık.' },
+  { value: 'hold3m', label: '3 ay tut', note: 'Listeye giren her hisse girdiği günün kapanışında alınır ve 3 ay (63 işlem günü) tutulur; eldekilere eşit ağırlık.' },
+]
+
+function Results({ run, screen }: { run: BtRun; screen: Screen }) {
   const r = run.result
+  const [mode, setMode] = useState<Mode>('list')
+  const rel = useMemo(() => reliability(r, screen), [r, screen])
+  const port = r.portfolios?.[mode] ?? r.portfolio
   const span = run.years === 0.5 ? 'Son 6 ayda' : `Son ${run.years} yılda`
   const bench = run.benchmarkName
   if (!r.episodes.length) {
@@ -126,6 +143,8 @@ function Results({ run }: { run: BtRun }) {
       </p>
       <p className="note">{r.tested} hisse test edildi{run.missing ? `, ${run.missing} hissenin günlük geçmişi yok` : ''}. {fmtDay(r.startDay)} – {fmtDay(r.endDay)}.</p>
 
+      <ReliabilityPanel rel={rel} years={run.years} bench={bench} />
+
       <section className="bt-sect">
         <h2>Girdikten sonra</h2>
         <HorizonTable stats={r.afterEntry} bench={bench} />
@@ -136,15 +155,17 @@ function Results({ run }: { run: BtRun }) {
         <HorizonTable stats={r.afterExit} bench={bench} />
       </section>
       <section className="bt-sect">
-        <h2>Listeyi her gün alsaydın</h2>
-        <p className="note" style={{ marginTop: -4 }}>Her gün listedekilere eşit ağırlıkla yatırım, ertesi günün kapanışına kadar. Liste boşken nakitte.</p>
-        <Curve result={r} benchName={bench} />
+        <h2>Listeyi takip etseydin</h2>
+        <Segmented value={mode} onChange={setMode} label="Portföy" options={MODES.map(({ value, label }) => ({ value, label }))} />
+        <p className="note" style={{ marginTop: 8 }}>{MODES.find((m) => m.value === mode)!.note}</p>
+        <Curve result={r} benchName={bench} mode={mode} />
         <dl className="bt-kv">
-          <div><dt>Liste</dt><dd className={'num ' + tone(r.portfolio.total)}>{pct1(r.portfolio.total)}</dd></div>
+          <div><dt>Portföy</dt><dd className={'num ' + tone(port.total)}>{pct1(port.total)}</dd></div>
           {bench && <div><dt>{bench}</dt><dd className={'num ' + tone(r.portfolio.bench)}>{pct1(r.portfolio.bench)}</dd></div>}
-          <div><dt>En büyük düşüş</dt><dd className="num">{pct1(r.portfolio.maxDrawdown)}</dd></div>
-          <div><dt>Ortalama hisse sayısı</dt><dd className="num">{Fmt.number(r.portfolio.avgMembers ?? 0, 1)}</dd></div>
-          <div><dt>Yatırımda geçen gün</dt><dd className="num">{r.portfolio.daysInvested} / {Math.max(0, r.curve.length - 1)}</dd></div>
+          <div><dt>En büyük düşüş</dt><dd className="num">{pct1(port.maxDrawdown)}</dd></div>
+          <div><dt>Ortalama hisse sayısı</dt><dd className="num">{Fmt.number(port.avgMembers ?? 0, 1)}</dd></div>
+          <div><dt>Yatırımda geçen gün</dt><dd className="num">{port.daysInvested} / {Math.max(0, r.curve.length - 1)}</dd></div>
+          {port.costPaid != null && port.costPaid > 0 && <div><dt>İşlem ücreti</dt><dd className="num">{pct1(-port.costPaid)}</dd></div>}
         </dl>
       </section>
       <section className="bt-sect">
@@ -183,8 +204,9 @@ function HorizonTable({ stats, bench }: { stats: HorizonStat[]; bench?: string }
 }
 
 /** Liste portföyü ve endeks: değer eğrisi, üzerine gelince o günün değerleri. */
-function Curve({ result, benchName }: { result: BtResult; benchName?: string }) {
-  const pts = result.curve
+function Curve({ result, benchName, mode }: { result: BtResult; benchName?: string; mode: Mode }) {
+  const pts = useMemo(() => result.curve.map((p) => ({ ...p, list: (mode === 'list' ? p.list : p[mode]) ?? p.list })), [result, mode])
+  const total = (result.portfolios?.[mode] ?? result.portfolio).total
   const [hover, setHover] = useState<number | null>(null)
   const W = 760, H = 240, P = { l: 8, r: 54, t: 14, b: 24 }
   const ys = pts.flatMap((p) => [p.list, p.bench ?? p.list])
@@ -199,7 +221,7 @@ function Curve({ result, benchName }: { result: BtResult; benchName?: string }) 
   const h = hover != null ? pts[hover] : undefined
   return (
     <div className="bt-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Liste portföyü ${pct1(result.portfolio.total)}${benchName ? `, ${benchName} ${pct1(result.portfolio.bench)}` : ''}`}
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Portföy ${pct1(total)}${benchName ? `, ${benchName} ${pct1(result.portfolio.bench)}` : ''}`}
         onPointerMove={(e) => {
           const r = (e.currentTarget as SVGSVGElement).getBoundingClientRect()
           const fx = ((e.clientX - r.left) / r.width) * W
@@ -227,12 +249,12 @@ function Curve({ result, benchName }: { result: BtResult; benchName?: string }) 
         {h ? (
           <>
             <span>{fmtDay(h.day)}</span>
-            <span><i className="sw list" />Liste {pct1(h.list - 1)}, {h.members} hisse</span>
+            <span><i className="sw list" />Portföy {pct1(h.list - 1)}{mode === 'list' ? `, ${h.members} hisse` : ''}</span>
             {h.bench != null && <span><i className="sw bench" />{benchName} {pct1(h.bench - 1)}</span>}
           </>
         ) : (
           <>
-            <span><i className="sw list" />Liste</span>
+            <span><i className="sw list" />Portföy</span>
             {benchName && <span><i className="sw bench" />{benchName}</span>}
             <span style={{ color: 'var(--ink-3)' }}>Ayrıntı için grafiğin üzerine gel</span>
           </>

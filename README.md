@@ -101,27 +101,30 @@ Formüller başka formülleri kullanabilir (`CEYREK = GRAM_ALTIN * 1.6067`). Dö
 
 Kendiliğinden güncellenen listeler: koşulları bir kez kurarsın, her yenilemede yeniden taranır. **+ → Dinamik liste oluştur** ile açılır; listede basılı tutup bırakınca açılan menüde *Düzenle* ile değiştirilir, basılı tutup sürükleyerek sıralanır. Widget düzenleyicisinde *Ekle → Dinamik listeler* ile widget'a da konur; widget'ta başlık ve ilk 3–10 sonuç görünür.
 
-Uygulamaya **15 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; silersen geri gelmez, *Varsayılan listeye dön* geri getirir). Hepsi yeni liste için şablon olarak da kullanılabilir.
+Uygulamaya **18 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; silersen geri gelmez, *Varsayılan listeye dön* geri getirir). Hepsi yeni liste için şablon olarak da kullanılabilir.
 
 | Hazır liste | Kurulum | 10 Kas 2026'da |
 |---|---|---|
 | **5 yıllık dibe yakın BIST ($)** | BIST hisseleri · USD · `Fiyat ≤ 5 yıl en düşük +%10` | Arçelik, Kalkınma Yatırım, Sasa |
 | **200 günlük ortalama civarı (listemdeki ABD)** | Listem · Amerika · `Fiyat < 200 günlük ortalama +%5` | Nasdaq, S&P 500, Dow (listene ABD hissesi ekledikçe onlar da) |
 | Günün yıldızları (BIST) | `Günlük değişim % ≥ 4` · `Piyasa değeri > 5 mlr` · en çok yükselen, 10 | 10 hisse |
-| Aşırı satılmış BIST devleri | `RSI (14) < 35` · `Piyasa değeri > 50 mlr` | Türkiye Sigorta, Tüpraş |
+| Yükselen trendde aşırı satılmış BIST devleri | `RSI (14) < 35` · `Fiyat > 200 günlük ort.` · `Piyasa değeri > 50 mlr` | Tüpraş |
 | Trendde ve ucuz (BIST) | `0 < F/K < 10` · `Fiyat > 200 günlük ort.` · `50 günlük ort. > 200 günlük ort.` · `Piyasa değeri > 10 mlr` | Tüpraş, Halkbank, Alarko … (6) |
 | Zirveye yakın BIST hisseleri | `Fiyat ≥ 52 hafta en yüksek −%5` · `Piyasa değeri > 20 mlr` | 3 hisse |
-| Düşüşteki ABD devleri | ABD · `Fiyat ≤ 52 hafta en düşük +%15` · `Piyasa değeri > 100 mlr $` | Netflix, Nvidia, Boeing, Alphabet … (19) |
+| Düşüşteki ABD devleri | ABD · `Fiyat ≤ 52 hafta en düşük +%25` · `Piyasa değeri > 100 mlr $` | Nvidia, Netflix, Boeing, Alphabet … (20) |
 | **F/K'sı 5 yıllık ortalamasının yarısına inenler (listem)** | Listem · yalnızca hisseler · `F/K ≤ 5 yıllık ortalama F/K −%50` · `F/K > 0` · en uç önce | listene eklediğin hisselerden (ör. PayPal, Nvidia, Tüpraş) |
 | Tarihine göre ucuzlamış BIST devleri | `F/K ≤ 5 yıllık ort. F/K −%40` · `F/K > 0` · `Piyasa değeri > 50 mlr` | Coca-Cola İçecek, Aygaz, Tüpraş, Sabancı … (9) |
-| Tarihine göre ucuzlamış ABD devleri | ABD · `F/K ≤ 5 yıllık ort. F/K −%25` · `F/K > 0` · `Piyasa değeri > 100 mlr $` | Nvidia, Netflix, Amazon, Oracle … (8) |
+| Tarihine göre ucuz, trendi yukarı ABD devleri | ABD · `F/K ≤ 5 yıllık ort. F/K −%25` · `F/K > 0` · `Fiyat > 200 günlük ort.` · `Piyasa değeri > 50 mlr $` | Salesforce, Amazon, Disney, Newmont … (8) |
 | Kârı artması beklenen ucuz BIST | `Beklenen F/K ≤ F/K −%30` · `0 < F/K < 15` · `Beklenen F/K > 0` · `Piyasa değeri > 20 mlr` | Doğuş Otomotiv, Ülker, Torunlar, Türk Telekom … (8) |
-| Defter değerinin altında, kârlı BIST | `0 < PD/DD < 1` · `Özsermaye kârlılığı > %10` · `Piyasa değeri > 10 mlr` | Halk GYO, Rönesans GYO, THY … (18) |
-| Yüksek temettü verimli BIST | `Temettü verimi ≥ %6` · `Piyasa değeri > 20 mlr` | Doğuş Otomotiv, Nuh Çimento, Ford Otosan … (12) |
-| Kaliteli ve makul fiyatlı ABD devleri | ABD · `ÖK kârlılığı > %20` · `Net marj > %15` · `Borç/Özsermaye < 1` · `0 < F/K < 25` · `Piyasa değeri > 100 mlr $` | Nvidia, Alphabet, Amazon, Meta … (13) |
-| Büyüyen ama geri çekilen ABD devleri | ABD · `Fiyat < 200 günlük ort.` · `EPS büyümesi (5 yıl, yıllık) > %15` · `Piyasa değeri > 50 mlr $` | American Express, Blackstone, Tesla … (20) |
+| Defter değerinin altında, kârlı BIST | `0 < PD/DD < 1` · `Özsermaye kârlılığı > %10` · `Piyasa değeri > 30 mlr` | Rönesans GYO, THY, Aygaz, Türk Telekom … (9) |
+| Yüksek temettü verimli BIST | `Temettü verimi ≥ %4` · `Piyasa değeri > 20 mlr` | Doğuş Otomotiv, Nuh Çimento, Ford Otosan … (20) |
+| Kaliteli ve makul fiyatlı ABD devleri | ABD · `ÖK kârlılığı > %15` · `Net marj > %15` · `Borç/Özsermaye < 1` · `0 < F/K < 35` · `Piyasa değeri > 100 mlr $` | Nvidia, Microsoft, Alphabet, Amazon … (20) |
+| Büyüyen, trendde geri çekilen ABD devleri | ABD · `RSI (14) < 40` · `Fiyat > 200 günlük ort.` · `EPS büyümesi (5 yıl, yıllık) > %20` · `Piyasa değeri > 50 mlr $` | şu an yok |
+| Dolar bazında zirvesindeki BIST | BIST hisseleri · USD · `Fiyat ≥ 52 hafta en yüksek −%5` · `Piyasa değeri > 5 mlr` | DO & CO, Enerya Enerji … (3) |
+| Defter değerine yakın, yükselen BIST | `0 < PD/DD < 1,5` · `Fiyat > 50 günlük ort.` · `Piyasa değeri > 30 mlr` | THY, Pegasus, İş Bankası, Reysas GYO … (12) |
+| Defter değerine göre makul, trendde ABD devleri | ABD · `0 < PD/DD < 2` · `Fiyat > 200 günlük ort.` · `Piyasa değeri > 100 mlr $` | CVS Health, Wells Fargo, Berkshire Hathaway, Duke Energy … (7) |
 
-İlk ikisi ve *F/K'sı 5 yıllık ortalamasının yarısına inenler* kullanıcının istediği örnekler; eski kurulumlara 0.7.0 ile yalnızca yeni temel analiz listeleri eklenir. Diğerlerinde piyasa değeri eşiği küçük ve sığ hisseleri eler (BIST ₺, ABD $; düzenleyicide milyar cinsinden girilir). Listedeki *yalnızca hisseler* açılırsa endeksler hariç tutulur.
+İlk ikisi ve *F/K'sı 5 yıllık ortalamasının yarısına inenler* kullanıcının istediği örnekler; eski kurulumlara 0.7.0 ile yalnızca yeni temel analiz listeleri eklenir. 0.9.0'da yedi hazır liste geçmişte testle iyileştirildi, üç yeni liste eklendi (yöntem ve skorlar: [web/README](web/README.md#hazır-listelerin-araştırması)). Koşullarını değiştirmediğin hazır listeler güncellenir, değiştirdiklerine dokunulmaz. Diğerlerinde piyasa değeri eşiği küçük ve sığ hisseleri eler (BIST ₺, ABD $; düzenleyicide milyar cinsinden girilir). Listedeki *yalnızca hisseler* açılırsa endeksler hariç tutulur.
 
 - **Nerede:** Listem (istersen tek kategori, istersen yalnızca hisseler), tüm BIST hisseleri, ABD hisseleri (piyasa değeri 2 milyar $ üstü).
 - **Koşul:** `[alan] [< ≤ > ≥] [sayı]` ya da `[alan] [< ≤ > ≥] [başka alan ± %]`. Birden çok koşul *tümü* ya da *herhangi biri* olarak birleşir.

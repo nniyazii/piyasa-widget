@@ -668,3 +668,27 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
   .sidebar, .tabbar, .mobile-top, .detail, .group-head .tools { display: none !important; }
   .shell { display: block; }
 }
+
+/* ------------------------------------------------------------ güvenilirlik */
+.rel-badge { --c: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; vertical-align: -1px; font-size: 12px; font-weight: 600; color: var(--c); white-space: nowrap; }
+.rel-badge b { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.rel-badge.strong, .rel-panel.strong { --c: var(--up); }
+.rel-badge.mid, .rel-panel.mid { --c: var(--brass); }
+.rel-badge.weak, .rel-panel.weak { --c: var(--ink-3); }
+.rel-badge.bad, .rel-panel.bad { --c: var(--down); }
+.screen-item h3 .rel-badge { margin-left: 6px; }
+.rel-meter { display: inline-flex; gap: 2px; }
+.rel-meter i { width: 4px; height: 11px; border-radius: 1.5px; background: var(--rule); }
+.rel-meter i.on { background: var(--c); }
+.rel-meter i:nth-child(1) { height: 5px; margin-top: 6px; }
+.rel-meter i:nth-child(2) { height: 7px; margin-top: 4px; }
+.rel-meter i:nth-child(3) { height: 9px; margin-top: 2px; }
+.rel-line { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 10px 0 0; font-size: 13.5px; color: var(--ink-3); }
+.rel-line a { color: var(--ink-2); }
+.rel-head { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
+.rel-head p { flex: 1 1 320px; margin: 2px 0 0; font-size: 15px; line-height: 1.55; max-width: 62ch; }
+.rel-score { display: flex; align-items: baseline; gap: 6px; padding-left: 12px; border-left: 3px solid var(--c); }
+.rel-score b { font-size: 44px; line-height: 1; font-weight: 720; font-stretch: 92%; letter-spacing: -0.02em; }
+.rel-score span { color: var(--ink-3); font-size: 14px; }
+.rel-score em { font-style: normal; font-weight: 650; color: var(--c); margin-left: 4px; }
+.rel-kv dd { font-size: 16px; }
