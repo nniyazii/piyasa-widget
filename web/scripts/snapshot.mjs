@@ -14,7 +14,9 @@ const OUT = process.argv[2] ?? 'dist/data/history'
 const BASE = process.argv[3] ?? process.env.SNAPSHOT_BASE
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36'
 const HALF_DAY = 12 * 3600
-const BUDGET_MS = Number(process.env.SNAPSHOT_BUDGET_MS ?? 9 * 60_000)
+const BUDGET_MS = Number(process.env.SNAPSHOT_BUDGET_MS ?? 7 * 60_000)
+/** Test için: chart'ı atla, yalnızca toplu kapanışlarla güncelle. */
+const SPARK_ONLY = !!process.env.SNAPSHOT_SPARK_ONLY
 let concurrency = 4
 let cookie = ''
 let limited = 0
@@ -79,6 +81,52 @@ async function monthly(y) {
   return null
 }
 
+/** Toplu kapanış (spark: 20 sembol/istek). Yalnızca kapanış verir; chart engellenince son ayları tamamlamak için. */
+async function sparkCloses(ys) {
+  const out = new Map()
+  for (let i = 0; i < ys.length; i += 20) {
+    if (Date.now() - started > BUDGET_MS + 3 * 60_000) break
+    const chunk = ys.slice(i, i + 20)
+    try {
+      const r = await fetch(`https://query1.finance.yahoo.com/v7/finance/spark?symbols=${chunk.map(encodeURIComponent).join(',')}&range=6y&interval=1mo`, {
+        headers: { 'User-Agent': UA, ...(cookie ? { Cookie: cookie } : {}) }, signal: AbortSignal.timeout(15000),
+      })
+      if (!r.ok) { await sleep(2000); continue }
+      for (const res of (await r.json()).spark?.result ?? []) {
+        const x = res.response?.[0]
+        const closes = x?.indicators?.quote?.[0]?.close ?? []
+        if (!x?.timestamp) continue
+        out.set(res.symbol, x.timestamp.map((t, k) => {
+          const d = new Date((t + HALF_DAY) * 1000)
+          return [Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1) / 1000, round(closes[k])]
+        }).filter((p) => p[1] != null))
+      }
+    } catch { await sleep(1000) }
+  }
+  return out
+}
+
+/** Önceki çubuklara spark kapanışlarını işler: eksik aylar eklenir, son ayın kapanışı güncellenir. */
+function mergeCloses(base, closes) {
+  // Yahoo içinde bulunulan ay için iki çubuk verir (ay + bugün): aynı aydakileri birleştir
+  const byMonth = new Map()
+  for (const b of base ?? []) {
+    const m = byMonth.get(b[0])
+    if (!m) byMonth.set(b[0], [...b])
+    else {
+      if (b[1] != null) m[1] = m[1] == null ? b[1] : Math.min(m[1], b[1])
+      if (b[2] != null) m[2] = m[2] == null ? b[2] : Math.max(m[2], b[2])
+      if (b[3] != null) m[3] = b[3]
+    }
+  }
+  for (const [t, c] of closes) {
+    const b = byMonth.get(t)
+    if (b) { b[3] = c; b[1] = b[1] == null ? c : Math.min(b[1], c); b[2] = b[2] == null ? c : Math.max(b[2], c) }
+    else byMonth.set(t, [t, c, c, c])
+  }
+  return [...byMonth.values()].sort((a, b) => a[0] - b[0])
+}
+
 async function loadBase(name) {
   if (!BASE) return {}
   try {
@@ -107,6 +155,7 @@ let fresh = 0
 for (const [name, list] of Object.entries(groups)) {
   const base = await loadBase(name)
   const bars = {}
+  const freshSet = new Set()
   let next = 0, done = 0, got = 0
   // Aynı anda en fazla [concurrency] istek; sınırlanınca tek tek
   const worker = async (i) => {
@@ -114,18 +163,30 @@ for (const [name, list] of Object.entries(groups)) {
       if (i >= concurrency) { await sleep(500); continue }
       const tv = list[next++]
       const y = yahooSymbol(tv)
-      const b = y ? await monthly(y) : null
-      if (b?.length) { bars[tv] = b; got++ } else if (base[tv]) bars[tv] = base[tv]
+      const b = y && !SPARK_ONLY ? await monthly(y) : null
+      if (b?.length) { bars[tv] = b; got++; freshSet.add(tv) } else if (base[tv]) bars[tv] = base[tv]
       if (++done % 100 === 0) console.log(`  ${name}: ${done}/${list.length} (yeni ${got}, sınırlanan istek ${limited}/${requests})`)
     }
   }
   await Promise.all([0, 1, 2, 3].map(worker))
-  // Süre biterse kalanlar önceki yayından
+  // chart ile gelmeyenler: toplu kapanışlarla önceki kopyanın üstüne işle
+  const stale = list.filter((tv) => !freshSet.has(tv) && yahooSymbol(tv))
+  if (stale.length) {
+    const closes = await sparkCloses(stale.map(yahooSymbol))
+    let patched = 0
+    for (const tv of stale) {
+      const c = closes.get(yahooSymbol(tv))
+      if (c?.length) { bars[tv] = mergeCloses(bars[tv] ?? base[tv], c); patched++ }
+    }
+    if (stale.length) console.log(`  ${name}: ${patched}/${stale.length} sembolün son ayları toplu kapanışlarla güncellendi`)
+    got += patched
+  }
+  // Kalanlar önceki yayından
   for (const tv of list) if (!bars[tv] && base[tv]) bars[tv] = base[tv]
   writeFileSync(join(OUT, `${name}.json`), JSON.stringify({ generated: Date.now(), bars }))
   counts[name] = Object.keys(bars).length
   fresh += got
-  console.log(`${name}: ${counts[name]} sembol (${got} yeni, ${counts[name] - got} önceki yayından)`)
+  console.log(`${name}: ${counts[name]} sembol (${got} güncel, ${counts[name] - got} önceki yayından)`)
 }
 writeFileSync(join(OUT, 'meta.json'), JSON.stringify({ generated: Date.now(), counts, fresh }))
 console.log(`Bitti: ${Math.round((Date.now() - started) / 1000)} sn, ${fresh} sembol yenilendi, ${limited}/${requests} istek sınırlandı`)

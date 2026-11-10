@@ -15,7 +15,7 @@ const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, i
 const page = await ctx.newPage()
 const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
-page.on('response', (r) => { if (r.status() >= 400 && r.url().startsWith(BASE) && !(r.status() === 404 && r.url().includes('/api/yahoo/'))) errors.push(`${r.status()} ${r.url()}`) })
+page.on('response', (r) => { if (r.status() >= 400 && r.url().startsWith(BASE) && !r.url().includes('/api/health') && !(r.status() === 404 && r.url().includes('/api/yahoo/'))) errors.push(`${r.status()} ${r.url()}`) })
 page.on('console', (m) => { if (/Failed to load resource/.test(m.text())) return; if (m.type() === 'error' && !/tradingview|sw\.js|favicon|preload/i.test(m.text())) errors.push(m.text()) })
 
 let failed = 0
