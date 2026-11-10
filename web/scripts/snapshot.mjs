@@ -7,17 +7,17 @@
  *   daily/{misc,bist,us}.json    günlük kapanışlar (~4 yıl): geçmişte test (backtest)
  *   history/meta.json            üretim zamanı ve sayılar
  *
- * Kaynak: TradingView grafik verisi (sunucu tarafı websocket). Bağlanamazsa aylık için Yahoo Finance denenir.
- * Hiçbiri olmazsa önceki yayındaki dosyalar korunur (yeni veri çekilemeyen semboller dahil).
+ * Artımlı: önceki yayındaki kopya depo olarak kullanılır; her sembol için yalnızca son ~100 gün çekilir.
+ * Bölünme/bedelsiz gibi geriye dönük düzeltmeler çakışan günlerden anlaşılır, o sembol baştan çekilir.
+ * Kaynak TradingView (sunucu tarafı websocket); bağlanamazsa aylık için Yahoo denenir, o da olmazsa önceki kopya kalır.
  */
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { monthlyFromDaily, packDaily, tvBars } from '../server/tv.mjs'
+import { refreshHistory } from '../server/store.mjs'
 
 const OUT = process.argv[2] ?? 'dist/data'
 const BASE = (process.argv[3] ?? process.env.SNAPSHOT_BASE ?? '').replace(/\/$/, '')
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36'
-const DAILY_KEEP = 1000
 const started = Date.now()
 const sig = (v) => (v == null || !Number.isFinite(v) ? null : Number(v.toPrecision(6)))
 
@@ -79,46 +79,35 @@ console.log(`Semboller: BIST ${bist.length}, ABD ${us.length}, diğer ${misc.len
 mkdirSync(join(OUT, 'history'), { recursive: true })
 mkdirSync(join(OUT, 'daily'), { recursive: true })
 const counts = {}
-let fresh = 0
+const totals = { incremental: 0, full: 0, kept: 0, failed: 0, yahoo: 0 }
 let tvOk = true
 for (const [name, list] of Object.entries(groups)) {
-  const baseMonthly = await loadBase('history', name)
-  const baseDaily = await loadBase('daily', name)
-  let bars = new Map()
+  const base = { daily: await loadBase('daily', name), monthly: await loadBase('history', name) }
+  let r = { daily: {}, monthly: {}, stats: { incremental: 0, full: 0, kept: 0, failed: list.length } }
   if (tvOk) {
     try {
-      bars = await tvBars(list, {
-        resolution: '1D', count: 1600, parallel: 8,
-        onProgress: (d, n) => { if (d % 100 === 0) console.log(`  ${name}: ${d}/${n}`) },
-      })
+      r = await refreshHistory(list, base, { onProgress: (d, n) => { if (d % 200 === 0) console.log(`  ${name}: ${d}/${n}`) } })
     } catch (e) {
       tvOk = false
       console.log(`TradingView'a bağlanılamadı (${e.message}); aylık geçmiş için Yahoo denenecek`)
     }
   }
-  const monthly = {}
-  const daily = {}
-  let got = 0, yahoo = 0, kept = 0
+  let yahoo = 0
   for (const tv of list) {
-    const b = bars.get(tv)
-    if (b?.length) {
-      monthly[tv] = monthlyFromDaily(b).map(([t, l, h, c]) => [t, sig(l), sig(h), sig(c)])
-      daily[tv] = packDaily(b.slice(-DAILY_KEEP))
-      got++
-      continue
-    }
-    if (Date.now() - started < 8 * 60_000) {
+    if (!r.monthly[tv] && Date.now() - started < 8 * 60_000) {
       const y = await yahooMonthly(tv)
-      if (y?.length) { monthly[tv] = y; yahoo++ }
+      if (y?.length) { r.monthly[tv] = y; yahoo++ }
     }
-    if (!monthly[tv] && baseMonthly[tv]) { monthly[tv] = baseMonthly[tv]; kept++ }
-    if (!daily[tv] && baseDaily[tv]) daily[tv] = baseDaily[tv]
+    if (!r.monthly[tv] && base.monthly[tv]) r.monthly[tv] = base.monthly[tv]
+    if (!r.daily[tv] && base.daily[tv]) r.daily[tv] = base.daily[tv]
   }
-  writeFileSync(join(OUT, 'history', `${name}.json`), JSON.stringify({ generated: Date.now(), bars: monthly }))
-  writeFileSync(join(OUT, 'daily', `${name}.json`), JSON.stringify({ generated: Date.now(), bars: daily }))
-  counts[name] = Object.keys(monthly).length
-  fresh += got + yahoo
-  console.log(`${name}: ${counts[name]} sembol (TradingView ${got}, Yahoo ${yahoo}, önceki yayından ${kept}); günlük ${Object.keys(daily).length}`)
+  writeFileSync(join(OUT, 'history', `${name}.json`), JSON.stringify({ generated: Date.now(), bars: r.monthly }))
+  writeFileSync(join(OUT, 'daily', `${name}.json`), JSON.stringify({ generated: Date.now(), bars: r.daily }))
+  counts[name] = Object.keys(r.monthly).length
+  for (const k of ['incremental', 'full', 'kept', 'failed']) totals[k] += r.stats[k]
+  totals.yahoo += yahoo
+  console.log(`${name}: ${counts[name]} sembol (son günler eklendi ${r.stats.incremental}, baştan çekildi ${r.stats.full}, eskisi korundu ${r.stats.kept}, Yahoo ${yahoo}); günlük ${Object.keys(r.daily).length}`)
 }
-writeFileSync(join(OUT, 'history', 'meta.json'), JSON.stringify({ generated: Date.now(), counts, fresh, source: tvOk ? 'tradingview' : 'yahoo' }))
+const fresh = totals.incremental + totals.full + totals.yahoo
+writeFileSync(join(OUT, 'history', 'meta.json'), JSON.stringify({ generated: Date.now(), counts, fresh, ...totals, source: tvOk ? 'tradingview' : 'yahoo' }))
 console.log(`Bitti: ${Math.round((Date.now() - started) / 1000)} sn, ${fresh} sembol güncel`)

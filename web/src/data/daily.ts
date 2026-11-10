@@ -3,7 +3,8 @@
  *   sunucuda  → /api/tv/daily (TradingView, canlı)
  *   statikte  → data/daily/{misc,bist,us}.json (her iş günü üretilen kopya)
  */
-import { historySource } from './history'
+import { cachedSnapshotFile, historySource } from './history'
+import { dayStamp, idbGet, idbSet } from './idb'
 
 /** Bir sembolün günlük serisi: gün (epoch gün, UTC) ve kapanış. */
 export interface DailySeries { days: Int32Array; close: Float64Array }
@@ -38,10 +39,7 @@ const files = new Map<string, Promise<Record<string, Packed>>>()
 function loadFile(name: string) {
   let p = files.get(name)
   if (!p) {
-    p = fetch(`data/daily/${name}.json`, { cache: 'no-cache' })
-      .then((r) => (r.ok ? r.json() : { bars: {} }))
-      .then((j: { bars: Record<string, Packed> }) => j.bars ?? {})
-      .catch(() => ({}))
+    p = cachedSnapshotFile<{ bars: Record<string, Packed> }>(`data/daily/${name}.json`).then((j) => j?.bars ?? {})
     files.set(name, p)
   }
   return p
@@ -66,15 +64,30 @@ export async function dailyCloses(symbols: string[], onProgress?: (done: number,
   if (!need.length) return out
   const src = await historySource()
   if (src === 'proxy') {
+    // Bugün tarayıcıya alınmış olanlar yeniden istenmez
+    const today = dayStamp()
+    const fresh: string[] = []
+    await Promise.all(need.map(async (s) => {
+      const hit = await idbGet<{ day: string; packed: Packed }>('d:' + s)
+      if (hit?.day === today) {
+        const d = unpack(hit.packed)
+        memory.set(s, d ?? null)
+        if (d) out.set(s, d)
+      } else fresh.push(s)
+    }))
+    done += need.length - fresh.length
+    onProgress?.(done, want.length)
+    need.splice(0, need.length, ...fresh)
     for (let i = 0; i < need.length; i += 100) {
       if (signal?.aborted) throw new DOMException('İptal', 'AbortError')
       const chunk = need.slice(i, i + 100)
-      const r = await fetch(`api/tv/daily?count=1000&symbols=${chunk.map(encodeURIComponent).join(',')}`, { signal })
+      const r = await fetch(`api/tv/daily?symbols=${chunk.map(encodeURIComponent).join(',')}`, { signal })
       const j = r.ok ? ((await r.json()) as { bars: Record<string, Packed> }) : { bars: {} }
       for (const s of chunk) {
-        const d = unpack(j.bars[s] ?? null)
+        const packed = j.bars[s] ?? null
+        const d = unpack(packed)
         memory.set(s, d ?? null)
-        if (d) out.set(s, d)
+        if (d) { out.set(s, d); void idbSet('d:' + s, { day: today, packed }) }
       }
       done += chunk.length
       onProgress?.(done, want.length)

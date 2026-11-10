@@ -47,15 +47,13 @@ export async function runScreenBacktest(screen: Screen, instruments: Instrument[
   const monthly = new Map<string, Awaited<ReturnType<typeof monthlyBars>>>()
   if (needMonthly) {
     const list = rows.filter((r) => daily.has(r.symbol.toUpperCase()))
-    let done = 0, next = 0
-    await Promise.all(Array.from({ length: 6 }, async () => {
-      while (next < list.length) {
-        if (signal?.aborted) throw new DOMException('İptal', 'AbortError')
-        const r = list[next++]
-        monthly.set(r.symbol, await monthlyBars(r.symbol))
-        onStep({ step: 'monthly', done: ++done, total: list.length })
-      }
+    let done = 0
+    // Hepsi birden istenir: sunucu deposunda 100'lük toplu isteklere, statik kopyada tek dosyaya düşer
+    await Promise.all(list.map(async (r) => {
+      monthly.set(r.symbol, await monthlyBars(r.symbol))
+      onStep({ step: 'monthly', done: ++done, total: list.length })
     }))
+    if (signal?.aborted) throw new DOMException('İptal', 'AbortError')
   }
 
   const symbols: BtSymbol[] = rows.filter((r) => daily.has(r.symbol.toUpperCase())).map((r) => ({

@@ -60,6 +60,18 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
 | Geçmişte test | TradingView günlük kapanışlar (~4 yıl) | TradingView'un veri akışı tarayıcıya yalnızca kendi alan adından açılır; sunucu tarafından çekilir. Kendi sunucunda `/api/tv/daily` canlı, GitHub Pages'te `data/daily/*.json` (BIST ~1,2 MB, ABD ~1,9 MB sıkıştırılmış; yalnızca test çalışınca indirilir). |
 | Grafikler | TradingView gömülü grafik | |
 
+### Geçmiş bir kez çekilir
+
+Fiyat geçmişi kullanıcı başına değil, merkezde bir kez çekilir ve saklanır; sonra yalnızca son günler eklenir:
+
+- **Merkezde (GitHub Pages):** `gh-pages` dalındaki kopya depo görevi görür. Her iş günü yalnızca son ~100 gün istenip eklenir; 1.390 sembol ~35 saniye.
+  Bölünme ya da bedelsiz gibi geriye dönük düzeltmeler çakışan günlerden anlaşılır, o sembol baştan çekilir.
+- **Kendi sunucunda:** `DATA_DIR` (varsayılan `web/.data`, Docker'da `/data` birimi) altında sembol başına bir dosya. Sunucu yeniden başlasa da geçmiş yeniden çekilmez; 6 saatten eski kayıtlara son günler eklenir.
+- **Tarayıcıda:** indirilen geçmiş IndexedDB'de saklanır. Merkezdeki kopya değişmediyse hiç indirilmez; çevrimdışıyken de kullanılır. *Ayarlar → Fiyat geçmişi önbelleği*'nden boyutu görülür ve temizlenir.
+
+Bu yapı için ayrı bir veritabanı hizmeti (Firebase vb.) gerekmez: veri salt okunurdur ve herkes için aynıdır. GitHub'ın dağıtım ağı ücretsiz ve hızlıdır.
+Ayrı bir veritabanı ancak kişisel listelerin cihazlar arasında eşitlenmesi gerektiğinde anlamlı olur.
+
 Yahoo aylık çubukları borsanın yerel gece yarısında damgalar (BIST için önceki gün 21:00 UTC). Zaman ayın başına çekilir; aksi halde USD çevriminde ve ortalama F/K'da bir ay kayardı. Android'de de düzeltildi.
 
 ## Çalıştırma
@@ -77,7 +89,7 @@ Docker:
 
 ```bash
 docker build -t piyasa-web web
-docker run -p 8080:8080 piyasa-web
+docker run -p 8080:8080 -v piyasa-data:/data piyasa-web
 ```
 
 Uçtan uca test (gerçek tarayıcı, gerçek veri; Playwright gerekir):
@@ -113,6 +125,7 @@ web/
   src/screens/    Piyasalar, Ayrıntı, Ara/Hesapla, Panolar, Dinamik listeler, Ayarlar
   server/api.mjs  /api/health, /api/yahoo/chart/:sembol, /api/tv/daily (önbellekli)
   server/tv.mjs   TradingView grafik verisi istemcisi (sunucu tarafı websocket)
+  server/store.mjs Artımlı geçmiş deposu (birleştirme, bölünme denetimi, disk deposu)
   server.mjs      Üretim sunucusu (statik + /api)
   scripts/        snapshot.mjs (geçmiş kopyası), e2e.mjs (uçtan uca test)
 ```

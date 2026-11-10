@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as Fmt from '../core/format'
 import { historySource, snapshotMeta, type HistorySource } from '../data/history'
+import { idbClear, idbStats } from '../data/idb'
 import { actions, exportState, useApp, useLive } from '../data/store'
 import { Icon } from '../ui/Icon'
 import { Dialog, Segmented, Switch, useToast } from '../ui/overlay'
@@ -12,6 +13,8 @@ export function Settings() {
   const file = useRef<HTMLInputElement>(null)
   const [confirm, setConfirm] = useState<'list' | 'all' | null>(null)
   const [hist, setHist] = useState<{ src: HistorySource; generated?: number } | null>(null)
+  const [cache, setCache] = useState<{ entries: number; bytes?: number } | null>(null)
+  useEffect(() => { void idbStats().then(setCache) }, [])
   useEffect(() => {
     void historySource().then(async (src) => setHist({ src, generated: src === 'snapshot' ? (await snapshotMeta())?.generated : undefined }))
   }, [])
@@ -63,6 +66,15 @@ export function Settings() {
           <input ref={file} type="file" accept="application/json,.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); e.target.value = '' }} />
         </div>
         <p className="note">Android uygulamasının durum dosyası (piyasa_state.json) da içe aktarılabilir.</p>
+      </section>
+
+      <section>
+        <h2>Fiyat geçmişi önbelleği</h2>
+        <p>İndirilen fiyat geçmişi (dinamik listeler ve geçmişte test için) bu tarayıcıda saklanır; yalnızca kaynak yenilendiğinde yeniden indirilir ve çevrimdışıyken de kullanılır.</p>
+        <p className="note" style={{ marginTop: -6 }}>
+          {cache == null ? 'Denetleniyor…' : cache.entries ? `${cache.entries} kayıt${cache.bytes ? `, bu site toplam ${Fmt.number(cache.bytes / 1e6, 1)} MB kullanıyor` : ''}` : 'Henüz saklanan geçmiş yok.'}
+        </p>
+        <button className="btn" disabled={!cache?.entries} onClick={async () => { await idbClear(); setCache(await idbStats()); toast('Fiyat geçmişi önbelleği temizlendi') }}>Önbelleği temizle</button>
       </section>
 
       <section>

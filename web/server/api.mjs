@@ -2,7 +2,11 @@
  * /api uçları (Node 18+; TradingView için undici):
  *   GET /api/health                     → { ok, yahoo }
  *   GET /api/yahoo/chart/:symbol?range=6y&interval=1mo  → Yahoo Finance chart yanıtı (önbellekli)
- *   GET /api/tv/daily?symbols=BIST:THYAO,NASDAQ:AAPL     → TradingView günlük kapanışları (backtest)
+ *   GET /api/tv/daily?symbols=BIST:THYAO,NASDAQ:AAPL     → günlük kapanışlar (geçmişte test)
+ *   GET /api/tv/monthly?symbols=…                         → aylık çubuklar (5 yıllık dip/zirve, ortalama F/K)
+ *
+ * TradingView geçmişi diskte saklanır (DATA_DIR, varsayılan web/.data): sunucu yeniden başlasa da
+ * yeniden çekilmez; 6 saatten eski kayıtlara yalnızca son günler eklenir.
  *
  * Yahoo tarayıcıdan doğrudan çağrılamadığı (CORS) için sunucu aracılık eder. Yalnızca chart uç noktası,
  * yalnızca izin verilen aralıklar; yanıtlar bellekte 6 saat tutulur.
@@ -13,8 +17,16 @@ const RANGES = new Set(['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '6y',
 const INTERVALS = new Set(['15m', '1h', '1d', '1wk', '1mo'])
 const TTL = 6 * 3600 * 1000
 const cache = new Map()
-const dailyCache = new Map() // sembol → { time, packed }
-const DAILY_TTL = 6 * 3600 * 1000
+let store = null
+async function getStore() {
+  if (!store) {
+    const { DiskStore } = await import('./store.mjs')
+    const { fileURLToPath } = await import('node:url')
+    const dir = process.env.DATA_DIR ?? fileURLToPath(new URL('../.data', import.meta.url))
+    store = new DiskStore(dir)
+  }
+  return store
+}
 
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers })
@@ -24,8 +36,9 @@ function send(res, status, body, headers = {}) {
 export async function handleApi(req, res) {
   try {
     const url = new URL(req.url, 'http://local')
-    if (url.pathname === '/api/health') return send(res, 200, { ok: true, yahoo: true, daily: true })
-    if (url.pathname === '/api/tv/daily') return daily(url, res)
+    if (url.pathname === '/api/health') return send(res, 200, { ok: true, yahoo: true, daily: true, monthly: true })
+    if (url.pathname === '/api/tv/daily') return history(url, res, 'daily')
+    if (url.pathname === '/api/tv/monthly') return history(url, res, 'monthly')
     const m = url.pathname.match(/^\/api\/yahoo\/chart\/([^/]+)$/)
     if (!m || req.method !== 'GET') return send(res, 404, { error: 'Bulunamadı' })
     const symbol = decodeURIComponent(m[1])
@@ -59,34 +72,18 @@ export async function handleApi(req, res) {
   }
 }
 
-/** TradingView günlük kapanışları: { bars: { "BIST:THYAO": [ilk gün, [farklar], [kapanışlar]] | null } } */
-async function daily(url, res) {
+/** Geçmiş: { bars: { "BIST:THYAO": günlük paket | aylık çubuklar | null } } */
+async function history(url, res, kind) {
   const symbols = (url.searchParams.get('symbols') ?? '').split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
   if (!symbols.length || symbols.length > 200 || symbols.some((s) => !/^[A-Z0-9_.!:*/+\-()]{3,80}$/.test(s))) {
     return send(res, 400, { error: 'symbols: en fazla 200 TradingView sembolü' })
   }
-  const count = Math.min(2000, Math.max(100, Number(url.searchParams.get('count') ?? 1000)))
-  const now = Date.now()
-  const bars = {}
-  const need = []
-  for (const s of symbols) {
-    const hit = dailyCache.get(s + '|' + count)
-    if (hit && now - hit.time < DAILY_TTL) bars[s] = hit.packed
-    else need.push(s)
+  try {
+    const recs = await (await getStore()).get(symbols)
+    const bars = {}
+    for (const s of symbols) bars[s] = recs[s]?.[kind] ?? null
+    return send(res, 200, { bars }, { 'Cache-Control': 'public, max-age=1800' })
+  } catch (e) {
+    return send(res, 502, { error: e?.message ?? 'TradingView erişilemedi' })
   }
-  if (need.length) {
-    try {
-      const { tvBars, packDaily } = await import('./tv.mjs')
-      const got = await tvBars(need, { resolution: '1D', count, parallel: 8 })
-      for (const s of need) {
-        const packed = packDaily(got.get(s) ?? null)
-        bars[s] = packed
-        if (packed) dailyCache.set(s + '|' + count, { time: now, packed })
-      }
-      if (dailyCache.size > 6000) dailyCache.delete(dailyCache.keys().next().value)
-    } catch (e) {
-      return send(res, 502, { error: e?.message ?? 'TradingView erişilemedi' })
-    }
-  }
-  return send(res, 200, { bars }, { 'Cache-Control': 'public, max-age=1800' })
 }

@@ -6,6 +6,7 @@
  *  2. Statik yayında (GitHub Pages): her gün GitHub Actions ile üretilen data/history/*.json.
  */
 import type { Bar } from '../core/screener'
+import { dayStamp, idbGet, idbSet } from './idb'
 
 export type HistorySource = 'proxy' | 'snapshot' | 'none'
 
@@ -49,6 +50,8 @@ export function parseChart(body: unknown): Bar[] {
 interface SnapshotFile { generated: number; bars: Record<string, [number, number | null, number | null, number | null][]> }
 
 let sourcePromise: Promise<HistorySource> | null = null
+/** Sunucu TradingView geçmiş deposunu sunuyor mu (/api/tv/monthly) */
+let serverMonthly = false
 
 export function historySource(): Promise<HistorySource> {
   sourcePromise ??= (async () => {
@@ -57,7 +60,8 @@ export function historySource(): Promise<HistorySource> {
     if (forced === 'snapshot' || forced === 'none') return forced
     try {
       const r = await fetch('api/health', { cache: 'no-store' })
-      if (r.ok && (await r.json())?.yahoo) return 'proxy'
+      const j = r.ok ? await r.json() : null
+      if (j?.yahoo) { serverMonthly = !!j.monthly; return 'proxy' }
     } catch { /* statik yayın */ }
     try {
       const r = await fetch('data/history/meta.json', { cache: 'no-cache' })
@@ -68,12 +72,31 @@ export function historySource(): Promise<HistorySource> {
   return sourcePromise
 }
 
-export async function snapshotMeta(): Promise<{ generated: number; counts: Record<string, number> } | undefined> {
+let metaPromise: Promise<{ generated: number; counts: Record<string, number> } | undefined> | null = null
+export function snapshotMeta(): Promise<{ generated: number; counts: Record<string, number> } | undefined> {
+  metaPromise ??= fetch('data/history/meta.json', { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : undefined))
+    .catch(() => undefined)
+  return metaPromise
+}
+
+/**
+ * Statik kopya dosyası: tarayıcıda (IndexedDB) saklanır; yalnızca merkezdeki kopya yenilendiyse
+ * (meta.json'daki üretim zamanı değiştiyse) yeniden indirilir.
+ */
+export async function cachedSnapshotFile<T>(path: string): Promise<T | undefined> {
+  const meta = await snapshotMeta()
+  const key = 'f:' + path
+  const hit = await idbGet<{ generated: number; data: T }>(key)
+  if (hit && meta && hit.generated === meta.generated) return hit.data
   try {
-    const r = await fetch('data/history/meta.json', { cache: 'no-cache' })
-    return r.ok ? await r.json() : undefined
+    const r = await fetch(path, { cache: 'no-cache' })
+    if (!r.ok) return hit?.data
+    const data = (await r.json()) as T
+    if (meta) void idbSet(key, { generated: meta.generated, data })
+    return data
   } catch {
-    return undefined
+    return hit?.data // çevrimdışı: eldeki kopya
   }
 }
 
@@ -89,12 +112,35 @@ function snapshotFileFor(tv: string): string {
 function loadFile(name: string) {
   let p = files.get(name)
   if (!p) {
-    p = fetch(`data/history/${name}.json`, { cache: 'no-cache' })
-      .then((r) => (r.ok ? (r.json() as Promise<SnapshotFile>) : undefined))
-      .catch(() => undefined)
+    p = cachedSnapshotFile<SnapshotFile>(`data/history/${name}.json`)
     files.set(name, p)
   }
   return p
+}
+
+const toBars = (raw: [number, number | null, number | null, number | null][]) =>
+  raw.map(([time, low, high, close]) => ({ time, low: low ?? undefined, high: high ?? undefined, close: close ?? undefined }))
+
+// Sunucu deposundan toplu istek: aynı anda istenen semboller tek istekte (en fazla 100)
+let batch: { symbols: Set<string>; promise: Promise<Record<string, [number, number | null, number | null, number | null][] | null>> } | null = null
+function serverMonthlyBatch(sym: string) {
+  if (!batch || batch.symbols.size >= 100) {
+    const symbols = new Set<string>()
+    const promise = new Promise<Record<string, [number, number | null, number | null, number | null][] | null>>((resolve) => {
+      setTimeout(async () => {
+        if (batch?.symbols === symbols) batch = null
+        try {
+          const r = await fetch(`api/tv/monthly?symbols=${[...symbols].map(encodeURIComponent).join(',')}`)
+          resolve(r.ok ? (await r.json()).bars ?? {} : {})
+        } catch {
+          resolve({})
+        }
+      }, 30)
+    })
+    batch = { symbols, promise }
+  }
+  batch.symbols.add(sym)
+  return batch.promise
 }
 
 const memory = new Map<string, Promise<Bar[] | undefined>>()
@@ -107,17 +153,27 @@ export function monthlyBars(tv: string): Promise<Bar[] | undefined> {
     p = (async () => {
       const src = await historySource()
       if (src === 'proxy') {
-        const y = yahooSymbol(key)
-        if (!y) return undefined
-        const r = await fetch(`api/yahoo/chart/${encodeURIComponent(y)}?range=6y&interval=1mo`)
-        if (!r.ok) return undefined
-        const bars = parseChart(await r.json())
-        return bars.length ? bars : undefined
+        // Tarayıcıda bugün alınmışsa yeniden isteme
+        const cached = await idbGet<{ day: string; bars: Bar[] }>('m:' + key)
+        if (cached?.day === dayStamp() && cached.bars.length) return cached.bars
+        let bars: Bar[] | undefined
+        if (serverMonthly) {
+          const raw = (await serverMonthlyBatch(key))[key]
+          if (raw?.length) bars = toBars(raw)
+        }
+        if (!bars) {
+          const y = yahooSymbol(key)
+          if (y) {
+            const r = await fetch(`api/yahoo/chart/${encodeURIComponent(y)}?range=6y&interval=1mo`)
+            if (r.ok) { const b = parseChart(await r.json()); if (b.length) bars = b }
+          }
+        }
+        if (bars) void idbSet('m:' + key, { day: dayStamp(), bars })
+        return bars ?? cached?.bars
       }
       if (src === 'snapshot') {
-        const file = await loadFile(snapshotFileFor(key))
-        const raw = file?.bars[key]
-        return raw?.map(([time, low, high, close]) => ({ time, low: low ?? undefined, high: high ?? undefined, close: close ?? undefined }))
+        const raw = (await loadFile(snapshotFileFor(key)))?.bars[key]
+        return raw ? toBars(raw) : undefined
       }
       return undefined
     })().catch(() => undefined)
