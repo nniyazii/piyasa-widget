@@ -156,26 +156,10 @@ internal fun suggestUnit(tokens: List<String>): Pair<String, String> {
     return "" to ""
 }
 
-@Composable
-fun ComposerDialog(
-    state: AppState,
-    editing: Formula?,
-    onClose: () -> Unit,
-    onAddInstrument: (Instrument) -> Unit,
-    onUndoInstrument: (Instrument) -> Unit,
-    onSaveFormula: (formula: Formula, originalKey: String?, needed: List<Instrument>) -> Unit,
-    onDeleteFormula: (String) -> Unit,
-) {
-    Dialog(
-        onDismissRequest = onClose,
-        properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
-    ) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            ComposerScreen(state, editing, onClose, onAddInstrument, onUndoInstrument, onSaveFormula, onDeleteFormula)
-        }
-    }
-}
-
+/**
+ * Ekle ekranı. Dialog penceresi yerine etkinliğin içinde tam ekran çizilir:
+ * böylece gezinme çubuğu ve klavye boşlukları (insets) doğru hesaplanır.
+ */
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ComposerScreen(
@@ -264,6 +248,19 @@ fun ComposerScreen(
             pending.isNotEmpty() -> setPending(pending.dropLast(1))
             sel != null && sel in tokens.indices -> { tokens.removeAt(sel); selected = null }
             tokens.isNotEmpty() -> tokens.removeAt(tokens.lastIndex)
+        }
+    }
+
+    /** Tek "( )" tuşu: açık parantez varsa ve önünde bir değer duruyorsa kapatır, yoksa açar. */
+    fun smartParen() {
+        if (!commitPending()) return
+        val open = tokens.count { it == "(" || Tokens.isFunction(it) } - tokens.count { it == ")" }
+        val last = tokens.lastOrNull()
+        val lastIsValue = last != null && (Tokens.isVariable(last) || Tokens.isNumber(last) || last == ")")
+        when {
+            open > 0 && lastIsValue -> tokens += ")"
+            lastIsValue -> { tokens += "*"; tokens += "(" } // 2(…) → 2 × (…)
+            else -> tokens += "("
         }
     }
 
@@ -383,9 +380,10 @@ fun ComposerScreen(
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
             ) {
-                Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                Column(Modifier.padding(start = 14.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)) {
+                    Row(verticalAlignment = Alignment.Top) {
                     FlowRow(
-                        Modifier.fillMaxWidth().heightIn(min = 36.dp).clickable { runCatching { focus.requestFocus() }; keyboard?.show() },
+                        Modifier.weight(1f).padding(top = 4.dp).heightIn(min = 36.dp).clickable { runCatching { focus.requestFocus() }; keyboard?.show() },
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
@@ -410,6 +408,17 @@ fun ComposerScreen(
                                 }
                             },
                         )
+                    }
+                    // ⌫ ekranın yanında (hesap makinelerindeki gibi); basılı tutunca hepsini siler
+                    if (tokens.isNotEmpty() || pending.isNotEmpty()) {
+                        Box(
+                            Modifier.size(44.dp).combinedClickable(
+                                onClick = ::backspace,
+                                onLongClick = { tokens.clear(); setPending(""); selected = null; needed.clear() },
+                            ),
+                            contentAlignment = Alignment.Center,
+                        ) { Text("⌫", fontSize = 22.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
                     }
                     // Büyük sonuç (hesap makinesi gibi)
                     if (formulaMode) {
@@ -523,10 +532,8 @@ fun ComposerScreen(
                         else { commitPending(); tokens += ";" }
                     },
                     onOperator = ::pushOperator,
-                    onOpen = { if (pending.isNotBlank()) commitPending(); tokens += "(" },
-                    onClose = { commitPending(); tokens += ")" },
+                    onParen = ::smartParen,
                     onClear = { tokens.clear(); setPending(""); selected = null; needed.clear() },
-                    onBackspace = ::backspace,
                     onEquals = ::submit,
                     onFunction = { fnMenu = true },
                     onLetters = { runCatching { focus.requestFocus() }; keyboard?.show() },
@@ -633,16 +640,22 @@ private fun ExprChip(label: String, kind: Kind, selected: Boolean, onClick: () -
     }
 }
 
-/** Tanıdık hesap makinesi düzeni. */
+/**
+ * Tanıdık hesap makinesi düzeni (Google Hesap Makinesi gibi 4×5):
+ *   C   ( )  ƒ   ÷
+ *   7   8    9   ×
+ *   4   5    6   −
+ *   1   2    3   +
+ *   abc 0    ,   =
+ * ⌫ ekranın yanında durur.
+ */
 @Composable
 private fun Keypad(
     onDigit: (String) -> Unit,
     onComma: () -> Unit,
     onOperator: (String) -> Unit,
-    onOpen: () -> Unit,
-    onClose: () -> Unit,
+    onParen: () -> Unit,
     onClear: () -> Unit,
-    onBackspace: () -> Unit,
     onEquals: () -> Unit,
     onFunction: () -> Unit,
     onLetters: () -> Unit,
@@ -655,13 +668,16 @@ private fun Keypad(
     val num = MaterialTheme.colorScheme.surfaceVariant
     val onNum = MaterialTheme.colorScheme.onSurfaceVariant
     Column(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
     ) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Key("C", fn, onFn, Modifier.weight(1f), onClick = onClear)
-            Key("(", fn, onFn, Modifier.weight(1f), onClick = onOpen)
-            Key(")", fn, onFn, Modifier.weight(1f), onClick = onClose)
+            Key("( )", fn, onFn, Modifier.weight(1f), onClick = onParen)
+            Box(Modifier.weight(1f)) {
+                Key("ƒ", fn, onFn, Modifier.fillMaxWidth(), onClick = onFunction)
+                fnMenu()
+            }
             Key("÷", op, onOp, Modifier.weight(1f)) { onOperator("/") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -677,17 +693,10 @@ private fun Keypad(
             Key("+", op, onOp, Modifier.weight(1f)) { onOperator("+") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(Modifier.weight(1f)) {
-                Key("ƒ", fn, onFn, Modifier.fillMaxWidth(), onClick = onFunction)
-                fnMenu()
-            }
+            Key("abc", fn, onFn, Modifier.weight(1f), onClick = onLetters)
             Key("0", num, onNum, Modifier.weight(1f)) { onDigit("0") }
             Key(",", num, onNum, Modifier.weight(1f), onClick = onComma)
-            Key("⌫", num, onNum, Modifier.weight(1f), onClick = onBackspace)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Key("abc  ara", fn, onFn, Modifier.weight(2f), onClick = onLetters)
-            Key("=", op, onOp, Modifier.weight(2f), onClick = onEquals)
+            Key("=", op, onOp, Modifier.weight(1f), onClick = onEquals)
         }
     }
 }
@@ -704,16 +713,16 @@ private fun Key(
 ) {
     Box(
         modifier
-            .height(52.dp)
-            .background(bg, RoundedCornerShape(26.dp))
+            .height(48.dp)
+            .background(bg, RoundedCornerShape(24.dp))
             .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             label,
             color = fg,
-            fontSize = if (label.length <= 2) 24.sp else 15.sp,
-            fontWeight = if (label.length <= 2) FontWeight.Normal else FontWeight.Medium,
+            fontSize = if (label.length <= 1) 24.sp else 18.sp,
+            fontWeight = if (label.length <= 1) FontWeight.Normal else FontWeight.Medium,
         )
     }
 }

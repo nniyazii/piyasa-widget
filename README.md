@@ -51,7 +51,7 @@ Uygulamada tek bir liste ve tek bir yuvarlak **+** düğmesi vardır. **+** ile 
 
 - **Operatöre basmak, yazılan kelimeyi en iyi eşleşen sembole dönüştürür** (TradingView'daki gibi): önce listendekiler (formüllerin dahil), sonra katalog ve tüm piyasalar. Listende olmayan bir sembol formülde kullanılırsa kaydederken listeye de eklenir.
 - Yazarken **canlı ara sonuç** soluk renkte görünür; ifade tamamlanınca koyulaşır. Günlük değişim ve TradingView karşılığı da gösterilir.
-- Tuş takımı: `C ( ) ÷ / 7 8 9 × / 4 5 6 − / 1 2 3 + / ƒ 0 , ⌫ / abc =`. `ƒ` menüsünde % fark, günlük %, önceki kapanış, ortalama, min/max, yuvarla ve OZ bulunur. `abc` harf klavyesini açar; klavye açıkken tuş takımı gizlenir.
+- Tuş takımı (Google Hesap Makinesi gibi 4×5): `C ( ) ƒ ÷ / 7 8 9 × / 4 5 6 − / 1 2 3 + / abc 0 , =`. Tek `( )` tuşu bağlama göre açar veya kapatır; ⌫ ekranın yanındadır (basılı tutunca temizler). `ƒ` menüsünde % fark, günlük %, önceki kapanış, ortalama, min/max, yuvarla ve OZ bulunur. `abc` harf klavyesini açar; klavye açıkken tuş takımı gizlenir.
 - `=`, ad (otomatik önerilir), birim (yok / ₺ / $ / € / %) ve ondalık seçimi sunar. Formülü düzenlemek için listede uzun basıp *Düzenle*'yi seçin; aynı ekran açılır.
 - Boş ekranda örnek formüller ve önerilen semboller görünür. TCMB kuru veya Yahoo sembolü için *Gelişmiş* bölümü en altta durur.
 

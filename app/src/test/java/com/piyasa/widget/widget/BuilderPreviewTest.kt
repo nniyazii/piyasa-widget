@@ -78,28 +78,28 @@ class BuilderPreviewTest {
     }
 
     @Test
-    @Config(qualifiers = "w400dp-h860dp-xxhdpi")
+    @Config(qualifiers = "w400dp-h760dp-xxhdpi")
     fun composerEmpty() {
         assumeTrue(System.getProperty("previews") == "true")
         composer("composer_empty")
     }
 
     @Test
-    @Config(qualifiers = "w400dp-h860dp-xxhdpi")
+    @Config(qualifiers = "w400dp-h760dp-xxhdpi")
     fun composerSymbolSearch() {
         assumeTrue(System.getProperty("previews") == "true")
         composer("composer_search", query = "altın")
     }
 
     @Test
-    @Config(qualifiers = "w400dp-h860dp-xxhdpi")
+    @Config(qualifiers = "w400dp-h760dp-xxhdpi")
     fun composerFormula() {
         assumeTrue(System.getProperty("previews") == "true")
         composer("composer_formula", tokens = listOf("ONS", "*", "USDTRY", "/", "OZ"))
     }
 
     @Test
-    @Config(qualifiers = "w400dp-h860dp-xxhdpi")
+    @Config(qualifiers = "w400dp-h760dp-xxhdpi")
     fun composerFormulaTyping() {
         assumeTrue(System.getProperty("previews") == "true")
         composer("composer_formula_typing", tokens = listOf("ONS", "*"), query = "dolar")

@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -100,6 +101,10 @@ private fun MainScreen() {
     LaunchedEffect(Unit) { RefreshWorker.runNow(context) }
 
     val s = state
+    // Ekle ekranı açıkken geri tuşu onu kapatır
+    BackHandler(enabled = composing != null) { composing = null }
+
+    Box(Modifier.fillMaxSize()) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -144,22 +149,6 @@ private fun MainScreen() {
                 },
             )
         }
-        composing?.let { target ->
-            ComposerDialog(
-                state = s,
-                editing = target.formula,
-                onClose = { composing = null },
-                onAddInstrument = { ins -> scope.launch { Actions.addInstrument(context, ins) } },
-                onUndoInstrument = { ins -> scope.launch { Actions.removeInstrument(context, ins.key) } },
-                onSaveFormula = { f, originalKey, needed ->
-                    scope.launch {
-                        needed.forEach { Actions.addInstrument(context, it) }
-                        Actions.upsertFormula(context, f, originalKey)
-                    }
-                },
-                onDeleteFormula = { key -> scope.launch { Actions.deleteFormula(context, key) }; composing = null },
-            )
-        }
         if (showSettings) {
             Dialog(onDismissRequest = { showSettings = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
@@ -173,6 +162,25 @@ private fun MainScreen() {
                 }
             }
         }
+    }
+    // Ekle ekranı: listenin üstünde tam ekran katman (Dialog değil; gezinme çubuğu ve klavye boşlukları doğru)
+    val target = composing
+    if (target != null && s != null) {
+        ComposerScreen(
+            baseState = s,
+            editing = target.formula,
+            onClose = { composing = null },
+            onAddInstrument = { ins -> scope.launch { Actions.addInstrument(context, ins) } },
+            onUndoInstrument = { ins -> scope.launch { Actions.removeInstrument(context, ins.key) } },
+            onSaveFormula = { f, originalKey, needed ->
+                scope.launch {
+                    needed.forEach { Actions.addInstrument(context, it) }
+                    Actions.upsertFormula(context, f, originalKey)
+                }
+            },
+            onDeleteFormula = { key -> scope.launch { Actions.deleteFormula(context, key) }; composing = null },
+        )
+    }
     }
 }
 
