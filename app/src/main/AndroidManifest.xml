@@ -44,5 +44,10 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/piyasa_widget_info" />
         </receiver>
+
+        <!-- Uygulamadan sabitlenen widget'ın içeriğini atar (yalnızca sistemin geri çağrısı) -->
+        <receiver
+            android:name=".widget.WidgetPinnedReceiver"
+            android:exported="false" />
     </application>
 </manifest>

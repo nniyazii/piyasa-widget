@@ -205,7 +205,8 @@ private fun buildLines(state: AppState, cfg: WidgetConfig, twoColumns: Boolean):
             WidgetConfig.isScreen(k) -> {
                 val scr = state.screen(WidgetConfig.screenId(k)) ?: continue
                 flush()
-                out += Line.Header(scr.name)
+                // Widget'ın başlığı zaten liste adıysa (tek dokunuşla eklenen liste widget'ı) tekrar yazma
+                if (!(cfg.showHeader && cfg.title == scr.name)) out += Line.Header(scr.name)
                 val r = state.screenResults[scr.id]
                 val rows = r?.rows.orEmpty().take(cfg.screenRows.coerceIn(1, 20))
                 if (rows.isEmpty()) {

@@ -30,12 +30,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -93,6 +93,9 @@ import com.piyasa.widget.model.Category
 import com.piyasa.widget.model.ChangeStyle
 import com.piyasa.widget.model.Display
 import com.piyasa.widget.model.FormulaEngine
+import com.piyasa.widget.model.Reorder
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import com.piyasa.widget.model.RowDensity
 import com.piyasa.widget.model.WidgetConfig
 import com.piyasa.widget.model.WidgetTheme
@@ -133,7 +136,9 @@ class WidgetConfigActivity : ComponentActivity() {
                 if (s == null) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 } else {
-                    WidgetEditor(s, s.widgetConfig(appWidgetId), DpSize(w.dp, h.dp), onSave = ::save, onCancel = { finish() })
+                    // Uygulamadan sabitlenen yeni widget: hazır içerikle başla
+                    val initial = s.widgets[appWidgetId] ?: s.pendingWidget() ?: s.widgetConfig(appWidgetId)
+                    WidgetEditor(s, initial, DpSize(w.dp, h.dp), onSave = ::save, onCancel = { finish() })
                 }
             }
         }
@@ -260,13 +265,22 @@ private fun ContentTab(state: AppState, cfg: WidgetConfig, onChange: (WidgetConf
     var filter by remember { mutableStateOf("") }
 
     fun set(list: List<String>) = onChange(cfg.copy(keys = list))
-    fun move(i: Int, d: Int) {
-        val t = i + d
-        if (t !in entries.indices) return
-        set(entries.toMutableList().apply { add(t, removeAt(i)) })
+    // Aynı bölüm başlığı iki kez olabilir: anahtar = giriş + kaçıncı tekrarı
+    val entryKeys = run {
+        val seen = HashMap<String, Int>()
+        entries.map { k -> val n = seen.merge(k, 1, Int::plus)!!; "e_${k}#$n" }
+    }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    val listState = rememberLazyListState()
+    val reorder = rememberReorderableLazyListState(listState) { from, to ->
+        val a = entryKeys.indexOf(from.key)
+        val b = entryKeys.indexOf(to.key)
+        if (a < 0 || b < 0) return@rememberReorderableLazyListState
+        set(Reorder.move(entries, a, b))
+        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
     }
 
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
         item {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilledTonalButton(onClick = { sectionDialog = -1 }) {
@@ -285,50 +299,33 @@ private fun ContentTab(state: AppState, cfg: WidgetConfig, onChange: (WidgetConf
                 Text("Aşağıdan gösterge ekleyin.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+        } else if (entries.size > 1) {
+            item {
+                Text("Sıralamak için ≡ tutamacından ya da satıra basılı tutup sürükleyin.", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
-        itemsIndexed(entries, key = { i, k -> "e_${i}_$k" }) { i, k ->
-            if (WidgetConfig.isSection(k)) {
-                Row(
-                    Modifier.fillMaxWidth().clickable { sectionDialog = i }.padding(start = 16.dp, end = 4.dp, top = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+        itemsIndexed(entries, key = { i, _ -> entryKeys[i] }) { i, k ->
+            ReorderableItem(reorder, key = entryKeys[i]) { dragging ->
+                val elevation by androidx.compose.animation.core.animateDpAsState(if (dragging) 8.dp else 0.dp, label = "drag")
+                Surface(
+                    shadowElevation = elevation,
+                    color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
                 ) {
-                    Text(
-                        WidgetConfig.sectionTitle(k).uppercase(Locale.forLanguageTag("tr-TR")),
-                        Modifier.weight(1f), color = MaterialTheme.colorScheme.primary,
-                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
-                    )
-                    EntryActions(i, entries.size, ::move) { set(entries.filterIndexed { j, _ -> j != i }) }
-                }
-            } else if (WidgetConfig.isScreen(k)) {
-                // Dinamik liste: widget'ta başlık + ilk N sonuç olarak açılır
-                val scr = state.screen(WidgetConfig.screenId(k))
-                val n = state.screenResults[WidgetConfig.screenId(k)]?.rows?.size
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                        Text("≡", color = MaterialTheme.colorScheme.onTertiary, fontWeight = FontWeight.Bold)
+                    val drag = Modifier.longPressDraggableHandle(onDragStarted = {
+                        haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                    })
+                    val actions: @Composable () -> Unit = {
+                        IconButton(onClick = { set(entries.filterIndexed { j, _ -> j != i }) }) { Icon(Icons.Default.Close, "Çıkar") }
+                        Icon(
+                            Icons.Default.Menu, "Sürükle",
+                            Modifier.draggableHandle(onDragStarted = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+                            }).padding(12.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(scr?.name ?: "Silinmiş liste", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("Dinamik liste · ilk ${cfg.screenRows} sonuç" + (n?.let { " · şu an $it eşleşme" } ?: ""),
-                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    EntryActions(i, entries.size, ::move) { set(entries.filterIndexed { j, _ -> j != i }) }
-                }
-            } else {
-                val item = Display.item(state, engine, k)
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val cat = state.instrument(k)?.category
-                    if (cat != null) CategoryBadge(cat, 28) else Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
-                        Text("ƒ", color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Bold)
-                    }
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(item?.title ?: k, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(item?.valueText ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    if (item != null) ChangeChip(item.changeText, item.direction)
-                    EntryActions(i, entries.size, ::move) { set(entries.filterIndexed { j, _ -> j != i }) }
+                    EntryRow(state, engine, cfg, k, Modifier.then(if (WidgetConfig.isSection(k)) Modifier.clickable { sectionDialog = i } else Modifier).then(drag), actions)
                 }
             }
         }
@@ -404,7 +401,7 @@ private fun ContentTab(state: AppState, cfg: WidgetConfig, onChange: (WidgetConf
                         items(SECTION_SUGGESTIONS) { s -> AssistChip(onClick = { title = s }, label = { Text(s) }) }
                     }
                     if (!editing) {
-                        Text("Bölüm listenin sonuna eklenir; oklarla yerini değiştirebilirsiniz.",
+                        Text("Bölüm listenin sonuna eklenir; sürükleyerek yerini değiştirebilirsiniz.",
                             style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
@@ -421,11 +418,50 @@ private fun ContentTab(state: AppState, cfg: WidgetConfig, onChange: (WidgetConf
     }
 }
 
+/** Widget içeriğindeki tek giriş: bölüm başlığı, dinamik liste ya da gösterge/formül. */
 @Composable
-private fun EntryActions(i: Int, size: Int, move: (Int, Int) -> Unit, remove: () -> Unit) {
-    IconButton(enabled = i > 0, onClick = { move(i, -1) }) { Icon(Icons.Default.KeyboardArrowUp, "Yukarı") }
-    IconButton(enabled = i < size - 1, onClick = { move(i, 1) }) { Icon(Icons.Default.KeyboardArrowDown, "Aşağı") }
-    IconButton(onClick = remove) { Icon(Icons.Default.Close, "Çıkar") }
+private fun EntryRow(state: AppState, engine: FormulaEngine, cfg: WidgetConfig, k: String, modifier: Modifier, actions: @Composable () -> Unit) {
+    if (WidgetConfig.isSection(k)) {
+        Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                WidgetConfig.sectionTitle(k).uppercase(Locale.forLanguageTag("tr-TR")),
+                Modifier.weight(1f), color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
+            )
+            actions()
+        }
+    } else if (WidgetConfig.isScreen(k)) {
+        // Dinamik liste: widget'ta başlık + ilk N sonuç olarak açılır
+        val scr = state.screen(WidgetConfig.screenId(k))
+        val n = state.screenResults[WidgetConfig.screenId(k)]?.rows?.size
+        Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                Text("≡", color = MaterialTheme.colorScheme.onTertiary, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(scr?.name ?: "Silinmiş liste", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text("Dinamik liste · ilk ${cfg.screenRows} sonuç" + (n?.let { " · şu an $it eşleşme" } ?: ""),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            actions()
+        }
+    } else {
+        val item = Display.item(state, engine, k)
+        Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            val cat = state.instrument(k)?.category
+            if (cat != null) CategoryBadge(cat, 28) else Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.tertiaryContainer, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                Text("ƒ", color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Bold)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item?.title ?: k, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item?.valueText ?: "", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            if (item != null) ChangeChip(item.changeText, item.direction)
+            actions()
+        }
+    }
 }
 
 /** Göstergeleri kategoriye göre bölümler; formüller "Hesaplamalar" altında. Sıra, ilk görülme sırasıdır. */

@@ -13,6 +13,7 @@ import org.robolectric.RuntimeEnvironment
 import com.piyasa.widget.data.appStore
 import com.piyasa.widget.model.Quote
 import com.piyasa.widget.model.WidgetConfig
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -178,5 +179,9 @@ class WidgetPreviewTest {
         render("screens_4x3", 320, 290)
         config(WidgetConfig(keys = listOf("GRAM_ALTIN", "USDTRY", WidgetConfig.screenEntry("s1")), screenRows = 3))
         render("screens_mixed", 320, 250)
+        // Uygulamadan tek dokunuşla sabitlenen liste widget'ı: başlık = liste adı, iç başlık tekrarlanmaz
+        val s1 = runBlocking { context.appStore.data.first().screen("s1")!! }
+        config(WidgetConfig.forScreen(s1))
+        render("screens_pinned", 320, 160)
     }
 }

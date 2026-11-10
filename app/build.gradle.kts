@@ -13,8 +13,8 @@ android {
         applicationId = "com.piyasa.widget"
         minSdk = 26
         targetSdk = 35
-        versionCode = 10
-        versionName = "0.7.0"
+        versionCode = 11
+        versionName = "0.8.0"
     }
 
     buildTypes {
@@ -70,6 +70,7 @@ dependencies {
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
+    implementation(libs.reorderable)
 
     testImplementation(libs.junit)
     testImplementation(libs.robolectric)

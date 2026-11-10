@@ -1,7 +1,5 @@
 package com.piyasa.widget.ui
 
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
@@ -73,7 +71,15 @@ import com.piyasa.widget.model.Category
 import com.piyasa.widget.model.Display
 import com.piyasa.widget.model.Formula
 import com.piyasa.widget.model.FormulaEngine
-import com.piyasa.widget.widget.PiyasaWidgetReceiver
+import com.piyasa.widget.model.Reorder
+import com.piyasa.widget.model.WidgetConfig
+import com.piyasa.widget.widget.WidgetPins
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import com.piyasa.widget.work.RefreshWorker
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -154,14 +160,21 @@ private fun MainScreen() {
                 onOpenScreen = { viewingScreen = it },
                 onEditScreen = { editingScreen = ScreenEditTarget(it) },
                 onDeleteScreen = { id -> scope.launch { Actions.deleteScreen(context, id) } },
-                onMoveScreen = { id, d -> scope.launch { Actions.moveScreen(context, id, d) } },
                 onEdit = { composing = ComposeTarget(it) },
                 onRemove = { key ->
                     scope.launch { if (s.formula(key) != null) Actions.deleteFormula(context, key) else Actions.removeInstrument(context, key) }
                 },
-                onMove = { key, d ->
-                    scope.launch { if (s.formula(key) != null) Actions.moveFormula(context, key, d) else Actions.moveInstrument(context, key, d) }
+                onReorder = { groupId, keys ->
+                    scope.launch {
+                        when (groupId) {
+                            ListGroup.FORMULAS -> Actions.reorderFormulas(context, keys)
+                            ListGroup.SCREENS -> Actions.reorderScreens(context, keys)
+                            else -> Actions.reorderInstruments(context, keys)
+                        }
+                    }
                 },
+                onPinScreen = { scr -> scope.launch { pinWidget(context, WidgetConfig.forScreen(scr)) } },
+                onPinGroup = { title, keys -> scope.launch { pinWidget(context, WidgetConfig.forGroup(title, keys)) } },
             )
         }
         if (showSettings) {
@@ -207,6 +220,7 @@ private fun MainScreen() {
             onEdit = { editingScreen = ScreenEditTarget(viewing) },
             onRefresh = { scope.launch { Actions.runScreen(context, viewing.id) } },
             onAdd = { row -> scope.launch { Actions.addInstrument(context, row.toInstrument(s)) } },
+            onPinWidget = { scope.launch { pinWidget(context, WidgetConfig.forScreen(viewing)) } },
         )
     }
     // Dinamik liste düzenleyici
@@ -239,20 +253,45 @@ private fun statusText(s: AppState): String = when {
     }
 }
 
-/** Tek liste: önce hesaplamalar (formüller), sonra kategoriye göre semboller. */
-@OptIn(ExperimentalFoundationApi::class)
+/** Listedeki sıralanabilir grup: formüller, tek kategori ya da dinamik listeler. */
+internal data class ListGroup(val id: String, val label: String, val keys: List<String>) {
+    /** LazyColumn öğe anahtarı (formül ve gösterge anahtarları zaten benzersiz). */
+    fun itemKey(k: String) = if (id == SCREENS) "scr_$k" else k
+    fun keyOf(itemKey: Any): String? {
+        val s = itemKey as? String ?: return null
+        val k = if (id == SCREENS) s.takeIf { it.startsWith("scr_") }?.removePrefix("scr_") ?: return null else s
+        return k.takeIf { it in keys }
+    }
+
+    companion object {
+        const val FORMULAS = "f"
+        const val SCREENS = "s"
+
+        fun of(state: AppState): List<ListGroup> =
+            listOf(ListGroup(FORMULAS, "Hesaplamalar", state.formulas.map { it.key })) +
+                Category.entries.map { c -> ListGroup("c_" + c.name, c.label, state.instruments.filter { it.category == c }.map { it.key }) } +
+                ListGroup(SCREENS, "Dinamik listeler", state.screens.map { it.id })
+    }
+}
+
+/**
+ * Tek liste: önce hesaplamalar (formüller), sonra kategoriye göre semboller, en altta dinamik listeler.
+ * Dokun: aç · Uzun bas ve sürükle: grup içinde sırala · Uzun bas ve bırak: menü.
+ */
 @Composable
 internal fun WatchList(
     state: AppState,
     onEdit: (Formula) -> Unit,
     onRemove: (String) -> Unit,
-    onMove: (String, Int) -> Unit,
+    onReorder: (groupId: String, keys: List<String>) -> Unit = { _, _ -> },
     onOpenScreen: (String) -> Unit = {},
     onEditScreen: (com.piyasa.widget.model.Screen) -> Unit = {},
     onDeleteScreen: (String) -> Unit = {},
-    onMoveScreen: (String, Int) -> Unit = { _, _ -> },
+    onPinScreen: (com.piyasa.widget.model.Screen) -> Unit = {},
+    onPinGroup: (title: String, keys: List<String>) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
     val engine = remember(state) { FormulaEngine(state) }
     if (state.instruments.isEmpty() && state.formulas.isEmpty() && state.screens.isEmpty()) {
         Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
@@ -262,90 +301,154 @@ internal fun WatchList(
         }
         return
     }
-    val groups: List<Pair<String, List<String>>> =
-        listOf("Hesaplamalar" to state.formulas.map { it.key }) +
-            Category.entries.map { c -> c.label to state.instruments.filter { it.category == c }.map { it.key } }
+    // Sürüklerken sıra yerelde tutulur (anında tepki); bırakınca kaydedilir.
+    val base = remember(state.formulas, state.instruments, state.screens) { ListGroup.of(state) }
+    var groups by remember(base) { mutableStateOf(base) }
+    var movedGroup by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val reorder = rememberReorderableLazyListState(listState) { from, to ->
+        val g = groups.indexOfFirst { it.keyOf(from.key) != null }
+        if (g < 0 || groups[g].keyOf(to.key) == null) return@rememberReorderableLazyListState // yalnızca kendi grubunda
+        val grp = groups[g]
+        val a = grp.keys.indexOf(grp.keyOf(from.key))
+        val b = grp.keys.indexOf(grp.keyOf(to.key))
+        groups = groups.toMutableList().also { it[g] = grp.copy(keys = Reorder.move(grp.keys, a, b)) }
+        movedGroup = grp.id
+        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+    // Uzun basıp bırakınca (sürüklemeden) menü açılır; sürüklendiyse yeni sıra kaydedilir.
+    fun dragStopped(openMenu: () -> Unit) {
+        val id = movedGroup
+        movedGroup = null
+        if (id == null) openMenu() else groups.firstOrNull { it.id == id }?.let { onReorder(it.id, it.keys) }
+    }
 
-    LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
-        groups.forEach { (label, keys) ->
-            if (keys.isEmpty()) return@forEach
-            item(key = "h_$label") { SectionHeader(label) }
-            items(keys, key = { it }) { key ->
-                val item = Display.item(state, engine, key) ?: return@items
-                val formula = state.formula(key)
-                var menu by remember { mutableStateOf(false) }
-                Box {
-                    ValueRow(
-                        item,
-                        Modifier.combinedClickable(
-                            onClick = { if (item.tvUrl != null) openUrl(context, item.tvUrl) else formula?.let(onEdit) },
-                            onLongClick = { menu = true },
-                        ),
-                        subtitle = formula?.let { f -> Tokens2.pretty(state, f.expression) } ?: item.subtitle,
-                    )
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        if (formula != null) DropdownMenuItem(text = { Text("Düzenle") }, onClick = { menu = false; onEdit(formula) })
-                        if (item.tvUrl != null) DropdownMenuItem(text = { Text("TradingView'da aç") }, onClick = { menu = false; openUrl(context, item.tvUrl) })
-                        DropdownMenuItem(text = { Text("Yukarı taşı") }, onClick = { menu = false; onMove(key, -1) })
-                        DropdownMenuItem(text = { Text("Aşağı taşı") }, onClick = { menu = false; onMove(key, 1) })
-                        DropdownMenuItem(
-                            text = { Text(if (formula != null) "Sil" else "Kaldır", color = MaterialTheme.colorScheme.error) },
-                            onClick = { menu = false; onRemove(key) },
-                        )
+    LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 96.dp)) {
+        groups.forEach { grp ->
+            if (grp.keys.isEmpty()) return@forEach
+            item(key = "h_${grp.id}") {
+                GroupHeader(grp, pinnable = grp.id != ListGroup.SCREENS) { onPinGroup(grp.label, grp.keys) }
+            }
+            if (grp.id == ListGroup.SCREENS) {
+                items(grp.keys, key = { grp.itemKey(it) }) { id ->
+                    val scr = state.screen(id) ?: return@items
+                    ReorderableItem(reorder, key = grp.itemKey(id)) { dragging ->
+                        var menu by remember { mutableStateOf(false) }
+                        DragSurface(dragging) {
+                            Box {
+                                ScreenListRow(
+                                    state, scr,
+                                    Modifier.clickable { onOpenScreen(scr.id) }
+                                        .longPressDraggableHandle(
+                                            onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                                            onDragStopped = { dragStopped { menu = true } },
+                                        ),
+                                )
+                                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                    DropdownMenuItem(text = { Text("Ana ekrana widget olarak ekle") }, onClick = { menu = false; onPinScreen(scr) })
+                                    DropdownMenuItem(text = { Text("Düzenle") }, onClick = { menu = false; onEditScreen(scr) })
+                                    DropdownMenuItem(text = { Text("Sil", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDeleteScreen(scr.id) })
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                items(grp.keys, key = { it }) { key ->
+                    val item = Display.item(state, engine, key) ?: return@items
+                    val formula = state.formula(key)
+                    ReorderableItem(reorder, key = key) { dragging ->
+                        var menu by remember { mutableStateOf(false) }
+                        DragSurface(dragging) {
+                            Box {
+                                ValueRow(
+                                    item,
+                                    Modifier.clickable { if (item.tvUrl != null) openUrl(context, item.tvUrl) else formula?.let(onEdit) }
+                                        .longPressDraggableHandle(
+                                            onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                                            onDragStopped = { dragStopped { menu = true } },
+                                        ),
+                                    subtitle = formula?.let { f -> Tokens2.pretty(state, f.expression) } ?: item.subtitle,
+                                )
+                                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                                    if (formula != null) DropdownMenuItem(text = { Text("Düzenle") }, onClick = { menu = false; onEdit(formula) })
+                                    if (item.tvUrl != null) DropdownMenuItem(text = { Text("TradingView'da aç") }, onClick = { menu = false; openUrl(context, item.tvUrl) })
+                                    DropdownMenuItem(
+                                        text = { Text(if (formula != null) "Sil" else "Kaldır", color = MaterialTheme.colorScheme.error) },
+                                        onClick = { menu = false; onRemove(key) },
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
-        // ---- Dinamik listeler (en altta: günlük fiyatları aşağı itmesin). İki satır: ad · ilk eşleşenler
-        if (state.screens.isNotEmpty()) {
-            item(key = "h_screens") { SectionHeader("Dinamik listeler") }
-            items(state.screens, key = { "scr_" + it.id }) { scr ->
-                val r = state.screenResults[scr.id]
-                var menu by remember { mutableStateOf(false) }
-                Box {
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .combinedClickable(onClick = { onOpenScreen(scr.id) }, onLongClick = { menu = true })
-                            .padding(horizontal = 16.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(scr.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            val rows = r?.rows.orEmpty()
-                            // Eşleşenlerin adları (listeyi açmadan bir bakışta); yoksa koşulun kendisi
-                            Text(
-                                if (rows.isNotEmpty()) rows.take(4).joinToString(", ") { it.name } + if (rows.size > 4) " …" else ""
-                                else scr.conditions.firstOrNull()?.let { com.piyasa.widget.model.ScreenEngine.describe(it) } ?: scr.summary(),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (rows.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            )
-                        }
-                        Spacer(Modifier.size(8.dp))
-                        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                            Text(
-                                when { r == null -> "…"; r.error != null && r.rows.isEmpty() -> "!"; else -> "${r.rows.size}" },
-                                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("Düzenle") }, onClick = { menu = false; onEditScreen(scr) })
-                        DropdownMenuItem(text = { Text("Yukarı taşı") }, onClick = { menu = false; onMoveScreen(scr.id, -1) })
-                        DropdownMenuItem(text = { Text("Aşağı taşı") }, onClick = { menu = false; onMoveScreen(scr.id, 1) })
-                        DropdownMenuItem(text = { Text("Sil", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDeleteScreen(scr.id) })
-                    }
-                }
-            }
-        }
-        item {
+        item(key = "hint") {
             Text(
-                "Dokun: TradingView'da aç · Uzun bas: düzenle, sırala, kaldır",
+                "Dokun: aç · Basılı tutup sürükle: sırala · Basılı tutup bırak: menü",
                 Modifier.padding(16.dp),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Sürüklenen satır hafifçe kalkar (gölge + yüzey rengi). */
+@Composable
+private fun DragSurface(dragging: Boolean, content: @Composable () -> Unit) {
+    val elevation by androidx.compose.animation.core.animateDpAsState(if (dragging) 8.dp else 0.dp, label = "drag")
+    Surface(
+        shadowElevation = elevation,
+        color = if (dragging) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surface,
+        content = content,
+    )
+}
+
+/** Grup başlığı; sağda grubu ana ekrana widget olarak ekleyen menü. */
+@Composable
+private fun GroupHeader(grp: ListGroup, pinnable: Boolean, onPin: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Box {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f)) { SectionHeader(grp.label) }
+            if (pinnable) {
+                IconButton(onClick = { menu = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.MoreVert, "${grp.label} seçenekleri", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }, offset = androidx.compose.ui.unit.DpOffset(200.dp, 0.dp)) {
+            DropdownMenuItem(text = { Text("Ana ekrana widget olarak ekle") }, onClick = { menu = false; onPin() })
+        }
+    }
+}
+
+/** Dinamik liste satırı: ad · ilk eşleşenler · eşleşme sayısı. */
+@Composable
+private fun ScreenListRow(state: AppState, scr: com.piyasa.widget.model.Screen, modifier: Modifier) {
+    val r = state.screenResults[scr.id]
+    Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(scr.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            val rows = r?.rows.orEmpty()
+            // Eşleşenlerin adları (listeyi açmadan bir bakışta); yoksa koşulun kendisi
+            Text(
+                if (rows.isNotEmpty()) rows.take(4).joinToString(", ") { it.name } + if (rows.size > 4) " …" else ""
+                else scr.conditions.firstOrNull()?.let { com.piyasa.widget.model.ScreenEngine.describe(it) } ?: scr.summary(),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (rows.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.size(8.dp))
+        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+            Text(
+                when { r == null -> "…"; r.error != null && r.rows.isEmpty() -> "!"; else -> "${r.rows.size}" },
+                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold,
             )
         }
     }
@@ -393,9 +496,11 @@ private fun SettingsScreen(state: AppState) {
         )
         HorizontalDivider()
         Text("Widget", style = MaterialTheme.typography.titleSmall)
-        Button(onClick = { pinWidget(context) }) { Text("Ana ekrana widget ekle") }
+        Button(onClick = { scope.launch { pinWidget(context, null) } }) { Text("Ana ekrana widget ekle") }
         Text(
-            "Her widget kendi içeriğine ve görünümüne sahiptir. Widget'a uzun basıp “Yeniden yapılandır” ile bölümler, yazı boyutu, tema ve opaklığı ayarlayabilirsiniz.",
+            "Her widget kendi içeriğine ve görünümüne sahiptir. Bir dinamik listeyi ya da listedeki bir grubu (Döviz, Hesaplamalar …) " +
+                "doğrudan widget yapmak için listede ona uzun basın ya da başlığındaki ⋮ menüsünü kullanın. " +
+                "Widget'a uzun basıp “Yeniden yapılandır” ile içerik (sürükleyerek sıralama), yazı boyutu, tema ve opaklık ayarlanır.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -441,11 +546,9 @@ private fun SettingsScreen(state: AppState) {
     }
 }
 
-private fun pinWidget(context: Context) {
-    val mgr = AppWidgetManager.getInstance(context)
-    if (mgr.isRequestPinAppWidgetSupported) {
-        mgr.requestPinAppWidget(ComponentName(context, PiyasaWidgetReceiver::class.java), null, null)
-    } else {
+/** Ana ekrana widget sabitler; [preset] verilirse widget bu içerikle gelir (ör. bir dinamik liste). */
+private suspend fun pinWidget(context: Context, preset: WidgetConfig?) {
+    if (!WidgetPins.request(context, preset)) {
         Toast.makeText(context, "Başlatıcınız desteklemiyor; ana ekrana uzun basıp Widget'lar menüsünden ekleyin.", Toast.LENGTH_LONG).show()
     }
 }

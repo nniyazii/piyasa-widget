@@ -23,8 +23,11 @@ Uygulamanın kendi ekranı yalnızca ayar içindir. Veriler widget'ta gösterili
 ## Widget
 
 - **Boyuta göre düzen**: 1 satır yükseklikte yatay bant, 2 hücre genişlikte iki satırlı dar liste, standart genişlikte mini grafikli liste, 5+ hücre genişlikte çift sütun.
+- **Listeyi tek dokunuşla widget yap.** Bir dinamik listeye basılı tutup bırakın → *Ana ekrana widget olarak ekle* (ya da liste ekranında ⌂ simgesi). Listedeki bir grup (Hesaplamalar, Döviz, Emtia …) için başlığındaki ⋮ menüsü. Başlatıcı onay penceresinde widget'ın gerçek içeriği önizlenir; eklendiğinde widget hazır gelir: başlık liste adı, ilk 10 sonuç, her yenilemede güncellenir. *Ayarlar → Ana ekrana widget ekle* boş/varsayılan widget ekler.
+
+  ![sabitlenen liste widget'ı](docs/widget-sabitlenen-liste.png)
 - **Her widget ayrı yapılandırılır.** Widget'ı eklerken açılan ekrandan veya widget'a uzun basıp *Yeniden yapılandır* ile ayarlanır. Ekranın üstünde, widget'ın gerçek boyutunda **canlı önizleme** vardır; her değişiklik anında görünür.
-  - **İçerik:** göstergeler, formüller ve **bölümler** (ör. Altın · Döviz · Borsa). *+ Bölüm* hazır başlık önerileri sunar. *Otomatik bölümle* göstergeleri kategoriye göre gruplar. Oklarla sıralanır; bölüm başlıkları çift sütunda da satırı keser.
+  - **İçerik:** göstergeler, formüller ve **bölümler** (ör. Altın · Döviz · Borsa). *+ Bölüm* hazır başlık önerileri sunar. *Otomatik bölümle* göstergeleri kategoriye göre gruplar. **Sürükle-bırak** ile sıralanır (≡ tutamacından hemen, satıra basılı tutarak da); bölüm başlıkları çift sütunda da satırı keser.
   - **Görünüm:** yazı boyutu (Küçük / Normal / Büyük / Çok büyük), satır aralığı (Sıkı / Normal / Rahat), günlük değişim (Rozet / Yazı / Gizli), tema (Sistem / Açık / Koyu), arka plan opaklığı (%20–100), başlık satırı, güncelleme saati, mini grafik ve alt satır. Büyük yazıda yer kalmazsa mini grafik otomatik gizlenir.
 
 ![widget düzenleyici](docs/widget-duzenleyici.png)
@@ -52,7 +55,9 @@ Uygulamada tek bir liste ve tek bir yuvarlak **+** düğmesi vardır. **+** ile 
 - **Operatöre basmak, yazılan kelimeyi en iyi eşleşen sembole dönüştürür** (TradingView'daki gibi): önce listendekiler (formüllerin dahil), sonra katalog ve tüm piyasalar. Listende olmayan bir sembol formülde kullanılırsa kaydederken listeye de eklenir.
 - Yazarken **canlı ara sonuç** soluk renkte görünür; ifade tamamlanınca koyulaşır. Günlük değişim ve TradingView karşılığı da gösterilir.
 - Tuş takımı (Google Hesap Makinesi gibi 4×5): `C ( ) ƒ ÷ / 7 8 9 × / 4 5 6 − / 1 2 3 + / abc 0 , =`. Tek `( )` tuşu bağlama göre açar veya kapatır; ⌫ ekranın yanındadır (basılı tutunca temizler). `ƒ` menüsünde % fark, günlük %, önceki kapanış, ortalama, min/max, yuvarla ve OZ bulunur. `abc` harf klavyesini açar; klavye açıkken tuş takımı gizlenir.
-- `=`, ad (otomatik önerilir), birim (yok / ₺ / $ / € / %) ve ondalık seçimi sunar. Formülü düzenlemek için listede uzun basıp *Düzenle*'yi seçin; aynı ekran açılır.
+- `=`, ad (otomatik önerilir), birim (yok / ₺ / $ / € / %) ve ondalık seçimi sunar. Formülü düzenlemek için listede basılı tutup bırakın ve *Düzenle*'yi seçin; aynı ekran açılır.
+
+**Uygulama listesinde sıralama:** satıra basılı tutun, satır kalkınca sürükleyin. Göstergeler kendi grubu (Döviz, Emtia …) içinde, formüller Hesaplamalar içinde, dinamik listeler kendi aralarında yer değiştirir. Basılı tutup sürüklemeden bırakmak menüyü açar; kısa dokunuş TradingView'u açar.
 - Boş ekranda örnek formüller ve önerilen semboller görünür. TCMB kuru veya Yahoo sembolü için *Gelişmiş* bölümü en altta durur.
 
 ![ekle: hesap makinesi](docs/ekle-hesap-makinesi.png)
@@ -89,7 +94,7 @@ Formüller başka formülleri kullanabilir (`CEYREK = GRAM_ALTIN * 1.6067`). Dö
 
 ## Dinamik listeler (filtreler)
 
-Kendiliğinden güncellenen listeler: koşulları bir kez kurarsın, her yenilemede yeniden taranır. **+ → Dinamik liste oluştur** ile açılır; listede uzun basıp *Düzenle* ile değiştirilir. Widget düzenleyicisinde *Ekle → Dinamik listeler* ile widget'a da konur; widget'ta başlık ve ilk 3–10 sonuç görünür.
+Kendiliğinden güncellenen listeler: koşulları bir kez kurarsın, her yenilemede yeniden taranır. **+ → Dinamik liste oluştur** ile açılır; listede basılı tutup bırakınca açılan menüde *Düzenle* ile değiştirilir, basılı tutup sürükleyerek sıralanır. Widget düzenleyicisinde *Ekle → Dinamik listeler* ile widget'a da konur; widget'ta başlık ve ilk 3–10 sonuç görünür.
 
 Uygulamaya **15 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; silersen geri gelmez, *Varsayılan listeye dön* geri getirir). Hepsi yeni liste için şablon olarak da kullanılabilir.
 

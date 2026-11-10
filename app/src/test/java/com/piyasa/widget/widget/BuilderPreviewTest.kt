@@ -188,7 +188,7 @@ class BuilderPreviewTest {
     fun watchListWithScreens() {
         assumeTrue(System.getProperty("previews") == "true")
         render("list_with_screens") {
-            androidx.compose.material3.Surface { com.piyasa.widget.ui.WatchList(screenState, onEdit = {}, onRemove = {}, onMove = { _, _ -> }) }
+            androidx.compose.material3.Surface { com.piyasa.widget.ui.WatchList(screenState, onEdit = {}, onRemove = {}) }
         }
     }
 
@@ -207,7 +207,7 @@ class BuilderPreviewTest {
         val s = AppState().copy(quotes = q.mapValues { (_, v) -> Quote(v.first, v.second, 0) })
         render("default_list") {
             androidx.compose.material3.Surface {
-                com.piyasa.widget.ui.WatchList(s, onEdit = {}, onRemove = {}, onMove = { _, _ -> })
+                com.piyasa.widget.ui.WatchList(s, onEdit = {}, onRemove = {})
             }
         }
     }

@@ -115,6 +115,12 @@ data class WidgetConfig(
         fun screenEntry(id: String) = SCREEN_PREFIX + id
 
         val TEXT_SCALES = listOf(0.85f to "Küçük", 1.0f to "Normal", 1.15f to "Büyük", 1.3f to "Çok büyük")
+
+        /** Ana ekrana tek dokunuşla eklenen dinamik liste widget'ı: başlık = liste adı, ilk 10 sonuç. */
+        fun forScreen(screen: Screen) = WidgetConfig(title = screen.name, keys = listOf(screenEntry(screen.id)), screenRows = 10)
+
+        /** Listedeki bir grubun (Döviz, Hesaplamalar …) widget'ı. */
+        fun forGroup(title: String, keys: List<String>) = WidgetConfig(title = title, keys = keys)
     }
 
     /** Bölüm başlıkları ve dinamik listeler hariç gösterge anahtarları. */
@@ -136,7 +142,17 @@ data class AppState(
     /** Dinamik listeler (filtreler) ve son tarama sonuçları. */
     val screens: List<Screen> = ScreenTemplates.defaults,
     val screenResults: Map<String, ScreenResult> = emptyMap(),
+    /**
+     * Uygulamadan ana ekrana sabitlenmesi istenen widget'ın içeriği. Başlatıcı widget'ı eklediğinde
+     * yeni widget'a atanır (bkz. WidgetPins); başlatıcı ayar ekranını açarsa orada başlangıç değeridir.
+     */
+    val pendingWidget: WidgetConfig? = null,
+    val pendingWidgetAt: Long = 0L,
 ) {
+    /** Yakın zamanda (2 dk) istenen sabitleme içeriği; vazgeçilmiş eski istekler sonraki widget'lara sızmasın. */
+    fun pendingWidget(now: Long = System.currentTimeMillis()): WidgetConfig? =
+        pendingWidget?.takeIf { now - pendingWidgetAt in 0..120_000 }
+
     fun instrument(key: String): Instrument? = instruments.firstOrNull { it.key == key }
     fun formula(key: String): Formula? = formulas.firstOrNull { it.key == key }
     fun screen(id: String): Screen? = screens.firstOrNull { it.id == id }

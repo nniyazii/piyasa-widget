@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
@@ -447,6 +448,7 @@ fun ScreenResultsView(
     onEdit: () -> Unit,
     onRefresh: () -> Unit,
     onAdd: (ScreenRow) -> Unit,
+    onPinWidget: (() -> Unit)? = null,
 ) {
     val result = state.screenResults[screen.id]
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
@@ -458,6 +460,9 @@ fun ScreenResultsView(
                     Text(screen.summary(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, "Yeniden tara") }
+                if (onPinWidget != null) {
+                    IconButton(onClick = onPinWidget) { Icon(Icons.Default.Home, "Ana ekrana widget olarak ekle") }
+                }
                 IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, "Düzenle") }
             }
             LazyColumn(Modifier.weight(1f)) {

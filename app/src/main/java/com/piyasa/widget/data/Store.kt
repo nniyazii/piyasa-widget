@@ -8,6 +8,7 @@ import androidx.datastore.dataStore
 import com.piyasa.widget.model.AppState
 import com.piyasa.widget.model.Formula
 import com.piyasa.widget.model.Instrument
+import com.piyasa.widget.model.Reorder
 import com.piyasa.widget.model.WidgetConfig
 import com.piyasa.widget.widget.PiyasaWidget
 import com.piyasa.widget.work.RefreshWorker
@@ -73,6 +74,35 @@ object Actions {
         s.copy(instruments = s.instruments.moved(s.instruments.indexOfFirst { it.key == key }, delta))
     }
 
+    /** Sürükle-bırak sonrası: verilen anahtarların (ör. tek kategori) yeni sırası. */
+    suspend fun reorderInstruments(context: Context, keys: List<String>) = edit(context) { s ->
+        s.copy(instruments = Reorder.subset(s.instruments, keys) { it.key })
+    }
+
+    suspend fun reorderFormulas(context: Context, keys: List<String>) = edit(context) { s ->
+        s.copy(formulas = Reorder.subset(s.formulas, keys) { it.key })
+    }
+
+    suspend fun reorderScreens(context: Context, ids: List<String>) = edit(context) { s ->
+        s.copy(screens = Reorder.subset(s.screens, ids) { it.id })
+    }
+
+    /** Ana ekrana sabitleme isteği: başlatıcı widget'ı eklediğinde bu içerik atanır. */
+    suspend fun setPendingWidget(context: Context, config: WidgetConfig?) {
+        context.appStore.updateData { it.copy(pendingWidget = config, pendingWidgetAt = System.currentTimeMillis()) }
+    }
+
+    /**
+     * Sabitlenen widget eklendi: içeriğini ata. Kullanıcı bu arada ayar ekranında kaydettiyse
+     * (başlatıcı ayar ekranını açtıysa) onun seçimi korunur.
+     */
+    suspend fun applyPinnedWidget(context: Context, appWidgetId: Int, config: WidgetConfig) = edit(context) { s ->
+        s.copy(
+            widgets = if (s.widgets.containsKey(appWidgetId)) s.widgets else s.widgets + (appWidgetId to config),
+            pendingWidget = null,
+        )
+    }
+
     // ------------------------------------------------------------------ dinamik listeler
 
     /** Kaydeder ve hemen çalıştırır (sonuç beklenmeden ekran kapanabilir; sonuç gelince liste güncellenir). */
@@ -129,7 +159,7 @@ object Actions {
     }
 
     suspend fun setWidgetConfig(context: Context, appWidgetId: Int, config: WidgetConfig) = edit(context) { s ->
-        s.copy(widgets = s.widgets + (appWidgetId to config))
+        s.copy(widgets = s.widgets + (appWidgetId to config), pendingWidget = null)
     }
 
     suspend fun removeWidgets(context: Context, ids: IntArray) {
