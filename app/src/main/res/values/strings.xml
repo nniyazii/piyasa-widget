@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Piyasa</string>
+    <string name="widget_name">Piyasa</string>
+    <string name="widget_description">ABD ve BIST endeksleri, spot emtia, döviz ve kendi formülleriniz</string>
+</resources>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_bg">#EB111519</color>
+    <color name="widget_stroke">#1AFFFFFF</color>
+    <color name="widget_text">#FFF1F4F7</color>
+    <color name="widget_muted">#FF8B95A1</color>
+    <color name="widget_divider">#14FFFFFF</color>
+    <color name="widget_up">#FF34D399</color>
+    <color name="widget_down">#FFFB7185</color>
+    <color name="pill_up_bg">#2634D399</color>
+    <color name="pill_down_bg">#26FB7185</color>
+    <color name="pill_flat_bg">#1A8B95A1</color>
+</resources>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_bg">#F5FAFBFC</color>
+    <color name="widget_stroke">#14000000</color>
+    <color name="widget_text">#FF0E141B</color>
+    <color name="widget_muted">#FF6B7785</color>
+    <color name="widget_divider">#120E141B</color>
+    <color name="widget_up">#FF0E9F6E</color>
+    <color name="widget_down">#FFE02D3C</color>
+    <color name="pill_up_bg">#1F0E9F6E</color>
+    <color name="pill_down_bg">#1FE02D3C</color>
+    <color name="pill_flat_bg">#146B7785</color>
+    <color name="brand">#FF0F172A</color>
+</resources>
