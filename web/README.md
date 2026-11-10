@@ -85,8 +85,10 @@ Canlı veri testleri: `LIVE=1 npx vitest run src/data/live.test.ts`.
 2. Yahoo'dan aylık geçmiş kopyasını üretir: tüm BIST hisseleri ve piyasa değeri 10 milyar $ üstü ABD hisseleri.
 3. `gh-pages` dalına yayınlar.
 
-İlk kez: depo **Settings → Pages → Build and deployment → Source: Deploy from a branch, `gh-pages` / root**.
-Pages zaten açıksa bu adım gerekmez.
+Pages, `gh-pages` dalından yayınlanır (bu depoda açık). Başka bir depoya kopyalarsanız: **Settings → Pages → Source: Deploy from a branch, `gh-pages` / root**.
+
+Yahoo, GitHub'ın sunucularını sık sık sınırlar. Betik 9 dakikalık bir süre bütçesiyle çalışır ve çekemediği sembollerin geçmişini `gh-pages` dalındaki önceki kopyadan korur.
+Aylık çubuklarda birkaç günlük eskilik sonucu pek etkilemez; güncel fiyat her zaman TradingView'dan canlı gelir.
 
 Statik barındırmada geçmiş kopyası olmadan da çalışır. O durumda yalnızca 5 yıllık geçmiş isteyen koşullar "bu yayında geçmiş verisi yok" der.
 

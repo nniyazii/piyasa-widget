@@ -25,8 +25,8 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -38,7 +38,9 @@ jobs:
         env:
           VITE_HISTORY: snapshot
       - name: Fiyat geçmişi kopyası (Yahoo Finance)
-        run: node scripts/snapshot.mjs dist/data/history
+        # Yeni çekilemeyen semboller yayındaki önceki kopyadan korunur
+        run: node scripts/snapshot.mjs dist/data/history "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/history"
+        timeout-minutes: 12
         continue-on-error: true
       - name: 404 yönlendirmesi ve Jekyll'siz yayın
         run: |
