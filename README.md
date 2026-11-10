@@ -87,7 +87,35 @@ Kaynak seçmek, sembol biçimi öğrenmek ya da form doldurmak gerekmez; ne bili
 
 Formüller başka formülleri kullanabilir (`CEYREK = GRAM_ALTIN * 1.6067`). Döngüsel referanslar yakalanır. Bir formülün günlük değişimi, aynı formül önceki kapanış fiyatlarıyla hesaplanarak bulunur.
 
-Hazır formüller: Gram Altın, Çeyrek (has), Gram Gümüş, BIST 100 ($), Altın/Gümüş oranı, Döviz sepeti.
+## Varsayılan liste
+
+İlk kurulumda derli toplu bir liste gelir. *Ayarlar → Varsayılan listeye dön* ile istediğiniz zaman bu listeye dönebilirsiniz (widget ayarları korunur).
+
+| Grup | Göstergeler |
+|---|---|
+| Döviz | Dolar/TL, Euro/TL, EUR/USD, Dolar Endeksi |
+| Emtia | Ons Altın, Ons Gümüş (spot), Brent Petrol |
+| Türkiye | BIST 100, BIST 30, Darphane Altın Sertifikası (ALTIN.S1) |
+| Amerika | S&P 500, Nasdaq, Dow Jones, ABD 10 Yıllık Tahvil |
+| Kripto | Bitcoin |
+| Ekonomi | TÜFE (yıllık), TCMB Politika Faizi |
+
+| Hesaplama | Formül | Not |
+|---|---|---|
+| Gram Altın | `ONS × USDTRY ÷ OZ` | 1 troy ons = 31,1034768 gr |
+| Çeyrek Altın (has) | `Gram Altın × 1,6067` | 1,75 gr × 22 ayar (0,916); işçilik hariç |
+| Gram Gümüş | `GUMUS × USDTRY ÷ OZ` | |
+| Sertifika Primi | `% fark(ALTIN × 100; Gram Altın)` | 1 sertifika = 0,01 gr altın |
+| BIST 100 ($) | `XU100 ÷ USDTRY` | Dolar bazlı endeks |
+| Altın/Gümüş Rasyosu | `ONS ÷ GUMUS` | |
+| Döviz Sepeti | `(USDTRY + EURTRY) ÷ 2` | 0,5 $ + 0,5 € |
+| Reel Faiz | `TR_FAIZ − TR_ENF` | Politika faizi − yıllık TÜFE |
+
+**Değişim gösterimi:** fiyatlarda günlük yüzde değişim (`+%0,18`); birimi yüzde olan oranlarda (faiz, enflasyon, prim, tahvil getirisi) **puan farkı** (`+0,04 p` = %29,73 → %29,77). Yüzde işareti Türkçe yazımla başa gelir (`%29,77`).
+
+![varsayılan liste](docs/varsayilan-liste.png)
+
+Eski sürümlerden yükseltmede katalog göstergelerinin adları ve birimleri, değiştirilmemiş eski varsayılan formüllerin adları kendiliğinden güncellenir; kendi eklediğiniz gösterge ve formüllere dokunulmaz.
 
 ## Veri kaynakları
 

@@ -107,6 +107,12 @@ object Actions {
         RefreshWorker.schedule(context, minutes, replace = true)
     }
 
+    /** Göstergeleri ve formülleri derli toplu varsayılan listeye döndürür (widget'lar korunur). */
+    suspend fun resetToDefaults(context: Context) {
+        edit(context) { com.piyasa.widget.model.Migrations.resetToDefaults(it) }
+        RefreshWorker.runNow(context)
+    }
+
     private fun <T> List<T>.moved(index: Int, delta: Int): List<T> {
         val target = index + delta
         if (index < 0 || target !in indices) return this

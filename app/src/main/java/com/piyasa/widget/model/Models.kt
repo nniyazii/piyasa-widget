@@ -4,10 +4,11 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 enum class Category(val label: String, val short: String) {
-    US("Amerika", "ABD"),
-    TR("Türkiye", "TR"),
-    COMMODITY("Emtia", "EMT"),
+    // Sıra = uygulamadaki ve widget düzenleyicisindeki gruplama sırası (kayıtta ad kullanılır, sıra değil)
     FX("Döviz", "FX"),
+    COMMODITY("Emtia", "EMT"),
+    TR("Türkiye", "TR"),
+    US("Amerika", "ABD"),
     CRYPTO("Kripto", "KRP"),
     ECONOMY("Ekonomi", "EKO"),
     WORLD("Dünya", "DÜN"),

@@ -32,7 +32,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -196,7 +198,7 @@ private fun statusText(s: AppState): String = when {
 /** Tek liste: önce hesaplamalar (formüller), sonra kategoriye göre semboller. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun WatchList(
+internal fun WatchList(
     state: AppState,
     onEdit: (Formula) -> Unit,
     onRemove: (String) -> Unit,
@@ -259,8 +261,19 @@ private fun WatchList(
 
 /** Formül ifadesini insan diliyle gösterir: "ONS * USDTRY / OZ" → "Ons Altın × Dolar/TL ÷ OZ". */
 internal object Tokens2 {
-    fun pretty(state: AppState, expression: String): String =
-        com.piyasa.widget.formula.Tokens.tokenize(expression).joinToString(" ") { tokenLabel(state, it) }
+    /** Parantez içi boşluksuz: "(Dolar/TL + Euro/TL) ÷ 2", "% fark(Sertifika × 100; Gram Altın)". */
+    fun pretty(state: AppState, expression: String): String {
+        val tokens = com.piyasa.widget.formula.Tokens.tokenize(expression)
+        return buildString {
+            tokens.forEachIndexed { i, t ->
+                val label = tokenLabel(state, t).removeSuffix(" (").let { if (com.piyasa.widget.formula.Tokens.isFunction(t)) "$it(" else it }
+                val prev = tokens.getOrNull(i - 1)
+                val glue = prev == null || prev == "(" || com.piyasa.widget.formula.Tokens.isFunction(prev) || t == ")" || t == ";"
+                if (!glue) append(' ')
+                append(label)
+            }
+        }
+    }
 }
 
 @Composable
@@ -295,6 +308,35 @@ private fun SettingsScreen(state: AppState) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         OutlinedButton(onClick = { RefreshWorker.runNow(context) }) { Text("Şimdi yenile") }
+        HorizontalDivider()
+        Text("Liste", style = MaterialTheme.typography.titleSmall)
+        var confirmReset by remember { mutableStateOf(false) }
+        OutlinedButton(onClick = { confirmReset = true }) { Text("Varsayılan listeye dön") }
+        Text(
+            "Derli toplu hazır liste: döviz, altın ve gümüş, BIST, ABD endeksleri, Bitcoin, enflasyon ve faiz; " +
+                "gram/çeyrek altın, sertifika primi, BIST ($), reel faiz gibi hesaplamalar.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (confirmReset) {
+            AlertDialog(
+                onDismissRequest = { confirmReset = false },
+                title = { Text("Varsayılan listeye dön?") },
+                text = {
+                    Text(
+                        "Listen ve formüllerin hazır listeyle değiştirilecek (${state.instruments.size} gösterge, " +
+                            "${state.formulas.size} formül → ${AppState().instruments.size} gösterge, ${AppState().formulas.size} formül). " +
+                            "Widget ayarların korunur. Bu işlem geri alınamaz.",
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { confirmReset = false; scope.launch { Actions.resetToDefaults(context) } }) {
+                        Text("Değiştir", color = MaterialTheme.colorScheme.error)
+                    }
+                },
+                dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Vazgeç") } },
+            )
+        }
         HorizontalDivider()
         Text("Veri kaynakları", style = MaterialTheme.typography.titleSmall)
         Text(

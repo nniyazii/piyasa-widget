@@ -24,8 +24,8 @@ object Catalog {
         t("NASDAQ", "Nasdaq", "NASDAQ:IXIC", US),
         t("DOW", "Dow Jones", "DJ:DJI", US),
         t("RUSSELL", "Russell 2000", "TVC:RUT", US),
-        t("VIX", "VIX", "TVC:VIX", US),
-        t("US10Y", "ABD 10Y Faiz", "TVC:US10Y", US, decimals = 3, suffix = "%"),
+        t("VIX", "VIX Korku Endeksi", "TVC:VIX", US),
+        t("US10Y", "ABD 10 Yıllık Tahvil", "TVC:US10Y", US, suffix = "%", note = "Faiz"),
         t("AAPL", "Apple", "NASDAQ:AAPL", US, prefix = "$"),
         t("MSFT", "Microsoft", "NASDAQ:MSFT", US, prefix = "$"),
         t("NVDA", "Nvidia", "NASDAQ:NVDA", US, prefix = "$"),
@@ -48,13 +48,13 @@ object Catalog {
         t("EREGL", "Ereğli", "BIST:EREGL", TR, suffix = "₺"),
         t("FROTO", "Ford Otosan", "BIST:FROTO", TR, suffix = "₺"),
         t("SISE", "Şişecam", "BIST:SISE", TR, suffix = "₺"),
-        t("ALTIN", "Darphane Altın Sertifikası", "BIST:ALTIN", TR, suffix = "₺", note = "ALTIN.S1"),
-        t("GLDTR", "Altın Fonu (GoldIST)", "BIST:GLDTR", TR, suffix = "₺", note = "BYF"),
-        t("GMSTR", "Gümüş Fonu", "BIST:GMSTR", TR, suffix = "₺", note = "GMSTR.F · BYF"),
+        t("ALTIN", "Darphane Altın Sertifikası", "BIST:ALTIN", TR, suffix = "₺", note = "ALTIN.S1 · 0,01 gr"),
+        t("GLDTR", "Altın Fonu", "BIST:GLDTR", TR, suffix = "₺", note = "GoldIST BYF"),
+        t("GMSTR", "Gümüş Fonu", "BIST:GMSTR", TR, suffix = "₺", note = "GMSTR.F BYF"),
 
         // --- Emtia
         t("ONS", "Ons Altın", "OANDA:XAUUSD", COMMODITY, prefix = "$", note = "Spot"),
-        t("GUMUS", "Ons Gümüş", "TVC:SILVER", COMMODITY, decimals = 3, prefix = "$", note = "Spot"),
+        t("GUMUS", "Ons Gümüş", "TVC:SILVER", COMMODITY, prefix = "$", note = "Spot"),
         t("PLATIN", "Platin", "TVC:PLATINUM", COMMODITY, prefix = "$", note = "Spot"),
         t("PALADYUM", "Paladyum", "TVC:PALLADIUM", COMMODITY, prefix = "$", note = "Spot"),
         t("BAKIR", "Bakır", "COMEX:HG1!", COMMODITY, decimals = 3, prefix = "$", note = "Vadeli"),
@@ -83,9 +83,9 @@ object Catalog {
         // --- Ekonomi
         t("TR_ENF", "TÜFE (yıllık)", "ECONOMICS:TRIRYY", ECONOMY, suffix = "%", note = "Türkiye"),
         t("TR_FAIZ", "TCMB Politika Faizi", "ECONOMICS:TRINTR", ECONOMY, suffix = "%", note = "Türkiye"),
-        t("TR_KONUT", "Konut Fiyat Endeksi", "ECONOMICS:TRHPI", ECONOMY, note = "TRHPI · Türkiye"),
+        t("TR_KONUT", "Konut Fiyat Endeksi", "ECONOMICS:TRHPI", ECONOMY, note = "Türkiye"),
         t("TR_ISSIZ", "İşsizlik Oranı", "ECONOMICS:TRUR", ECONOMY, decimals = 1, suffix = "%", note = "Türkiye"),
-        t("US_ENF", "ABD Enflasyonu (yıllık)", "ECONOMICS:USIRYY", ECONOMY, decimals = 1, suffix = "%", note = "ABD"),
+        t("US_ENF", "ABD TÜFE (yıllık)", "ECONOMICS:USIRYY", ECONOMY, decimals = 1, suffix = "%", note = "ABD"),
         t("US_FAIZ", "Fed Faizi", "ECONOMICS:USINTR", ECONOMY, suffix = "%", note = "ABD"),
     )
 
@@ -235,21 +235,46 @@ object Catalog {
         )
     }
 
+    /**
+     * İlk kurulumdaki liste: Türkiye'deki bir kullanıcının her gün baktığı, derli toplu bir set.
+     * Sıra uygulamadaki gruplamayla aynı: Döviz, Emtia, Türkiye, Amerika, Kripto, Ekonomi.
+     */
     private val defaultKeys = listOf(
-        "SPX", "NASDAQ", "DOW",
-        "XU100", "XU030",
+        "USDTRY", "EURTRY", "EURUSD", "DXY",
         "ONS", "GUMUS", "BRENT",
-        "USDTRY", "EURTRY", "EURUSD",
+        "XU100", "XU030", "ALTIN",
+        "SPX", "NASDAQ", "DOW", "US10Y",
+        "BTC",
+        "TR_ENF", "TR_FAIZ",
     )
 
     val defaultInstruments: List<Instrument> = defaultKeys.mapNotNull { k -> all.firstOrNull { it.key == k } }
 
+    /**
+     * Hazır hesaplamalar. Hepsi doğrulanmış tanımlar:
+     * - 1 troy ons = 31,1034768 gr (OZ)
+     * - Çeyrek altın 1,75 gr, 22 ayar (0,916) → 1,6067 gr has altın (işçilik hariç)
+     * - 1 Darphane altın sertifikası (ALTIN.S1) = 0,01 gr altın → prim = sertifika × 100 / gram altın
+     * - Reel faiz = politika faizi − yıllık TÜFE (puan)
+     */
     val defaultFormulas: List<Formula> = listOf(
         Formula("GRAM_ALTIN", "Gram Altın", "ONS * USDTRY / OZ", 2, suffix = "₺"),
-        Formula("CEYREK", "Çeyrek (has)", "GRAM_ALTIN * 1.6067", 0, suffix = "₺"),
+        Formula("CEYREK", "Çeyrek Altın (has)", "GRAM_ALTIN * 1.6067", 0, suffix = "₺"),
         Formula("GRAM_GUMUS", "Gram Gümüş", "GUMUS * USDTRY / OZ", 2, suffix = "₺"),
+        Formula("SERTIFIKA_PRIM", "Sertifika Primi", "pct(ALTIN * 100; GRAM_ALTIN)", 2, suffix = "%"),
         Formula("BIST_USD", "BIST 100 ($)", "XU100 / USDTRY", 2, prefix = "$"),
-        Formula("ALTIN_GUMUS", "Altın/Gümüş", "ONS / GUMUS", 2),
-        Formula("SEPET", "Döviz Sepeti", "(USDTRY + EURTRY) / 2", 4),
+        Formula("ALTIN_GUMUS", "Altın/Gümüş Rasyosu", "ONS / GUMUS", 2),
+        Formula("SEPET", "Döviz Sepeti", "(USDTRY + EURTRY) / 2", 4, suffix = "₺"),
+        Formula("REEL_FAIZ", "Reel Faiz", "TR_FAIZ - TR_ENF", 2, suffix = "%"),
+    )
+
+    /** 0.1–0.4 sürümlerindeki varsayılan formüller (değiştirilmemişlerse yenisiyle güncellenir). */
+    internal val legacyDefaultFormulas: Map<String, String> = mapOf(
+        "GRAM_ALTIN" to "ONS * USDTRY / OZ",
+        "CEYREK" to "GRAM_ALTIN * 1.6067",
+        "GRAM_GUMUS" to "GUMUS * USDTRY / OZ",
+        "BIST_USD" to "XU100 / USDTRY",
+        "ALTIN_GUMUS" to "ONS / GUMUS",
+        "SEPET" to "(USDTRY + EURTRY) / 2",
     )
 }

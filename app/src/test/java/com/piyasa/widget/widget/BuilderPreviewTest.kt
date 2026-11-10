@@ -135,4 +135,24 @@ class BuilderPreviewTest {
             com.piyasa.widget.config.WidgetEditor(state, editorConfig, androidx.compose.ui.unit.DpSize(320.dp, 230.dp), {}, {}, initialTab = 1)
         }
     }
+
+    /** Varsayılan liste (yeni kurulum), 10 Kasım 2026'ya yakın örnek fiyatlarla. */
+    @Test
+    @Config(qualifiers = "w400dp-h2200dp-xxhdpi")
+    fun defaultWatchList() {
+        assumeTrue(System.getProperty("previews") == "true")
+        val q = mapOf(
+            "USDTRY" to (50.2302 to 50.141), "EURTRY" to (56.075 to 56.33), "EURUSD" to (1.1164 to 1.1225), "DXY" to (102.25 to 101.67),
+            "ONS" to (4028.82 to 4140.68), "GUMUS" to (51.294 to 53.41), "BRENT" to (91.44 to 92.18),
+            "XU100" to (11661.86 to 11712.2), "XU030" to (14607.56 to 14610.4), "ALTIN" to (71.34 to 72.32),
+            "SPX" to (7492.83 to 7550.2), "NASDAQ" to (24921.85 to 25250.8), "DOW" to (52106.41 to 52390.1), "US10Y" to (4.998 to 4.884),
+            "BTC" to (73377.0 to 75270.0), "TR_ENF" to (29.77 to 29.73), "TR_FAIZ" to (36.0 to 37.0),
+        )
+        val s = AppState().copy(quotes = q.mapValues { (_, v) -> Quote(v.first, v.second, 0) })
+        render("default_list") {
+            androidx.compose.material3.Surface {
+                com.piyasa.widget.ui.WatchList(s, onEdit = {}, onRemove = {}, onMove = { _, _ -> })
+            }
+        }
+    }
 }

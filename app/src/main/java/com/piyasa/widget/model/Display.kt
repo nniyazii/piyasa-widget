@@ -117,15 +117,16 @@ object Display {
     fun item(state: AppState, engine: FormulaEngine, key: String): DisplayItem? {
         state.instrument(key)?.let { ins ->
             val q = state.quotes[key]
-            val change = q?.prevClose?.takeIf { it != 0.0 }?.let { (q.price / it - 1.0) * 100.0 }
+            val (change, changeText) = changeFor(q?.price, q?.prevClose, ins.suffix)
             return DisplayItem(
                 key = key,
                 title = ins.name,
-                subtitle = ins.note ?: ins.symbol,
+                // Her satırda aynı biçim: sembol · not ("OANDA:XAUUSD · Spot")
+                subtitle = listOfNotNull(ins.symbol, ins.note).joinToString(" · "),
                 value = q?.price,
                 change = change,
                 valueText = q?.let { Fmt.value(it.price, ins.decimals, ins.prefix, ins.suffix) } ?: "—",
-                changeText = Fmt.change(change),
+                changeText = changeText,
                 spark = q?.spark.orEmpty(),
                 error = if (q == null) "Veri yok" else null,
                 isFormula = false,
@@ -134,14 +135,15 @@ object Display {
         }
         state.formula(key)?.let { f ->
             val r = engine.evaluateKey(key)
+            val (change, changeText) = changeFor(r.value, r.prev, f.suffix)
             return DisplayItem(
                 key = key,
                 title = f.name,
                 subtitle = f.expression,
                 value = r.value,
-                change = r.change,
+                change = change,
                 valueText = r.value?.let { Fmt.value(it, f.decimals, f.prefix, f.suffix) } ?: "—",
-                changeText = Fmt.change(r.change),
+                changeText = changeText,
                 spark = emptyList(),
                 error = r.error,
                 isFormula = true,
@@ -149,6 +151,21 @@ object Display {
             )
         }
         return null
+    }
+
+    /**
+     * Günlük değişim. Fiyatlarda yüzde ("+%1,23"); oranlarda (faiz, enflasyon, prim — birimi %)
+     * yüzdenin yüzdesi yanıltıcı olduğundan puan farkı ("+0,50 p": %29,27 → %29,77).
+     */
+    fun changeFor(value: Double?, prev: Double?, suffix: String): Pair<Double?, String> {
+        if (value == null || prev == null) return null to "—"
+        if (suffix == "%") {
+            val diff = value - prev
+            return diff to Fmt.points(diff)
+        }
+        if (prev == 0.0) return null to "—"
+        val pct = (value / prev - 1.0) * 100.0
+        return pct to Fmt.change(pct)
     }
 }
 
@@ -166,15 +183,28 @@ object Fmt {
     fun number(v: Double, decimals: Int): String = format(decimals.coerceIn(0, 8)).format(v)
 
     fun value(v: Double, decimals: Int, prefix: String = "", suffix: String = ""): String {
+        // Türkçede yüzde işareti sayıdan önce yazılır: %29,77 · −%2,50
+        if (suffix == "%") return (if (v < 0) "−" else "") + "%" + number(abs(v), decimals)
         val body = number(v, decimals)
         return buildString {
             append(prefix)
             append(body)
             if (suffix.isNotEmpty()) {
-                if (suffix != "%") append(' ')
+                append(' ')
                 append(suffix)
             }
         }
+    }
+
+    /** Puan farkı: "+0,50 p" / "−1,25 p". */
+    fun points(diff: Double?): String {
+        if (diff == null) return "—"
+        val sign = when {
+            diff > 0.005 -> "+"
+            diff < -0.005 -> "−"
+            else -> ""
+        }
+        return "$sign${number(abs(diff), 2)} p"
     }
 
     /** "+%1,23" / "−%0,45" (Türkçe yazım: yüzde işareti başta). */

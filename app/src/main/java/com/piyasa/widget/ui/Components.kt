@@ -81,7 +81,6 @@ fun ValueRow(item: DisplayItem, modifier: Modifier = Modifier, subtitle: String 
                 item.error ?: subtitle,
                 style = MaterialTheme.typography.labelSmall,
                 color = if (item.error != null && item.isFormula) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                fontFamily = if (item.isFormula && item.error == null) FontFamily.Monospace else null,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
