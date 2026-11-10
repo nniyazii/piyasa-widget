@@ -1,8 +1,8 @@
 name: Web
 
 # Web sürümü: test → derleme → (günlük) fiyat geçmişi kopyası → GitHub Pages (gh-pages dalı).
-# Geçmiş kopyası her iş günü BIST kapanışından sonra yenilenir; dinamik listelerdeki
-# 5 yıllık dip/zirve ve ortalama F/K koşulları statik yayında bu dosyalardan çalışır.
+# Geçmiş kopyası her iş günü BIST kapanışından sonra yenilenir: aylık çubuklar (5 yıllık dip/zirve,
+# ortalama F/K) ve günlük kapanışlar (geçmişte test). Statik yayında bu dosyalardan çalışır.
 on:
   push:
     branches: [main]
@@ -37,9 +37,9 @@ jobs:
         run: npm run build
         env:
           VITE_HISTORY: snapshot
-      - name: Fiyat geçmişi kopyası (Yahoo Finance)
+      - name: Fiyat geçmişi kopyası (TradingView, Yahoo yedek)
         # Yeni çekilemeyen semboller yayındaki önceki kopyadan korunur
-        run: node scripts/snapshot.mjs dist/data/history "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/history"
+        run: node scripts/snapshot.mjs dist/data "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data"
         timeout-minutes: 12
         continue-on-error: true
       - name: 404 yönlendirmesi ve Jekyll'siz yayın

@@ -208,6 +208,8 @@ export interface Row {
   epsFy?: (number | undefined)[]
   /** Son mali yıl sonu (epoch saniye). */
   fyEnd?: number
+  /** Yıllık gelir, en yeni önce (geçmişte test için). */
+  revenueFy?: (number | undefined)[]
 }
 
 export interface HistoryStats { low?: number; high?: number; peAvg?: number }

@@ -11,9 +11,11 @@ import {
 import { historySource, monthlyBars } from './history'
 import { scan, type ScanRow } from './tv'
 
-const BASE_COLUMNS = ['name', 'description', 'currency', 'pricescale', 'type']
+export const BASE_SCAN_COLUMNS = ['name', 'description', 'currency', 'pricescale', 'type']
+const BASE_COLUMNS = BASE_SCAN_COLUMNS
 const STOCK_TYPES = new Set(['stock', 'dr'])
 const HISTORY_CANDIDATES = 60
+export const FUNDAMENTAL_COLUMNS = ['earnings_per_share_diluted_fy_h', 'total_revenue_fy_h', 'earnings_per_share_forecast_next_fy', 'fiscal_period_end_fy', 'fundamental_currency_code']
 const COL_EPS_FY = 'earnings_per_share_diluted_fy_h'
 const COL_REV_FY = 'total_revenue_fy_h'
 const COL_EPS_FWD = 'earnings_per_share_forecast_next_fy'
@@ -94,7 +96,15 @@ async function fetchUsdTry(signal?: AbortSignal) {
   }
 }
 
-async function fetchRows(screen: Screen, ctx: Ctx, fields: FieldId[], columns: string[], signal?: AbortSignal): Promise<Row[]> {
+/**
+ * Evrendeki satırlar. [backtest] için bugünkü değerlere göre sunucuda ön eleme yapılmaz
+ * (geçmişte koşulu sağlayıp bugün sağlamayanlar da gerekir) ve ABD evreni en büyük 400 hisseyle sınırlanır.
+ */
+export async function fetchUniverse(screen: Screen, ctx: Ctx, fields: FieldId[], columns: string[], signal?: AbortSignal, backtest = false): Promise<Row[]> {
+  return fetchRows(screen, ctx, fields, columns, signal, backtest)
+}
+
+async function fetchRows(screen: Screen, ctx: Ctx, fields: FieldId[], columns: string[], signal?: AbortSignal, backtest = false): Promise<Row[]> {
   const parse = (data: ScanRow[]) => data.map((r) => parseRow(r, screen, ctx, fields, columns)).filter((r): r is Row => !!r)
   if (screen.universe === 'MY_LIST') {
     const tickers = ctx.instruments.filter((i) => !screen.category || i.category === screen.category).map((i) => i.symbol)
@@ -118,9 +128,9 @@ async function fetchRows(screen: Screen, ctx: Ctx, fields: FieldId[], columns: s
       { left: 'market_cap_basic', operation: 'egreater', right: 2e9 },
     ]
   const body = {
-    filter: [...universe, ...serverFilters(screen)],
+    filter: [...universe, ...(backtest ? [] : serverFilters(screen))],
     columns,
-    range: [0, screen.universe === 'BIST' ? 800 : 1500],
+    range: [0, screen.universe === 'BIST' ? 800 : backtest ? 400 : 1500],
     sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' },
   }
   return parse(await scan(screen.universe === 'BIST' ? 'turkey' : 'america', body, signal))
@@ -157,5 +167,6 @@ export function parseRow(r: ScanRow, screen: Screen, ctx: Ctx, fields: FieldId[]
     values,
     epsFy,
     fyEnd: num(at(COL_FY_END)),
+    revenueFy: columns.includes(COL_REV_FY) ? arr(at(COL_REV_FY)) : undefined,
   }
 }

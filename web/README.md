@@ -25,6 +25,17 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
 - **Dinamik listeler.** Koşullu taramalar: "F/K’sı 5 yıllık ortalamasının yarısına inenler", "USD cinsinden 5 yıllık dibe yakın BIST" ve 13 tane daha.
   - Düzenleyicide yazarken canlı önizleme gösterilir.
   - Liste tek tıkla panoya eklenir.
+- **Geçmişte test (backtest).** Her dinamik listede *Geçmişte test et*: son 6 ay / 1 / 2 / 3 yılın her işlem günü liste o günün kapanışıyla yeniden hesaplanır.
+  - **Kim, ne zaman:** hangi hisse ne zaman girdi, kaç işlem günü kaldı, ne zaman çıktı. Şu an listede olanlar da görünür.
+  - **Sonra ne oldu:** girdikten ve çıktıktan 1 hafta, 1 ay, 3 ay ve 6 ay sonra ortalama ve medyan getiri, yükselenlerin oranı, BIST 100 ya da S&P 500'e göre fark.
+  - **Liste portföyü:** her gün listedekilere eşit ağırlıkla yatırım yapılsaydı endekse karşı değer eğrisi, en büyük düşüş ve ortalama hisse sayısı.
+  - **Girişler:** tüm girişler aranabilir, sıralanabilir tabloda; CSV olarak indirilebilir.
+  - **Doğruluk düzeyi:** her koşulun geçmişte nasıl hesaplandığı açıkça yazılır.
+    - *Tam:* fiyat, ortalamalar, RSI, getiriler.
+    - *Yaklaşık:* 52 hafta ve 5 yıl dip/zirve kapanış bazında. F/K son açıklanan yıllık kârla, yıl sonundan 75 gün sonra. Piyasa değeri bugünkü hisse sayısıyla.
+    - *Sabit:* PD/DD, ROE gibi geçmişi bilinmeyenler bugünkü değerle alınır (ileriye bakma yanlılığı).
+
+  ![geçmişte test](../docs/web-gecmiste-test.png)
 - **Ayarlar.** Tema (sistem/açık/koyu), yenileme aralığı, dışa/içe aktarma (Android'in durum dosyası dahil), sıfırlama.
 - **Kurulabilir (PWA).** Tarayıcıdan "Ana ekrana ekle" ile uygulama gibi açılır; uygulama kabuğu çevrimdışı da açılır.
 
@@ -45,7 +56,8 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
 | Ne | Kaynak | Not |
 |---|---|---|
 | Fiyatlar, arama, taramalar | TradingView tarayıcı servisi | Tarayıcıdan doğrudan (CORS açık), anahtar gerekmez. BIST ~15 dk gecikmeli. |
-| 5 yıllık dip/zirve, 5 yıllık ortalama F/K | Yahoo Finance aylık çubuklar | Yahoo tarayıcıya kapalı. Sunucuyla çalışırken `/api` vekili canlı çeker; GitHub Pages'te her iş günü üretilen `data/history/*.json` kopyası kullanılır. |
+| 5 yıllık dip/zirve, 5 yıllık ortalama F/K | Aylık çubuklar | Sunucuyla çalışırken `/api` Yahoo vekili canlı çeker. GitHub Pages'te her iş günü TradingView'dan üretilen `data/history/*.json` kullanılır. |
+| Geçmişte test | TradingView günlük kapanışlar (~4 yıl) | TradingView'un veri akışı tarayıcıya yalnızca kendi alan adından açılır; sunucu tarafından çekilir. Kendi sunucunda `/api/tv/daily` canlı, GitHub Pages'te `data/daily/*.json` (BIST ~1,2 MB, ABD ~1,9 MB sıkıştırılmış; yalnızca test çalışınca indirilir). |
 | Grafikler | TradingView gömülü grafik | |
 
 Yahoo aylık çubukları borsanın yerel gece yarısında damgalar (BIST için önceki gün 21:00 UTC). Zaman ayın başına çekilir; aksi halde USD çevriminde ve ortalama F/K'da bir ay kayardı. Android'de de düzeltildi.
@@ -82,13 +94,12 @@ Canlı veri testleri: `LIVE=1 npx vitest run src/data/live.test.ts`.
 `.github/workflows/web.yml` her `web/` değişikliğinde ve her iş günü 18:41'de (TSİ):
 
 1. Testleri çalıştırır ve derler (`VITE_HISTORY=snapshot`).
-2. Yahoo'dan aylık geçmiş kopyasını üretir: tüm BIST hisseleri ve piyasa değeri 10 milyar $ üstü ABD hisseleri.
+2. TradingView'dan geçmiş kopyasını üretir: tüm BIST hisseleri ve piyasa değeri 10 milyar $ üstü ABD hisseleri için aylık çubuklar ve ~4 yıllık günlük kapanışlar. Bağlanamazsa aylık için Yahoo denenir.
 3. `gh-pages` dalına yayınlar.
 
 Pages, `gh-pages` dalından yayınlanır (bu depoda açık). Başka bir depoya kopyalarsanız: **Settings → Pages → Source: Deploy from a branch, `gh-pages` / root**.
 
-Yahoo, GitHub'ın sunucularını sık sık sınırlar. Betik 9 dakikalık bir süre bütçesiyle çalışır ve çekemediği sembollerin geçmişini `gh-pages` dalındaki önceki kopyadan korur.
-Aylık çubuklarda birkaç günlük eskilik sonucu pek etkilemez; güncel fiyat her zaman TradingView'dan canlı gelir.
+Çekilemeyen sembollerin geçmişi `gh-pages` dalındaki önceki kopyadan korunur; güncel fiyat her zaman TradingView'dan canlı gelir.
 
 Statik barındırmada geçmiş kopyası olmadan da çalışır. O durumda yalnızca 5 yıllık geçmiş isteyen koşullar "bu yayında geçmiş verisi yok" der.
 
@@ -96,11 +107,12 @@ Statik barındırmada geçmiş kopyası olmadan da çalışır. O durumda yalnı
 
 ```
 web/
-  src/core/       Formül dili, katalog, biçimler, TradingView çevirisi, tarama motoru (saf TypeScript, testli)
+  src/core/       Formül dili, katalog, biçimler, TradingView çevirisi, tarama ve geçmişte test motoru (saf TypeScript, testli)
   src/data/       TradingView istemcisi, geçmiş sağlayıcı, tarama kaynağı, durum deposu
   src/ui/         Simgeler, menü/pencere/bildirim, yönlendirme, fiyat bileşenleri
   src/screens/    Piyasalar, Ayrıntı, Ara/Hesapla, Panolar, Dinamik listeler, Ayarlar
-  server/api.mjs  /api/health, /api/yahoo/chart/:sembol (bağımlılıksız, önbellekli)
+  server/api.mjs  /api/health, /api/yahoo/chart/:sembol, /api/tv/daily (önbellekli)
+  server/tv.mjs   TradingView grafik verisi istemcisi (sunucu tarafı websocket)
   server.mjs      Üretim sunucusu (statik + /api)
   scripts/        snapshot.mjs (geçmiş kopyası), e2e.mjs (uçtan uca test)
 ```

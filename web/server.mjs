@@ -1,5 +1,5 @@
 /**
- * Piyasa web sunucusu (bağımlılıksız): derlenmiş uygulamayı (dist/) sunar ve /api vekilini çalıştırır.
+ * Piyasa web sunucusu: derlenmiş uygulamayı (dist/) sunar ve /api vekilini çalıştırır.
  *   npm run build && npm start        → http://localhost:8080
  *   PORT=3000 HOST=0.0.0.0 npm start
  */

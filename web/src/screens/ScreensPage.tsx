@@ -111,6 +111,7 @@ export function ScreenView({ id, onEdit }: { id: string; onEdit: (s: Screen) => 
         <button className="btn" onClick={() => void refreshScreen(screen.id)} disabled={running}><Icon name="refresh" className={running ? 'spin' : undefined} />Yeniden tara</button>
         <button className="btn" onClick={() => onEdit(screen)}><Icon name="edit" />Düzenle</button>
         <button className="btn" onClick={pin}><Icon name="boards" />Panoya ekle</button>
+        <a className="btn" href={`#/listeler/${screen.id}/test`}><Icon name="clock" />Geçmişte test et</a>
       </div>
       {result && result.rows.length === 0 && !result.error && <div className="empty"><h2>Şu an koşulları sağlayan yok</h2><p>Liste her yenilemede yeniden taranır; koşulları gevşetmek için Düzenle’ye bas.</p></div>}
       {result && result.rows.length > 0 && (

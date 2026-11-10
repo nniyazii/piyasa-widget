@@ -4,6 +4,7 @@ import type { Screen } from './core/screener'
 import { refreshQuotes, refreshScreens, screensStale, useApp, useLive } from './data/store'
 import { Boards, BoardEditor, Kiosk } from './screens/Boards'
 import { Composer } from './screens/Composer'
+import { BacktestView } from './screens/Backtest'
 import { Detail } from './screens/Detail'
 import { ScreenEditor, ScreensIndex, ScreenView } from './screens/ScreensPage'
 import { Settings } from './screens/Settings'
@@ -62,6 +63,7 @@ function Shell() {
 
   const current = NAV.find((n) => n.path === section) ?? NAV[0]
   const screenId = section === 'listeler' ? route.path[1] : undefined
+  const testing = section === 'listeler' && route.path[2] === 'test'
   const screen = screenId ? state.screens.find((s) => s.id === screenId) : undefined
   const status = statusOf(live)
 
@@ -98,9 +100,10 @@ function Shell() {
       <main className="main" id="main">
         <div className={'page' + (section === 'panolar' ? ' wide' : '')}>
           <header className="page-head">
-            {screen && <a className="icon-btn" href="#/listeler" aria-label="Dinamik listelere dön"><Icon name="back" /></a>}
+            {screen && <a className="icon-btn" href={testing ? `#/listeler/${screen.id}` : '#/listeler'} aria-label={testing ? 'Listeye dön' : 'Dinamik listelere dön'}><Icon name="back" /></a>}
             <div style={{ minWidth: 0 }}>
               <h1>{screen ? screen.name : current.label}</h1>
+              {testing && <div className="sub">Geçmişte test</div>}
               {section === '' && <div className="sub" aria-live="polite">{status.text}</div>}
             </div>
             <span className="spacer" />
@@ -123,7 +126,8 @@ function Shell() {
           {section === '' && <Watchlist onCompose={(query) => setCompose({ query })} onEditFormula={(editKey) => setCompose({ editKey })} />}
           {section === 'panolar' && <Boards />}
           {section === 'listeler' && !screenId && <ScreensIndex onNew={() => setScreenEdit({})} />}
-          {section === 'listeler' && screenId && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
+          {section === 'listeler' && screenId && !testing && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
+          {testing && screenId && <BacktestView id={screenId} />}
           {section === 'ayarlar' && <Settings />}
         </div>
       </main>

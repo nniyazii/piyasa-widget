@@ -107,6 +107,17 @@ await step('dinamik liste: şablondan oluştur, sonuç tablosu gelir', async () 
   await page.locator('.result-table tbody tr, .empty').first().waitFor({ timeout: 20000 })
 })
 
+await step('geçmişte test: aşırı satılmış BIST devleri, 1 yıl', async () => {
+  await page.goto(BASE + '/#/listeler/d_bist_oversold_big')
+  await page.locator('a.btn', { hasText: 'Geçmişte test et' }).click()
+  await page.locator('.bt-controls .btn.primary').click()
+  await page.locator('.bt-lead, .empty').first().waitFor({ timeout: 180000 })
+  const lead = await page.locator('.bt-lead').textContent()
+  if (!/kez listeye girdi/.test(lead ?? '')) throw new Error('özet yok: ' + lead)
+  if ((await page.locator('.bt-table').first().locator('tbody tr').count()) !== 4) throw new Error('ufuk tablosu eksik')
+  await page.locator('.bt-chart svg path.list').waitFor()
+})
+
 await step('ayarlar: koyu tema', async () => {
   await page.goto(BASE + '/#/ayarlar')
   await page.locator('.segmented button', { hasText: 'Koyu' }).click()
