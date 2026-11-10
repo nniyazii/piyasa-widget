@@ -10,6 +10,11 @@ Ana ekranda **şık ve kompakt** bir widget ile:
 
 Uygulamanın kendi ekranı yalnızca ayar içindir. Veriler widget'ta gösterilir.
 
+> **Web sürümü:** aynı uygulama tarayıcıda, kurulum gerektirmeden. Canlı fiyatlar, formüller, panolar (widget'ların karşılığı) ve dinamik listeler.
+> **https://nniyazii.github.io/piyasa-widget/**: ayrıntılar [web/README.md](web/README.md).
+>
+> ![web sürümü](docs/web-liste.png)
+
 | Liste (4×2, 2×2) | Bant (4×1) |
 |---|---|
 | ![liste](docs/widget-liste.png) | ![bant](docs/widget-bant.png) |

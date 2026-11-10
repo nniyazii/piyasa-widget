@@ -119,6 +119,9 @@ class ScreenEngineTest {
         assertEquals(10.5, bars[0].low!!, 1e-12)
         assertNull(bars[1].low)
         assertEquals(10.5, ScreenEngine.historyStats(bars).low!!, 1e-12)
+        // BIST damgası (önceki gün 21:00 UTC) doğru aya düşer
+        val ist = YahooSource.parseHistory("""{"chart":{"result":[{"meta":{"currency":"TRY"},"timestamp":[1764536400],"indicators":{"quote":[{"low":[1.0],"high":[2.0],"close":[1.5]}]}}]}}""")
+        assertEquals(t(2025, 12), ist.single().time) // 2025-11-30T21:00Z = İstanbul 1 Aralık
         assertEquals("THYAO.IS", YahooSource.fromTradingView("BIST:THYAO"))
         assertEquals("BRK-B", YahooSource.fromTradingView("NYSE:BRK.B"))
         assertEquals("USDTRY=X", YahooSource.fromTradingView("FX:USDTRY"))

@@ -165,7 +165,11 @@ object YahooSource {
         val ts = r.timestamp.orEmpty()
         val q = r.indicators?.quote?.firstOrNull()
         return ts.indices.map { i ->
-            com.piyasa.widget.model.ScreenEngine.Bar(ts[i], q?.low?.getOrNull(i), q?.high?.getOrNull(i), q?.close?.getOrNull(i))
+            // Yahoo aylık çubukları borsanın yerel gece yarısında damgalar (BIST: önceki gün 21:00 UTC);
+            // UTC'ye göre ay bulmak bir ay kaydırırdı. Zamanı ayın başına (UTC) çek.
+            val d = java.time.Instant.ofEpochSecond(ts[i] + 12 * 3600).atZone(java.time.ZoneOffset.UTC)
+            val monthStart = java.time.YearMonth.from(d).atDay(1).atStartOfDay(java.time.ZoneOffset.UTC).toEpochSecond()
+            com.piyasa.widget.model.ScreenEngine.Bar(monthStart, q?.low?.getOrNull(i), q?.high?.getOrNull(i), q?.close?.getOrNull(i))
         }
     }
 

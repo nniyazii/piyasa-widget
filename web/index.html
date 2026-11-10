@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Piyasa</title>
+    <meta name="description" content="Altın, döviz, Borsa İstanbul ve ABD piyasaları tek ekranda; gram altın gibi kendi formüllerini yaz, dinamik listelerle fırsatları tara." />
+    <meta name="theme-color" content="#F2F3F0" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#15191E" media="(prefers-color-scheme: dark)" />
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icon-192.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <script>
+      // Tema, ilk boyamadan önce: yanıp sönme olmasın
+      try {
+        var s = JSON.parse(localStorage.getItem('piyasa.state.v1') || '{}').settings || {}
+        if (s.theme === 'dark' || s.theme === 'light') document.documentElement.dataset.theme = s.theme
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>Piyasa çalışmak için JavaScript ister.</noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
