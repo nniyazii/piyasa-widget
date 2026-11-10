@@ -267,55 +267,6 @@ internal fun WatchList(
             Category.entries.map { c -> c.label to state.instruments.filter { it.category == c }.map { it.key } }
 
     LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
-        // ---- Dinamik listeler: ad, özet, eşleşme sayısı
-        if (state.screens.isNotEmpty()) {
-            item(key = "h_screens") { SectionHeader("Dinamik listeler") }
-            items(state.screens, key = { "scr_" + it.id }) { scr ->
-                val r = state.screenResults[scr.id]
-                var menu by remember { mutableStateOf(false) }
-                Box {
-                    Row(
-                        Modifier.fillMaxWidth()
-                            .combinedClickable(onClick = { onOpenScreen(scr.id) }, onLongClick = { menu = true })
-                            .padding(horizontal = 16.dp, vertical = 9.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(scr.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            Text(
-                                listOfNotNull(
-                                    scr.conditions.firstOrNull()?.let { com.piyasa.widget.model.ScreenEngine.describe(it) },
-                                    scr.summary(),
-                                ).joinToString(" · "),
-                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            )
-                            // İlk birkaç eşleşmenin adı: listeyi açmadan bir bakışta
-                            r?.rows?.takeIf { it.isNotEmpty() }?.let { rows ->
-                                Text(rows.take(4).joinToString(", ") { it.name } + if (rows.size > 4) " …" else "",
-                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1,
-                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                            }
-                        }
-                        Spacer(Modifier.size(8.dp))
-                        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primaryContainer) {
-                            Text(
-                                when { r == null -> "…"; r.error != null && r.rows.isEmpty() -> "!"; else -> "${r.rows.size}" },
-                                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                                color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold,
-                            )
-                        }
-                    }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(text = { Text("Düzenle") }, onClick = { menu = false; onEditScreen(scr) })
-                        DropdownMenuItem(text = { Text("Yukarı taşı") }, onClick = { menu = false; onMoveScreen(scr.id, -1) })
-                        DropdownMenuItem(text = { Text("Aşağı taşı") }, onClick = { menu = false; onMoveScreen(scr.id, 1) })
-                        DropdownMenuItem(text = { Text("Sil", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDeleteScreen(scr.id) })
-                    }
-                }
-            }
-        }
         groups.forEach { (label, keys) ->
             if (keys.isEmpty()) return@forEach
             item(key = "h_$label") { SectionHeader(label) }
@@ -341,6 +292,50 @@ internal fun WatchList(
                             text = { Text(if (formula != null) "Sil" else "Kaldır", color = MaterialTheme.colorScheme.error) },
                             onClick = { menu = false; onRemove(key) },
                         )
+                    }
+                }
+            }
+        }
+        // ---- Dinamik listeler (en altta: günlük fiyatları aşağı itmesin). İki satır: ad · ilk eşleşenler
+        if (state.screens.isNotEmpty()) {
+            item(key = "h_screens") { SectionHeader("Dinamik listeler") }
+            items(state.screens, key = { "scr_" + it.id }) { scr ->
+                val r = state.screenResults[scr.id]
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .combinedClickable(onClick = { onOpenScreen(scr.id) }, onLongClick = { menu = true })
+                            .padding(horizontal = 16.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(scr.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            val rows = r?.rows.orEmpty()
+                            // Eşleşenlerin adları (listeyi açmadan bir bakışta); yoksa koşulun kendisi
+                            Text(
+                                if (rows.isNotEmpty()) rows.take(4).joinToString(", ") { it.name } + if (rows.size > 4) " …" else ""
+                                else scr.conditions.firstOrNull()?.let { com.piyasa.widget.model.ScreenEngine.describe(it) } ?: scr.summary(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (rows.isNotEmpty()) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                        }
+                        Spacer(Modifier.size(8.dp))
+                        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                            Text(
+                                when { r == null -> "…"; r.error != null && r.rows.isEmpty() -> "!"; else -> "${r.rows.size}" },
+                                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("Düzenle") }, onClick = { menu = false; onEditScreen(scr) })
+                        DropdownMenuItem(text = { Text("Yukarı taşı") }, onClick = { menu = false; onMoveScreen(scr.id, -1) })
+                        DropdownMenuItem(text = { Text("Aşağı taşı") }, onClick = { menu = false; onMoveScreen(scr.id, 1) })
+                        DropdownMenuItem(text = { Text("Sil", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDeleteScreen(scr.id) })
                     }
                 }
             }

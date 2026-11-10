@@ -137,35 +137,59 @@ data class ScreenResult(
     val note: String? = null,
 )
 
-/** Hazır şablonlar: kullanıcının örnekleri ve sık kullanılan taramalar. */
+/**
+ * Uygulamaya hazır gelen dinamik listeler (aynı zamanda yeni liste için şablonlar).
+ * İlk ikisi kullanıcının örnekleri; diğerleri sık kullanılan "kısa yol" taramalar.
+ * Büyüklük eşikleri küçük/sığ hisseleri eler (BIST piyasa değeri ₺, ABD $).
+ */
 object ScreenTemplates {
+    private const val MLR = 1e9
+
     val all: List<Screen> = listOf(
+        // --- Kullanıcının örnekleri
         Screen(
-            "tpl_bist_5y_usd", "5 yıllık dibe yakın BIST (USD)", Universe.BIST, null, ScreenCurrency.USD,
+            "d_bist_5y_usd", "5 yıllık dibe yakın BIST ($)", Universe.BIST, null, ScreenCurrency.USD,
             listOf(Condition(Field.PRICE, Op.LTE, Field.LOW_5Y, 10.0)),
         ),
         Screen(
-            "tpl_my_us_sma200", "200 günlük ortalama civarı (ABD, listem)", Universe.MY_LIST, Category.US, ScreenCurrency.LOCAL,
+            "d_my_us_sma200", "200 günlük ortalama civarı (listemdeki ABD)", Universe.MY_LIST, Category.US, ScreenCurrency.LOCAL,
             listOf(Condition(Field.PRICE, Op.LT, Field.SMA200, 5.0)),
-            onlyStocks = true,
+        ),
+        // --- Kısa yollar
+        Screen(
+            "d_bist_movers", "Günün yıldızları (BIST)", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(Condition(Field.CHANGE, Op.GTE, null, 4.0), Condition(Field.MCAP, Op.GT, null, 5 * MLR)),
+            sort = ScreenSort.CHANGE_DESC, limit = 10,
         ),
         Screen(
-            "tpl_bist_52w_low", "52 hafta dibine yakın BIST", Universe.BIST, null, ScreenCurrency.LOCAL,
-            listOf(Condition(Field.PRICE, Op.LTE, Field.LOW_52W, 5.0)),
+            "d_bist_oversold_big", "Aşırı satılmış BIST devleri", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(Condition(Field.RSI, Op.LT, null, 35.0), Condition(Field.MCAP, Op.GT, null, 50 * MLR)),
+            limit = 20,
         ),
         Screen(
-            "tpl_us_oversold", "Aşırı satım (RSI < 30) ABD", Universe.US, null, ScreenCurrency.LOCAL,
-            listOf(Condition(Field.RSI, Op.LT, null, 30.0)),
+            "d_bist_trend_cheap", "Trendde ve ucuz (BIST)", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(
+                Condition(Field.PE, Op.LT, null, 10.0),
+                Condition(Field.PE, Op.GT, null, 0.0),
+                Condition(Field.PRICE, Op.GT, Field.SMA200, 0.0),
+                Condition(Field.SMA50, Op.GT, Field.SMA200, 0.0),
+                Condition(Field.MCAP, Op.GT, null, 10 * MLR),
+            ),
+            sort = ScreenSort.MCAP_DESC, limit = 20,
         ),
         Screen(
-            "tpl_bist_ath", "Zirveye yakın BIST", Universe.BIST, null, ScreenCurrency.LOCAL,
-            listOf(Condition(Field.PRICE, Op.GTE, Field.ATH, -3.0)),
-            sort = ScreenSort.CLOSEST,
+            // Tüm zamanların zirvesi çok katı (çoğu hisse uzak); yaygın "yeni zirve" taraması 52 haftalık zirveye bakar
+            "d_bist_52w_high", "Zirveye yakın BIST hisseleri", Universe.BIST, null, ScreenCurrency.LOCAL,
+            listOf(Condition(Field.PRICE, Op.GTE, Field.HIGH_52W, -5.0), Condition(Field.MCAP, Op.GT, null, 20 * MLR)),
+            limit = 20,
         ),
         Screen(
-            "tpl_bist_cheap_pe", "Düşük F/K, ortalama üstü BIST", Universe.BIST, null, ScreenCurrency.LOCAL,
-            listOf(Condition(Field.PE, Op.LT, null, 8.0), Condition(Field.PE, Op.GT, null, 0.0), Condition(Field.PRICE, Op.GT, Field.SMA200, 0.0)),
-            sort = ScreenSort.MCAP_DESC,
+            "d_us_megacap_dip", "Düşüşteki ABD devleri", Universe.US, null, ScreenCurrency.LOCAL,
+            listOf(Condition(Field.PRICE, Op.LTE, Field.LOW_52W, 15.0), Condition(Field.MCAP, Op.GT, null, 100 * MLR)),
+            limit = 20,
         ),
     )
+
+    /** Uygulamaya varsayılan olarak gelenler (şu an hepsi). */
+    val defaults: List<Screen> get() = all
 }

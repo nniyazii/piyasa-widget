@@ -137,8 +137,8 @@ class BuilderPreviewTest {
     }
 
     // ---- Dinamik listeler (canlı testteki sonuçlara benzer örnek veriler)
-    private val bist5y = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "tpl_bist_5y_usd" }.copy(id = "s1")
-    private val usSma = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "tpl_my_us_sma200" }.copy(id = "s2")
+    private val bist5y = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "d_bist_5y_usd" }.copy(id = "s1")
+    private val usSma = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "d_my_us_sma200" }.copy(id = "s2")
     private val screenState = state.copy(
         screens = listOf(bist5y, usSma),
         screenResults = mapOf(

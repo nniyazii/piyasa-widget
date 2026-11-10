@@ -91,14 +91,19 @@ Formüller başka formülleri kullanabilir (`CEYREK = GRAM_ALTIN * 1.6067`). Dö
 
 Kendiliğinden güncellenen listeler: koşulları bir kez kurarsın, her yenilemede yeniden taranır. **+ → Dinamik liste oluştur** ile açılır; listede uzun basıp *Düzenle* ile değiştirilir. Widget düzenleyicisinde *Ekle → Dinamik listeler* ile widget'a da konur; widget'ta başlık ve ilk 3–10 sonuç görünür.
 
-| Örnek | Kurulum |
-|---|---|
-| USD cinsinden 5 yıllık dibine yakın BIST hisseleri | BIST hisseleri · USD · `Fiyat ≤ 5 yıl en düşük +%10` |
-| Listemdeki, 200 günlük ortalamanın altında ya da en fazla %5 üstündeki ABD hisseleri | Listem · Amerika · yalnızca hisseler · `Fiyat < 200 günlük ortalama +%5` |
-| 52 hafta dibine yakın BIST | `Fiyat ≤ 52 hafta en düşük +%5` |
-| Aşırı satım ABD | ABD hisseleri · `RSI (14) < 30` |
-| Zirveye yakın BIST | `Fiyat ≥ Tüm zamanların en yükseği −%3` |
-| Düşük F/K, trendde | `F/K < 8` · `F/K > 0` · `Fiyat > 200 günlük ortalama` |
+Uygulamaya **7 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; silersen geri gelmez, *Varsayılan listeye dön* geri getirir). Hepsi yeni liste için şablon olarak da kullanılabilir.
+
+| Hazır liste | Kurulum | 10 Kas 2026'da |
+|---|---|---|
+| **5 yıllık dibe yakın BIST ($)** | BIST hisseleri · USD · `Fiyat ≤ 5 yıl en düşük +%10` | Arçelik, Kalkınma Yatırım, Sasa |
+| **200 günlük ortalama civarı (listemdeki ABD)** | Listem · Amerika · `Fiyat < 200 günlük ortalama +%5` | Nasdaq, S&P 500, Dow (listene ABD hissesi ekledikçe onlar da) |
+| Günün yıldızları (BIST) | `Günlük değişim % ≥ 4` · `Piyasa değeri > 5 mlr` · en çok yükselen, 10 | 10 hisse |
+| Aşırı satılmış BIST devleri | `RSI (14) < 35` · `Piyasa değeri > 50 mlr` | Türkiye Sigorta, Tüpraş |
+| Trendde ve ucuz (BIST) | `0 < F/K < 10` · `Fiyat > 200 günlük ort.` · `50 günlük ort. > 200 günlük ort.` · `Piyasa değeri > 10 mlr` | Tüpraş, Halkbank, Alarko … (6) |
+| Zirveye yakın BIST hisseleri | `Fiyat ≥ 52 hafta en yüksek −%5` · `Piyasa değeri > 20 mlr` | 3 hisse |
+| Düşüşteki ABD devleri | ABD · `Fiyat ≤ 52 hafta en düşük +%15` · `Piyasa değeri > 100 mlr $` | Netflix, Nvidia, Boeing, Alphabet … (19) |
+
+İlk ikisi kullanıcının istediği örnekler. Diğerlerinde piyasa değeri eşiği küçük ve sığ hisseleri eler (BIST ₺, ABD $; düzenleyicide milyar cinsinden girilir). Listedeki *yalnızca hisseler* açılırsa endeksler hariç tutulur.
 
 - **Nerede:** Listem (istersen tek kategori, istersen yalnızca hisseler), tüm BIST hisseleri, ABD hisseleri (piyasa değeri 2 milyar $ üstü).
 - **Koşul:** `[alan] [< ≤ > ≥] [sayı]` ya da `[alan] [< ≤ > ≥] [başka alan ± %]`. Birden çok koşul *tümü* ya da *herhangi biri* olarak birleşir.

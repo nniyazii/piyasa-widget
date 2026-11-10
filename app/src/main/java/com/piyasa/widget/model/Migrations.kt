@@ -2,13 +2,20 @@ package com.piyasa.widget.model
 
 /** Kayıtlı durumu güncel şemaya taşır. */
 object Migrations {
-    const val CURRENT = 3
+    const val CURRENT = 4
 
     fun apply(state: AppState): AppState {
         var s = state
         if (state.schema < 2) s = toTradingView(s)
         if (state.schema < 3) s = refreshCatalogDefinitions(s)
+        if (state.schema < 4) s = addDefaultScreens(s)
         return if (s.schema == CURRENT) s else s.copy(schema = CURRENT)
+    }
+
+    /** v3 -> v4: Hazır dinamik listeler eklenir (kullanıcının kendi listeleri korunur, önce gelir). */
+    private fun addDefaultScreens(s: AppState): AppState {
+        val missing = ScreenTemplates.defaults.filter { d -> s.screens.none { it.id == d.id } }
+        return if (missing.isEmpty()) s else s.copy(screens = s.screens + missing)
     }
 
     /**
@@ -54,10 +61,13 @@ object Migrations {
      */
     fun resetToDefaults(s: AppState): AppState {
         val fresh = AppState()
+        val screens = s.screens + ScreenTemplates.defaults.filter { d -> s.screens.none { it.id == d.id } }
         val keys = (fresh.instruments.map { it.key } + fresh.formulas.map { it.key }).toSet()
         return s.copy(
             instruments = fresh.instruments,
             formulas = fresh.formulas,
+            // Dinamik listeler: kullanıcınınkiler korunur, silinmiş hazır listeler geri gelir
+            screens = screens,
             quotes = s.quotes.filterKeys { k -> fresh.instruments.any { it.key == k && s.instrument(k)?.symbol == it.symbol } },
             widgets = s.widgets.mapValues { (_, w) ->
                 // Bölümler ve dinamik listeler korunur (dinamik listeler sıfırlamadan etkilenmez)

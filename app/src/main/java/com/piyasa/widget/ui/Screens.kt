@@ -290,7 +290,12 @@ private fun ConditionCard(c: Condition, onChange: (Condition) -> Unit, onRemove:
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                NumberField(c.value, "Değer", Modifier.fillMaxWidth()) { onChange(c.copy(value = it)) }
+                if (c.left.kind == com.piyasa.widget.model.FieldKind.MONEY) {
+                    // Piyasa değeri milyar cinsinden girilir (BIST ₺, ABD $)
+                    NumberField(c.value / 1e9, "Milyar", Modifier.fillMaxWidth()) { onChange(c.copy(value = it * 1e9)) }
+                } else {
+                    NumberField(c.value, "Değer", Modifier.fillMaxWidth()) { onChange(c.copy(value = it)) }
+                }
             }
         }
     }

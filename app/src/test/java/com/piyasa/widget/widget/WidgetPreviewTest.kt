@@ -154,8 +154,8 @@ class WidgetPreviewTest {
         assumeTrue(System.getProperty("previews") == "true")
         seed()
         runBlocking {
-            val s1 = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "tpl_bist_5y_usd" }.copy(id = "s1", name = "5Y dibe yakın BIST ($)")
-            val s2 = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "tpl_my_us_sma200" }.copy(id = "s2", name = "SMA200 civarı ABD")
+            val s1 = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "d_bist_5y_usd" }.copy(id = "s1", name = "5Y dibe yakın BIST ($)")
+            val s2 = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "d_my_us_sma200" }.copy(id = "s2", name = "SMA200 civarı ABD")
             context.appStore.updateData {
                 it.copy(
                     screens = listOf(s1, s2),

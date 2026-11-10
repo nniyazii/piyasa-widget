@@ -130,5 +130,24 @@ class ScreenEngineTest {
         assertEquals("Fiyat < 200 günlük ortalama +%5", ScreenEngine.describe(Condition(Field.PRICE, Op.LT, Field.SMA200, 5.0)))
         assertEquals("Fiyat ≥ Tüm zamanların en yükseği −%3", ScreenEngine.describe(Condition(Field.PRICE, Op.GTE, Field.ATH, -3.0)))
         assertEquals("RSI (14) < 30", ScreenEngine.describe(Condition(Field.RSI, Op.LT, null, 30.0)))
+        assertEquals("Piyasa değeri > 5 mlr", ScreenEngine.describe(Condition(Field.MCAP, Op.GT, null, 5e9)))
+        assertEquals("Piyasa değeri > 1,2 trn", ScreenEngine.describe(Condition(Field.MCAP, Op.GT, null, 1.2e12)))
+    }
+
+    @Test fun defaultScreensAreSane() {
+        val d = com.piyasa.widget.model.ScreenTemplates.defaults
+        assertEquals(7, d.size)
+        assertEquals(d.size, d.map { it.id }.toSet().size)
+        assertTrue(d.all { it.conditions.isNotEmpty() && it.name.isNotBlank() })
+        // Tüm BIST / ABD taramalarında (kullanıcının 5Y örneği hariç) küçük şirketler elenir
+        d.filter { it.universe != Universe.MY_LIST && it.id != "d_bist_5y_usd" }
+            .forEach { s -> assertTrue("${s.name}: büyüklük eşiği yok", s.conditions.any { it.left == Field.MCAP && it.op == Op.GT }) }
+        // Kullanıcının örnekleri birebir
+        val five = d.first { it.id == "d_bist_5y_usd" }
+        assertEquals(Universe.BIST, five.universe); assertEquals(ScreenCurrency.USD, five.currency)
+        assertEquals(Condition(Field.PRICE, Op.LTE, Field.LOW_5Y, 10.0), five.conditions.single())
+        val sma = d.first { it.id == "d_my_us_sma200" }
+        assertEquals(Universe.MY_LIST, sma.universe); assertEquals(com.piyasa.widget.model.Category.US, sma.category)
+        assertEquals(Condition(Field.PRICE, Op.LT, Field.SMA200, 5.0), sma.conditions.single())
     }
 }

@@ -168,7 +168,7 @@ object ScreenEngine {
         else -> "" to currency
     }
 
-    /** "Fiyat ≤ 5 yıl en düşük +%10" */
+    /** "Fiyat ≤ 5 yıl en düşük +%10" · "Piyasa değeri > 5 mlr" · "Günlük değişim % ≥ 4" */
     fun describe(c: Condition): String {
         val right = if (c.right != null) {
             val off = when {
@@ -177,7 +177,21 @@ object ScreenEngine {
                 else -> ""
             }
             c.right.label + off
+        } else if (c.left.kind == FieldKind.MONEY) {
+            money(c.value)
         } else Fmt.number(c.value, if (c.value % 1.0 == 0.0) 0 else 2)
         return "${c.left.label} ${c.op.symbol} $right"
+    }
+
+    /** Büyük tutarlar kısa: 5 mlr · 1,2 trn · 800 mn. (Birim evrene göre: BIST ₺, ABD $.) */
+    fun money(v: Double): String {
+        val a = abs(v)
+        fun n(x: Double) = Fmt.number(x, if (x % 1.0 == 0.0 || x >= 100) 0 else 1)
+        return when {
+            a >= 1e12 -> n(v / 1e12) + " trn"
+            a >= 1e9 -> n(v / 1e9) + " mlr"
+            a >= 1e6 -> n(v / 1e6) + " mn"
+            else -> n(v)
+        }
     }
 }

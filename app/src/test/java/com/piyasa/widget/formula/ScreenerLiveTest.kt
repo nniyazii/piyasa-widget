@@ -27,12 +27,28 @@ class ScreenerLiveTest {
         r.rows.take(8).forEach { println("   ${it.symbol.padEnd(18)} ${it.name.take(28).padEnd(28)} ${it.price} ${it.currency} skor=${it.score}") }
     }
 
+    /** Uygulamaya hazır gelen tüm dinamik listeler, varsayılan izleme listesiyle bugün ne veriyor. */
+    @Test fun everyDefaultScreenRunsAndFindsSomething() = runBlocking {
+        assumeTrue(live)
+        val state = AppState()
+        val empty = mutableListOf<String>()
+        for (s in ScreenTemplates.defaults) {
+            val r = ScreenerSource.run(s, state)
+            print(s.name, r)
+            assertNull("${s.name}: ${r.error}", r.error)
+            if (r.rows.isEmpty()) empty += s.name
+        }
+        println("Boş çıkanlar: $empty")
+        assertTrue("En fazla bir varsayılan liste boş olabilir: $empty", empty.size <= 1)
+    }
+
     @Test fun myUsStocksNearOrBelowSma200() = runBlocking {
         assumeTrue(live)
         // Listemde birkaç ABD hissesi + endeks
         val us = listOf("AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA").mapNotNull { k -> Catalog.all.firstOrNull { it.key == k } }
         val state = AppState().let { it.copy(instruments = it.instruments + us) }
-        val screen = ScreenTemplates.all.first { it.id == "tpl_my_us_sma200" }
+        // "yalnızca hisseler" açık (varsayılan listede kapalı: endeksler de görünsün diye)
+        val screen = ScreenTemplates.all.first { it.id == "d_my_us_sma200" }.copy(onlyStocks = true)
         val r = ScreenerSource.run(screen, state)
         print("listem ABD · fiyat < SMA200 +%5", r)
         assertNull(r.error)
@@ -75,7 +91,7 @@ class ScreenerLiveTest {
     @Test fun fiveYearLowNeedsYahooAndFailsGracefully() = runBlocking {
         assumeTrue(live)
         // Bu ortamda Yahoo engelli: çökmeden anlaşılır bir hata dönmeli (telefonda Yahoo ile çalışır)
-        val screen = ScreenTemplates.all.first { it.id == "tpl_bist_5y_usd" }
+        val screen = ScreenTemplates.all.first { it.id == "d_bist_5y_usd" }
         val r = runCatching { ScreenerSource.run(screen, AppState()) }.getOrElse { e -> throw AssertionError("çöktü: $e") }
         print("BIST 5Y dip (USD)", r)
         assertTrue(r.error != null || r.note != null)

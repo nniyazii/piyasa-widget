@@ -134,7 +134,7 @@ data class AppState(
     /** Durum şeması sürümü; eski kurulumlar açılışta taşınır (bkz. Migrations). */
     val schema: Int = 1,
     /** Dinamik listeler (filtreler) ve son tarama sonuçları. */
-    val screens: List<Screen> = emptyList(),
+    val screens: List<Screen> = ScreenTemplates.defaults,
     val screenResults: Map<String, ScreenResult> = emptyMap(),
 ) {
     fun instrument(key: String): Instrument? = instruments.firstOrNull { it.key == key }

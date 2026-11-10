@@ -26,9 +26,28 @@ class ScreenStateTest {
         val back = AppJson.decodeFromString(AppState.serializer(), json)
         assertEquals(state.screens, back.screens)
         assertEquals(state.screenResults, back.screenResults)
-        // Eski kayıt (screens alanı yok) sorunsuz okunur
+        // Eski kayıt (screens alanı yok) sorunsuz okunur ve hazır listelerle açılır
         val old = AppJson.decodeFromString(AppState.serializer(), """{"refreshMinutes":30}""")
-        assertTrue(old.screens.isEmpty())
+        assertEquals(ScreenTemplates.defaults, old.screens)
+    }
+
+    @Test fun newInstallHasDefaultScreens() {
+        val s = Migrations.apply(AppState())
+        assertEquals(ScreenTemplates.defaults.map { it.id }, s.screens.map { it.id })
+        // Kullanıcının iki örneği ilk sırada
+        assertEquals(listOf("d_bist_5y_usd", "d_my_us_sma200"), s.screens.take(2).map { it.id })
+    }
+
+    @Test fun upgradeAddsDefaultScreensAndKeepsOwn() {
+        val mine = ScreenTemplates.defaults.first().copy(id = "benim", name = "Benim listem")
+        val v3 = AppState(schema = 3, screens = listOf(mine, ScreenTemplates.defaults[2]))
+        val s = Migrations.apply(v3)
+        assertEquals("benim", s.screens.first().id)                 // kullanıcınınki önce, korunur
+        assertEquals(1 + ScreenTemplates.defaults.size, s.screens.size) // eksik hazırlar eklendi, tekrar yok
+        assertEquals(s.screens.size, s.screens.map { it.id }.toSet().size)
+        // v4'te kullanıcı bir hazır listeyi silerse geri gelmez
+        val deleted = s.copy(screens = s.screens.filterNot { it.id == "d_bist_movers" })
+        assertTrue(Migrations.apply(deleted).screens.none { it.id == "d_bist_movers" })
     }
 
     @Test fun widgetEntriesAreNotItems() {
@@ -40,7 +59,8 @@ class ScreenStateTest {
 
     @Test fun resetToDefaultsKeepsScreensAndTheirWidgetEntries() {
         val r = Migrations.resetToDefaults(state)
-        assertEquals(state.screens, r.screens)
+        assertTrue(r.screens.containsAll(state.screens))
+        assertEquals(ScreenTemplates.defaults.map { it.id }.toSet(), r.screens.map { it.id }.toSet()) // silinen hazırlar geri gelir
         assertTrue(WidgetConfig.screenEntry(screen.id) in r.widgetConfig(3).keys)
     }
 
