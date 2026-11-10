@@ -79,7 +79,11 @@ private class YMeta(
 private class YIndicators(val quote: List<YSeries>? = null)
 
 @Serializable
-private class YSeries(val close: List<Double?>? = null)
+private class YSeries(
+    val close: List<Double?>? = null,
+    val low: List<Double?>? = null,
+    val high: List<Double?>? = null,
+)
 
 @Serializable
 private class YSearchResponse(val quotes: List<YSearchQuote> = emptyList())
@@ -138,6 +142,43 @@ object YahooSource {
             }
         }
         throw last ?: IOException("Arama yapılamadı")
+    }
+
+    /** 5 yıllık aylık çubuklar (dinamik listelerde "5 yıl en düşük/en yüksek" için). */
+    suspend fun monthlyHistory(symbol: String): List<com.piyasa.widget.model.ScreenEngine.Bar> {
+        val enc = URLEncoder.encode(symbol, "UTF-8")
+        var last: IOException? = null
+        for (host in hosts) {
+            try {
+                return parseHistory(Http.get("https://$host/v8/finance/chart/$enc?range=5y&interval=1mo"))
+            } catch (e: IOException) {
+                last = e
+            }
+        }
+        throw last ?: IOException("Yahoo erişilemedi")
+    }
+
+    /** Yahoo chart yanıtından aylık çubuklar (test edilebilir). */
+    fun parseHistory(body: String): List<com.piyasa.widget.model.ScreenEngine.Bar> {
+        val resp = AppJson.decodeFromString(YChartResponse.serializer(), body)
+        val r = resp.chart.result?.firstOrNull() ?: throw IOException(resp.chart.error?.description ?: "Sembol bulunamadı")
+        val ts = r.timestamp.orEmpty()
+        val q = r.indicators?.quote?.firstOrNull()
+        return ts.indices.map { i ->
+            com.piyasa.widget.model.ScreenEngine.Bar(ts[i], q?.low?.getOrNull(i), q?.high?.getOrNull(i), q?.close?.getOrNull(i))
+        }
+    }
+
+    /** TradingView sembolünü Yahoo'ya çevirir: BIST:THYAO → THYAO.IS, NASDAQ:BRK.B → BRK-B. */
+    fun fromTradingView(symbol: String): String? {
+        val ex = symbol.substringBefore(':', "").uppercase()
+        val t = symbol.substringAfter(':').uppercase()
+        return when (ex) {
+            "BIST" -> "$t.IS"
+            "NASDAQ", "NYSE", "AMEX", "ARCA", "BATS", "CBOE", "OTC" -> t.replace('.', '-')
+            "FX", "FX_IDC", "OANDA" -> if (Regex("^[A-Z]{6}$").matches(t)) "$t=X" else null
+            else -> null
+        }
     }
 
     suspend fun fetch(symbol: String): Quote {

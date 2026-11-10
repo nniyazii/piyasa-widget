@@ -170,7 +170,12 @@ fun WidgetEditor(
     initialTab: Int = 0,
     livePreview: Boolean = true,
 ) {
-    var cfg by remember { mutableStateOf(initial.copy(keys = initial.keys.filter { WidgetConfig.isSection(it) || it in state.allKeys })) }
+    var cfg by remember {
+        mutableStateOf(initial.copy(keys = initial.keys.filter { k ->
+            WidgetConfig.isSection(k) || k in state.allKeys ||
+                (WidgetConfig.isScreen(k) && state.screen(WidgetConfig.screenId(k)) != null)
+        }))
+    }
     var tab by remember { mutableIntStateOf(initialTab) }
 
     Scaffold(
@@ -294,6 +299,22 @@ private fun ContentTab(state: AppState, cfg: WidgetConfig, onChange: (WidgetConf
                     )
                     EntryActions(i, entries.size, ::move) { set(entries.filterIndexed { j, _ -> j != i }) }
                 }
+            } else if (WidgetConfig.isScreen(k)) {
+                // Dinamik liste: widget'ta başlık + ilk N sonuç olarak açılır
+                val scr = state.screen(WidgetConfig.screenId(k))
+                val n = state.screenResults[WidgetConfig.screenId(k)]?.rows?.size
+                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(28.dp).background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(14.dp)), contentAlignment = Alignment.Center) {
+                        Text("≡", color = MaterialTheme.colorScheme.onTertiary, fontWeight = FontWeight.Bold)
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(scr?.name ?: "Silinmiş liste", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text("Dinamik liste · ilk ${cfg.screenRows} sonuç" + (n?.let { " · şu an $it eşleşme" } ?: ""),
+                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    EntryActions(i, entries.size, ::move) { set(entries.filterIndexed { j, _ -> j != i }) }
+                }
             } else {
                 val item = Display.item(state, engine, k)
                 Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -330,6 +351,24 @@ private fun ContentTab(state: AppState, cfg: WidgetConfig, onChange: (WidgetConf
             }
         }
         val needle = filter.trim().lowercase(Locale.forLanguageTag("tr-TR"))
+        // Dinamik listeler en üstte
+        val screensAvailable = state.screens.filter { WidgetConfig.screenEntry(it.id) !in entries }
+            .filter { needle.isEmpty() || it.name.lowercase(Locale.forLanguageTag("tr-TR")).contains(needle) }
+        if (screensAvailable.isNotEmpty()) {
+            item(key = "grp_screens") { SectionHeader("Dinamik listeler") }
+            items(screensAvailable, key = { "adds_${it.id}" }) { scr ->
+                Row(
+                    Modifier.fillMaxWidth().clickable { set(entries + WidgetConfig.screenEntry(scr.id)) }.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(scr.name, style = MaterialTheme.typography.bodyMedium)
+                        Text(scr.summary(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Icon(Icons.Default.Add, null, Modifier.padding(start = 8.dp), tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
         val groups: List<Pair<String, List<String>>> =
             listOf("Formüller" to state.formulas.map { it.key }) +
                 Category.entries.map { c -> c.label to state.instruments.filter { it.category == c }.map { it.key } }
@@ -444,6 +483,15 @@ private fun AppearanceTab(cfg: WidgetConfig, onChange: (WidgetConfig) -> Unit) {
                     }
                     Toggle("Mini grafik", cfg.showSpark) { onChange(cfg.copy(showSpark = it)) }
                     Toggle("Alt satırda sembol / formül", cfg.showSubtitle) { onChange(cfg.copy(showSubtitle = it)) }
+                }
+            }
+        }
+        if (cfg.keys.any { WidgetConfig.isScreen(it) }) {
+            item {
+                Setting("Dinamik listelerde en fazla") {
+                    Segmented(listOf("3", "5", "8", "10"), listOf(3, 5, 8, 10).indexOf(cfg.screenRows).coerceAtLeast(0)) {
+                        onChange(cfg.copy(screenRows = listOf(3, 5, 8, 10)[it]))
+                    }
                 }
             }
         }

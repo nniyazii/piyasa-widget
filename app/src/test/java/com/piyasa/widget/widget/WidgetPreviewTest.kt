@@ -147,4 +147,36 @@ class WidgetPreviewTest {
         config(WidgetConfig(keys = sectioned, theme = com.piyasa.widget.model.WidgetTheme.DARK, opacity = 0.55f))
         render("style_dark_transparent", 320, 300)
     }
+
+    /** Widget'ta dinamik liste: başlık + ilk N sonuç. */
+    @Test
+    fun renderScreens() {
+        assumeTrue(System.getProperty("previews") == "true")
+        seed()
+        runBlocking {
+            val s1 = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "tpl_bist_5y_usd" }.copy(id = "s1", name = "5Y dibe yakın BIST ($)")
+            val s2 = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "tpl_my_us_sma200" }.copy(id = "s2", name = "SMA200 civarı ABD")
+            context.appStore.updateData {
+                it.copy(
+                    screens = listOf(s1, s2),
+                    screenResults = mapOf(
+                        "s1" to com.piyasa.widget.model.ScreenResult(0, listOf(
+                            com.piyasa.widget.model.ScreenRow("BIST:ARCLK", "Arçelik", 1.4045, -0.8, "USD", 3),
+                            com.piyasa.widget.model.ScreenRow("BIST:KLNMA", "Kalkınma Yatırım", 0.1360, 0.4, "USD", 4),
+                            com.piyasa.widget.model.ScreenRow("BIST:SASA", "Sasa Polyester", 0.0317, -1.9, "USD", 4),
+                        )),
+                        "s2" to com.piyasa.widget.model.ScreenResult(0, listOf(
+                            com.piyasa.widget.model.ScreenRow("NASDAQ:META", "Meta", 639.61, -0.36, "USD", 2),
+                            com.piyasa.widget.model.ScreenRow("NASDAQ:TSLA", "Tesla", 377.29, -0.48, "USD", 2),
+                            com.piyasa.widget.model.ScreenRow("NASDAQ:GOOGL", "Alphabet", 286.66, -0.29, "USD", 2),
+                        )),
+                    ),
+                )
+            }
+        }
+        config(WidgetConfig(title = "Fırsatlar", keys = listOf(WidgetConfig.screenEntry("s1"), WidgetConfig.screenEntry("s2")), screenRows = 3))
+        render("screens_4x3", 320, 290)
+        config(WidgetConfig(keys = listOf("GRAM_ALTIN", "USDTRY", WidgetConfig.screenEntry("s1")), screenRows = 3))
+        render("screens_mixed", 320, 250)
+    }
 }

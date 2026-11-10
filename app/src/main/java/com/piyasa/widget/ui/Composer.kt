@@ -171,6 +171,7 @@ fun ComposerScreen(
     onUndoInstrument: (Instrument) -> Unit,
     onSaveFormula: (formula: Formula, originalKey: String?, needed: List<Instrument>) -> Unit,
     onDeleteFormula: (String) -> Unit,
+    onCreateScreen: (() -> Unit)? = null,
     searcher: suspend (String) -> List<SearchHit> = ::defaultSearch,
     initialTokens: List<String>? = null,
     initialQuery: String = "",
@@ -472,6 +473,30 @@ fun ComposerScreen(
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(top = 4.dp, bottom = 8.dp)) {
                 if (query.isEmpty()) {
                     if (!formulaMode) {
+                        if (onCreateScreen != null) {
+                            item {
+                                Surface(
+                                    onClick = onCreateScreen,
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = MaterialTheme.colorScheme.tertiaryContainer,
+                                ) {
+                                    Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            Modifier.size(36.dp).background(MaterialTheme.colorScheme.tertiary, CircleShape),
+                                            contentAlignment = Alignment.Center,
+                                        ) { Text("≡", color = MaterialTheme.colorScheme.onTertiary, fontSize = 20.sp, fontWeight = FontWeight.Bold) }
+                                        Spacer(Modifier.width(12.dp))
+                                        Column(Modifier.weight(1f)) {
+                                            Text("Dinamik liste oluştur", style = MaterialTheme.typography.titleSmall,
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                            Text("Filtreyle kendiliğinden güncellenen liste: 5 yıllık dibe yakın BIST, 200 günlük ortalama altındaki ABD hisseleri…",
+                                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onTertiaryContainer)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                         item {
                             Text(
                                 "Örnek formüller",

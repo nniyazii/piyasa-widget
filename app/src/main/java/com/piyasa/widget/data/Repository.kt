@@ -6,8 +6,12 @@ import com.piyasa.widget.data.source.TradingViewSource
 import com.piyasa.widget.model.Migrations
 import com.piyasa.widget.data.source.TcmbSource
 import com.piyasa.widget.data.source.YahooSource
+import com.piyasa.widget.data.source.ScreenerSource
+import com.piyasa.widget.model.AppState
 import com.piyasa.widget.model.Instrument
 import com.piyasa.widget.model.Quote
+import com.piyasa.widget.model.Screen
+import com.piyasa.widget.model.ScreenResult
 import com.piyasa.widget.model.Source
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -52,10 +56,32 @@ object Repository {
                         refreshing = false,
                     )
                 }
+                // Dinamik listeler: fiyatlardan sonra, tek tek (her biri bitince widget güncellenebilir)
+                val afterQuotes = store.data.first()
+                for (screen in afterQuotes.screens) {
+                    val result = runScreen(screen, afterQuotes)
+                    store.updateData { cur ->
+                        cur.copy(screenResults = (cur.screenResults + (screen.id to result)).filterKeys { id -> cur.screens.any { it.id == id } })
+                    }
+                }
             } finally {
                 store.updateData { if (it.refreshing) it.copy(refreshing = false) else it }
             }
         }
+    }
+
+    /** Bir dinamik listeyi çalıştırır; hata olursa sonucu hata mesajıyla döner (önceki sonuçları silmez). */
+    suspend fun runScreen(screen: Screen, state: AppState): ScreenResult = try {
+        ScreenerSource.run(screen, state)
+    } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        val previous = state.screenResults[screen.id]
+        ScreenResult(
+            time = System.currentTimeMillis(),
+            rows = previous?.rows.orEmpty(),
+            scanned = previous?.scanned ?: 0,
+            error = "Tarama yapılamadı: ${e.message ?: "bağlantı hatası"}",
+        )
     }
 
     private suspend fun fetchAll(instruments: List<Instrument>): Map<String, Result<Quote>> = coroutineScope {

@@ -99,12 +99,21 @@ private fun MainScreen() {
     val state by context.appStore.data.collectAsStateWithLifecycle(initialValue = null)
     var composing by remember { mutableStateOf<ComposeTarget?>(null) }
     var showSettings by remember { mutableStateOf(false) }
+    // Dinamik listeler: düzenlenen (yeni ise state'te yok) ve görüntülenen
+    var editingScreen by remember { mutableStateOf<ScreenEditTarget?>(null) }
+    var viewingScreen by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(Unit) { RefreshWorker.runNow(context) }
 
     val s = state
-    // Ekle ekranı açıkken geri tuşu onu kapatır
-    BackHandler(enabled = composing != null) { composing = null }
+    // Katmanlar açıkken geri tuşu en üsttekini kapatır
+    BackHandler(enabled = composing != null || editingScreen != null || viewingScreen != null) {
+        when {
+            editingScreen != null -> editingScreen = null
+            composing != null -> composing = null
+            else -> viewingScreen = null
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
     Scaffold(
@@ -142,6 +151,10 @@ private fun MainScreen() {
         Box(Modifier.fillMaxSize().padding(padding)) {
             WatchList(
                 state = s,
+                onOpenScreen = { viewingScreen = it },
+                onEditScreen = { editingScreen = ScreenEditTarget(it) },
+                onDeleteScreen = { id -> scope.launch { Actions.deleteScreen(context, id) } },
+                onMoveScreen = { id, d -> scope.launch { Actions.moveScreen(context, id, d) } },
                 onEdit = { composing = ComposeTarget(it) },
                 onRemove = { key ->
                     scope.launch { if (s.formula(key) != null) Actions.deleteFormula(context, key) else Actions.removeInstrument(context, key) }
@@ -181,10 +194,41 @@ private fun MainScreen() {
                 }
             },
             onDeleteFormula = { key -> scope.launch { Actions.deleteFormula(context, key) }; composing = null },
+            onCreateScreen = { composing = null; editingScreen = ScreenEditTarget(null) },
+        )
+    }
+    // Dinamik liste sonuçları
+    val viewing = viewingScreen?.let { id -> s?.screen(id) }
+    if (viewing != null && s != null) {
+        ScreenResultsView(
+            state = s,
+            screen = viewing,
+            onClose = { viewingScreen = null },
+            onEdit = { editingScreen = ScreenEditTarget(viewing) },
+            onRefresh = { scope.launch { Actions.runScreen(context, viewing.id) } },
+            onAdd = { row -> scope.launch { Actions.addInstrument(context, row.toInstrument(s)) } },
+        )
+    }
+    // Dinamik liste düzenleyici
+    val screenTarget = editingScreen
+    if (screenTarget != null && s != null) {
+        ScreenEditor(
+            state = s,
+            initial = screenTarget.screen,
+            onClose = { editingScreen = null },
+            onSave = { scr ->
+                editingScreen = null
+                viewingScreen = scr.id
+                scope.launch { Actions.upsertScreen(context, scr) }
+            },
+            onDelete = { id -> editingScreen = null; viewingScreen = null; scope.launch { Actions.deleteScreen(context, id) } },
+            runner = { scr -> com.piyasa.widget.data.Repository.runScreen(scr, s) },
         )
     }
     }
 }
+
+private data class ScreenEditTarget(val screen: com.piyasa.widget.model.Screen?)
 
 private fun statusText(s: AppState): String = when {
     s.refreshing -> "Güncelleniyor…"
@@ -203,10 +247,14 @@ internal fun WatchList(
     onEdit: (Formula) -> Unit,
     onRemove: (String) -> Unit,
     onMove: (String, Int) -> Unit,
+    onOpenScreen: (String) -> Unit = {},
+    onEditScreen: (com.piyasa.widget.model.Screen) -> Unit = {},
+    onDeleteScreen: (String) -> Unit = {},
+    onMoveScreen: (String, Int) -> Unit = { _, _ -> },
 ) {
     val context = LocalContext.current
     val engine = remember(state) { FormulaEngine(state) }
-    if (state.instruments.isEmpty() && state.formulas.isEmpty()) {
+    if (state.instruments.isEmpty() && state.formulas.isEmpty() && state.screens.isEmpty()) {
         Column(Modifier.fillMaxSize().padding(32.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
             Text("Listen boş", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(6.dp))
@@ -219,6 +267,55 @@ internal fun WatchList(
             Category.entries.map { c -> c.label to state.instruments.filter { it.category == c }.map { it.key } }
 
     LazyColumn(contentPadding = PaddingValues(bottom = 96.dp)) {
+        // ---- Dinamik listeler: ad, özet, eşleşme sayısı
+        if (state.screens.isNotEmpty()) {
+            item(key = "h_screens") { SectionHeader("Dinamik listeler") }
+            items(state.screens, key = { "scr_" + it.id }) { scr ->
+                val r = state.screenResults[scr.id]
+                var menu by remember { mutableStateOf(false) }
+                Box {
+                    Row(
+                        Modifier.fillMaxWidth()
+                            .combinedClickable(onClick = { onOpenScreen(scr.id) }, onLongClick = { menu = true })
+                            .padding(horizontal = 16.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(scr.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            Text(
+                                listOfNotNull(
+                                    scr.conditions.firstOrNull()?.let { com.piyasa.widget.model.ScreenEngine.describe(it) },
+                                    scr.summary(),
+                                ).joinToString(" · "),
+                                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                            // İlk birkaç eşleşmenin adı: listeyi açmadan bir bakışta
+                            r?.rows?.takeIf { it.isNotEmpty() }?.let { rows ->
+                                Text(rows.take(4).joinToString(", ") { it.name } + if (rows.size > 4) " …" else "",
+                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary, maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                            }
+                        }
+                        Spacer(Modifier.size(8.dp))
+                        Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.primaryContainer) {
+                            Text(
+                                when { r == null -> "…"; r.error != null && r.rows.isEmpty() -> "!"; else -> "${r.rows.size}" },
+                                Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer, fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("Düzenle") }, onClick = { menu = false; onEditScreen(scr) })
+                        DropdownMenuItem(text = { Text("Yukarı taşı") }, onClick = { menu = false; onMoveScreen(scr.id, -1) })
+                        DropdownMenuItem(text = { Text("Aşağı taşı") }, onClick = { menu = false; onMoveScreen(scr.id, 1) })
+                        DropdownMenuItem(text = { Text("Sil", color = MaterialTheme.colorScheme.error) }, onClick = { menu = false; onDeleteScreen(scr.id) })
+                    }
+                }
+            }
+        }
         groups.forEach { (label, keys) ->
             if (keys.isEmpty()) return@forEach
             item(key = "h_$label") { SectionHeader(label) }

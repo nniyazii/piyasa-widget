@@ -153,6 +153,25 @@ object Display {
         return null
     }
 
+    /** Dinamik liste sonucu → widget satırı (dokununca TradingView grafiği). */
+    fun screenRowItem(row: ScreenRow): DisplayItem {
+        val (pre, suf) = ScreenEngine.units(row.currency)
+        val (change, changeText) = changeFor(row.change?.let { 100.0 + it }, row.change?.let { 100.0 }, "")
+        return DisplayItem(
+            key = row.symbol,
+            title = row.name,
+            subtitle = row.symbol,
+            value = row.price,
+            change = change,
+            valueText = row.price?.let { Fmt.value(it, row.decimals, pre, suf) } ?: "—",
+            changeText = changeText,
+            spark = emptyList(),
+            error = null,
+            isFormula = false,
+            tvUrl = TradingView.chartUrl(row.symbol),
+        )
+    }
+
     /**
      * Günlük değişim. Fiyatlarda yüzde ("+%1,23"); oranlarda (faiz, enflasyon, prim — birimi %)
      * yüzdenin yüzdesi yanıltıcı olduğundan puan farkı ("+0,50 p": %29,27 → %29,77).

@@ -136,6 +136,62 @@ class BuilderPreviewTest {
         }
     }
 
+    // ---- Dinamik listeler (canlı testteki sonuçlara benzer örnek veriler)
+    private val bist5y = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "tpl_bist_5y_usd" }.copy(id = "s1")
+    private val usSma = com.piyasa.widget.model.ScreenTemplates.all.first { it.id == "tpl_my_us_sma200" }.copy(id = "s2")
+    private val screenState = state.copy(
+        screens = listOf(bist5y, usSma),
+        screenResults = mapOf(
+            "s1" to com.piyasa.widget.model.ScreenResult(System.currentTimeMillis(), listOf(
+                com.piyasa.widget.model.ScreenRow("BIST:ARCLK", "Arçelik", 1.4045, -0.8, "USD", 3, 1.042),
+                com.piyasa.widget.model.ScreenRow("BIST:KLNMA", "Kalkınma Yatırım Bankası", 0.1360, 0.4, "USD", 4, 1.046),
+                com.piyasa.widget.model.ScreenRow("BIST:SASA", "Sasa Polyester", 0.0317, -1.9, "USD", 4, 1.090),
+            ), scanned = 625, note = "5 yıllık veri: Yahoo Finance, ön elemeden geçen ilk 60 sembol (1 sembol alınamadı)"),
+            "s2" to com.piyasa.widget.model.ScreenResult(System.currentTimeMillis(), listOf(
+                com.piyasa.widget.model.ScreenRow("NASDAQ:META", "Meta", 639.61, -0.36, "USD", 2, 1.0125),
+                com.piyasa.widget.model.ScreenRow("NASDAQ:TSLA", "Tesla", 377.29, -0.48, "USD", 2, 0.9845),
+                com.piyasa.widget.model.ScreenRow("NASDAQ:GOOGL", "Alphabet", 286.66, -0.29, "USD", 2, 0.8454),
+                com.piyasa.widget.model.ScreenRow("NASDAQ:NVDA", "Nvidia", 168.30, -6.32, "USD", 2, 0.8228),
+            ), scanned = 7),
+        ),
+    )
+
+    @Test
+    @Config(qualifiers = "w400dp-h1500dp-xxhdpi")
+    fun screenEditor() {
+        assumeTrue(System.getProperty("previews") == "true")
+        render("screen_editor") {
+            com.piyasa.widget.ui.ScreenEditor(screenState, null, {}, {}, null, runner = { screenState.screenResults.getValue("s1") })
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h900dp-xxhdpi")
+    fun screenEditorTemplate() {
+        assumeTrue(System.getProperty("previews") == "true")
+        render("screen_editor_us") {
+            com.piyasa.widget.ui.ScreenEditor(screenState, usSma, {}, {}, {}, runner = { screenState.screenResults.getValue("s2") })
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h760dp-xxhdpi")
+    fun screenResults() {
+        assumeTrue(System.getProperty("previews") == "true")
+        render("screen_results") {
+            com.piyasa.widget.ui.ScreenResultsView(screenState, bist5y, {}, {}, {}, {})
+        }
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h900dp-xxhdpi")
+    fun watchListWithScreens() {
+        assumeTrue(System.getProperty("previews") == "true")
+        render("list_with_screens") {
+            androidx.compose.material3.Surface { com.piyasa.widget.ui.WatchList(screenState, onEdit = {}, onRemove = {}, onMove = { _, _ -> }) }
+        }
+    }
+
     /** Varsayılan liste (yeni kurulum), 10 Kasım 2026'ya yakın örnek fiyatlarla. */
     @Test
     @Config(qualifiers = "w400dp-h2200dp-xxhdpi")

@@ -60,7 +60,8 @@ object Migrations {
             formulas = fresh.formulas,
             quotes = s.quotes.filterKeys { k -> fresh.instruments.any { it.key == k && s.instrument(k)?.symbol == it.symbol } },
             widgets = s.widgets.mapValues { (_, w) ->
-                w.copy(keys = w.keys.filter { WidgetConfig.isSection(it) || it in keys })
+                // Bölümler ve dinamik listeler korunur (dinamik listeler sıfırlamadan etkilenmez)
+                w.copy(keys = w.keys.filter { WidgetConfig.isSection(it) || WidgetConfig.isScreen(it) || it in keys })
             },
             schema = CURRENT,
         )

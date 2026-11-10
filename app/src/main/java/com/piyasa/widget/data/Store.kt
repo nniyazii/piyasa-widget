@@ -11,6 +11,7 @@ import com.piyasa.widget.model.Instrument
 import com.piyasa.widget.model.WidgetConfig
 import com.piyasa.widget.widget.PiyasaWidget
 import com.piyasa.widget.work.RefreshWorker
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import java.io.InputStream
@@ -70,6 +71,39 @@ object Actions {
 
     suspend fun moveInstrument(context: Context, key: String, delta: Int) = edit(context) { s ->
         s.copy(instruments = s.instruments.moved(s.instruments.indexOfFirst { it.key == key }, delta))
+    }
+
+    // ------------------------------------------------------------------ dinamik listeler
+
+    /** Kaydeder ve hemen çalıştırır (sonuç beklenmeden ekran kapanabilir; sonuç gelince liste güncellenir). */
+    suspend fun upsertScreen(context: Context, screen: com.piyasa.widget.model.Screen) {
+        edit(context) { s ->
+            val list = s.screens.toMutableList()
+            val i = list.indexOfFirst { it.id == screen.id }
+            if (i >= 0) list[i] = screen else list += screen
+            s.copy(screens = list)
+        }
+        runScreen(context, screen.id)
+    }
+
+    suspend fun runScreen(context: Context, id: String) {
+        val state = context.appStore.data.first()
+        val screen = state.screen(id) ?: return
+        val result = Repository.runScreen(screen, state)
+        edit(context) { s -> if (s.screen(id) == null) s else s.copy(screenResults = s.screenResults + (id to result)) }
+    }
+
+    suspend fun deleteScreen(context: Context, id: String) = edit(context) { s ->
+        val entry = com.piyasa.widget.model.WidgetConfig.screenEntry(id)
+        s.copy(
+            screens = s.screens.filterNot { it.id == id },
+            screenResults = s.screenResults - id,
+            widgets = s.widgets.mapValues { (_, w) -> w.copy(keys = w.keys - entry) },
+        )
+    }
+
+    suspend fun moveScreen(context: Context, id: String, delta: Int) = edit(context) { s ->
+        s.copy(screens = s.screens.moved(s.screens.indexOfFirst { it.id == id }, delta))
     }
 
     /** [originalKey] düzenlenen formülün eski anahtarı (yeniyse null). */

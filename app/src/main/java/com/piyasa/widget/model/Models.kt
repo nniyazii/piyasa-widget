@@ -97,6 +97,8 @@ data class WidgetConfig(
     val changeStyle: ChangeStyle = ChangeStyle.PILL,
     val showHeader: Boolean = true,
     val showTime: Boolean = true,
+    /** Dinamik liste girişlerinde gösterilecek en fazla sonuç sayısı. */
+    val screenRows: Int = 5,
 ) {
     companion object {
         val DEFAULT_WIDGET_KEYS = listOf("GRAM_ALTIN", "ONS", "USDTRY", "EURTRY", "XU100", "SPX")
@@ -106,11 +108,17 @@ data class WidgetConfig(
         fun sectionTitle(entry: String) = entry.removePrefix(SECTION_PREFIX)
         fun section(title: String) = SECTION_PREFIX + title.trim()
 
+        /** Dinamik liste girişi: widget'ta başlık + ilk N sonuç olarak açılır. */
+        const val SCREEN_PREFIX = "@:"
+        fun isScreen(entry: String) = entry.startsWith(SCREEN_PREFIX)
+        fun screenId(entry: String) = entry.removePrefix(SCREEN_PREFIX)
+        fun screenEntry(id: String) = SCREEN_PREFIX + id
+
         val TEXT_SCALES = listOf(0.85f to "Küçük", 1.0f to "Normal", 1.15f to "Büyük", 1.3f to "Çok büyük")
     }
 
-    /** Bölüm başlıkları hariç gösterge anahtarları. */
-    val itemKeys: List<String> get() = keys.filterNot { isSection(it) }
+    /** Bölüm başlıkları ve dinamik listeler hariç gösterge anahtarları. */
+    val itemKeys: List<String> get() = keys.filterNot { isSection(it) || isScreen(it) }
 }
 
 @Serializable
@@ -125,9 +133,13 @@ data class AppState(
     val lastError: String? = null,
     /** Durum şeması sürümü; eski kurulumlar açılışta taşınır (bkz. Migrations). */
     val schema: Int = 1,
+    /** Dinamik listeler (filtreler) ve son tarama sonuçları. */
+    val screens: List<Screen> = emptyList(),
+    val screenResults: Map<String, ScreenResult> = emptyMap(),
 ) {
     fun instrument(key: String): Instrument? = instruments.firstOrNull { it.key == key }
     fun formula(key: String): Formula? = formulas.firstOrNull { it.key == key }
+    fun screen(id: String): Screen? = screens.firstOrNull { it.id == id }
     fun widgetConfig(appWidgetId: Int): WidgetConfig = widgets[appWidgetId] ?: WidgetConfig()
 
     /** Tüm anahtarlar (enstrüman + formül). */

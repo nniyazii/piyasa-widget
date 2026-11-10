@@ -87,6 +87,32 @@ Kaynak seçmek, sembol biçimi öğrenmek ya da form doldurmak gerekmez; ne bili
 
 Formüller başka formülleri kullanabilir (`CEYREK = GRAM_ALTIN * 1.6067`). Döngüsel referanslar yakalanır. Bir formülün günlük değişimi, aynı formül önceki kapanış fiyatlarıyla hesaplanarak bulunur.
 
+## Dinamik listeler (filtreler)
+
+Kendiliğinden güncellenen listeler: koşulları bir kez kurarsın, her yenilemede yeniden taranır. **+ → Dinamik liste oluştur** ile açılır; listede uzun basıp *Düzenle* ile değiştirilir. Widget düzenleyicisinde *Ekle → Dinamik listeler* ile widget'a da konur; widget'ta başlık ve ilk 3–10 sonuç görünür.
+
+| Örnek | Kurulum |
+|---|---|
+| USD cinsinden 5 yıllık dibine yakın BIST hisseleri | BIST hisseleri · USD · `Fiyat ≤ 5 yıl en düşük +%10` |
+| Listemdeki, 200 günlük ortalamanın altında ya da en fazla %5 üstündeki ABD hisseleri | Listem · Amerika · yalnızca hisseler · `Fiyat < 200 günlük ortalama +%5` |
+| 52 hafta dibine yakın BIST | `Fiyat ≤ 52 hafta en düşük +%5` |
+| Aşırı satım ABD | ABD hisseleri · `RSI (14) < 30` |
+| Zirveye yakın BIST | `Fiyat ≥ Tüm zamanların en yükseği −%3` |
+| Düşük F/K, trendde | `F/K < 8` · `F/K > 0` · `Fiyat > 200 günlük ortalama` |
+
+- **Nerede:** Listem (istersen tek kategori, istersen yalnızca hisseler), tüm BIST hisseleri, ABD hisseleri (piyasa değeri 2 milyar $ üstü).
+- **Koşul:** `[alan] [< ≤ > ≥] [sayı]` ya da `[alan] [< ≤ > ≥] [başka alan ± %]`. Birden çok koşul *tümü* ya da *herhangi biri* olarak birleşir.
+- **Alanlar:** fiyat, günlük değişim, 20/50/100/200 günlük ortalama, 200 günlük üssel ortalama, 52 hafta en düşük/yüksek, **5 yıl en düşük/yüksek**, tüm zamanların en düşük/yükseği, RSI (14), 1 ay / 3 ay / yılbaşından beri / 1 yıl / 5 yıl getiri, piyasa değeri, F/K.
+- **USD cinsinden:** TL fiyatlar Dolar/TL'ye bölünür. 5 yıllık dip ve zirve, her ay o ayın kuruyla USD'ye çevrilmiş aylık geçmişten hesaplanır; böylece "dolar bazında dip" gerçekten dolar bazındadır. Ortalamalar ve 52 hafta değerleri bugünkü kurla çevrilir (oranları değişmez).
+- **Sıralama:** koşula en yakın (dibe, ortalamaya ya da zirveye en yakın önce; RSI gibi sayılarda en uç önce), en çok yükselen/düşen, piyasa değeri, ad. En fazla 10–50 sonuç.
+- Düzenlerken **canlı önizleme** gösterilir. Sonuç ekranında her satırda koşula uzaklık yazar ("5 yıl en düşük: %4,2 üstünde"); dokununca TradingView açılır, + ile listene eklenir.
+
+![dinamik listeler](docs/dinamik-listeler.png)
+
+![widget'ta dinamik liste](docs/widget-dinamik-liste.png)
+
+**Nasıl çalışır:** Tarama TradingView'un tarayıcı servisiyle yapılır: evren ve sayısal koşullar mümkün olduğunda sunucuda ön elenir, kalanlar uygulamada değerlendirilir. TradingView 5 yıllık dip/zirve vermediği için bu alanlar Yahoo Finance aylık geçmişinden, yalnızca ön elemeden geçen ilk 60 aday için hesaplanır ve gün boyunca önbellekte tutulur.
+
 ## Varsayılan liste
 
 İlk kurulumda derli toplu bir liste gelir. *Ayarlar → Varsayılan listeye dön* ile istediğiniz zaman bu listeye dönebilirsiniz (widget ayarları korunur).

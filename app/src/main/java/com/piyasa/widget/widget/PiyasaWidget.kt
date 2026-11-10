@@ -182,6 +182,8 @@ private fun rowAction(item: DisplayItem, fallback: Action): Action {
 private sealed interface Line {
     data class Header(val title: String) : Line
     data class Items(val items: List<DisplayItem>) : Line
+    /** Dinamik liste boşsa/taranmadıysa kısa açıklama. */
+    data class Note(val text: String) : Line
 }
 
 private fun buildLines(state: AppState, cfg: WidgetConfig, twoColumns: Boolean): List<Line> {
@@ -194,16 +196,37 @@ private fun buildLines(state: AppState, cfg: WidgetConfig, twoColumns: Boolean):
         pending.clear()
     }
     for (k in cfg.keys) {
-        if (WidgetConfig.isSection(k)) {
-            flush()
-            out += Line.Header(WidgetConfig.sectionTitle(k))
-        } else {
-            Display.item(state, engine, k)?.let { pending += it }
+        when {
+            WidgetConfig.isSection(k) -> {
+                flush()
+                out += Line.Header(WidgetConfig.sectionTitle(k))
+            }
+            // Dinamik liste: başlık + ilk N sonuç (her yenilemede değişir)
+            WidgetConfig.isScreen(k) -> {
+                val scr = state.screen(WidgetConfig.screenId(k)) ?: continue
+                flush()
+                out += Line.Header(scr.name)
+                val r = state.screenResults[scr.id]
+                val rows = r?.rows.orEmpty().take(cfg.screenRows.coerceIn(1, 20))
+                if (rows.isEmpty()) {
+                    out += Line.Note(
+                        when {
+                            r == null -> "Taranıyor…"
+                            r.error != null -> r.error
+                            else -> "Şu an eşleşen yok"
+                        },
+                    )
+                } else {
+                    rows.forEach { pending += Display.screenRowItem(it) }
+                    flush()
+                }
+            }
+            else -> Display.item(state, engine, k)?.let { pending += it }
         }
     }
     flush()
     // Arkasında gösterge olmayan başlıkları at
-    return out.filterIndexed { i, l -> l !is Line.Header || (out.getOrNull(i + 1) is Line.Items) }
+    return out.filterIndexed { i, l -> l !is Line.Header || out.getOrNull(i + 1).let { it is Line.Items || it is Line.Note } }
 }
 
 // ------------------------------------------------------------------ içerik
@@ -232,7 +255,7 @@ private fun WidgetContent(state: AppState, cfg: WidgetConfig, appWidgetId: Int) 
             .cornerRadius(20.dp),
     ) {
         when {
-            lines.none { it is Line.Items } -> EmptyState(st, openConfig)
+            lines.none { it is Line.Items || it is Line.Note } -> EmptyState(st, openConfig)
             stripMode -> Strip(st, lines.filterIsInstance<Line.Items>().flatMap { it.items }, size.width.value, openApp)
             else -> ListLayout(st, state, cfg, lines, twoColumns, size.width.value, size.height.value, openApp)
         }
@@ -317,7 +340,7 @@ private fun ListLayout(
     }.let { it.coerceAtLeast(if (st.changeStyle == ChangeStyle.PILL) 19f * st.scale + 2 * st.pad else 0f) }
     val headerHeight = 20f * st.scale
     val topHeight = if (cfg.showHeader) 26f * st.scale.coerceAtLeast(1f) + 2f else 0f
-    val needed = lines.sumOf { (if (it is Line.Header) headerHeight else itemHeight).toDouble() }
+    val needed = lines.sumOf { (if (it is Line.Items) itemHeight else headerHeight).toDouble() }
     val fits = needed <= heightDp - 12f - topHeight && lines.size <= 10
     // Değer sütunu sabit genişlikte ve sağa hizalı: grafikler ve rozetler alt alta hizalanır.
     val charDp = (if (twoColumns) 6.4f else 7.6f) * st.scale
@@ -334,6 +357,12 @@ private fun ListLayout(
                 is Line.Items -> RowLine(
                     st, line.items, last = index == lines.lastIndex || lines.getOrNull(index + 1) is Line.Header,
                     twoColumns, showSpark, showSubtitle, compact, valueWidth, openApp,
+                )
+                is Line.Note -> Text(
+                    line.text,
+                    style = TextStyle(color = st.muted, fontSize = st.sp(10f)),
+                    maxLines = 1,
+                    modifier = GlanceModifier.fillMaxWidth().padding(vertical = 3.dp).clickable(openApp),
                 )
             }
         }
