@@ -30,6 +30,20 @@ Uygulamanın kendi ekranı yalnızca ayar içindir. Veriler widget'ta gösterili
 - ⟳ simgesi verileri hemen yeniler. Arka planda 15, 30, 60 veya 120 dakikada bir otomatik yenilenir.
 - Gece ve gündüz temaları sistemi izler.
 
+## Formül kurucu
+
+Formül yazmak gerekmez:
+
+- Semboller arama kutusu ve kategori filtreleriyle (Formüller, ABD, TR, Emtia, Döviz) listeden seçilir. Listede her sembolün güncel değeri ve değişimi görünür.
+- Formül kutucuklar halinde görünür (`Ons Altın` `×` `Dolar/TL` `÷` `OZ`). Bir kutucuğa dokununca imleç oraya gelir; ◀ ▶ ile imleç kaydırılır, ⌫ ile kutucuk silinir.
+- İşlem tuşları (+ − × ÷ ( )), virgülle de yazılabilen sayı ekleme alanı ve fonksiyon menüsü (% fark, günlük %, önceki kapanış, min/max/ortalama, yuvarlama) vardır.
+- **Hızlı şablonlar:** `A × B`, `A ÷ B`, `% Fark`, `TL / gram`, `Günlük %`, `Ortalama`. Şablonu seçtikten sonra listeden A ve B'yi seçmek yeterlidir.
+- Sonuç, günlük değişim ve TradingView karşılığı canlı görünür. Sembol listesinde aşağı kaydırırken özet çubuğu üstte kalır.
+- Ad boş bırakılırsa formülden otomatik üretilir. Anahtar, ondalık ve birim (₺, $, €, %) *Ayrıntılar* altındadır.
+- İleri düzey kullanıcılar ✎ ile metin olarak da düzenleyebilir.
+
+![formül kurucu](docs/formul-kurucu.png)
+
 ## Formül dili
 
 | | |
@@ -58,7 +72,7 @@ Katalogda olmayan bir sembol *Özel sembol* sekmesinden eklenebilir (ör. `ASELS
 
 ```bash
 ./gradlew assembleDebug          # app/build/outputs/apk/debug/app-debug.apk
-./gradlew testDebugUnitTest      # formül motoru + TradingView çeviri testleri
+./gradlew testDebugUnitTest      # formül motoru, kurucu parçalayıcı, TradingView çeviri testleri
 ```
 
 GitHub Actions her push'ta testleri ve lint'i çalıştırır, APK'yı *Artifacts* altına koyar. `v*` etiketi (ör. `v0.1.0`) atıldığında APK bir GitHub Release'e eklenir. Release APK'sı kolay kurulum için debug anahtarıyla imzalanır. Play Store'a çıkmadan önce kendi keystore'unuzu tanımlayın.

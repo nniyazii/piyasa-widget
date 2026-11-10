@@ -178,7 +178,7 @@ private fun MainScreen() {
             )
         }
         editing?.let { target ->
-            FormulaEditorDialog(
+            FormulaBuilderDialog(
                 state = s,
                 original = target.formula,
                 onDismiss = { editing = null },
