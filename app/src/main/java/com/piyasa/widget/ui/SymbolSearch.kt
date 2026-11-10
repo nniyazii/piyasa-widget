@@ -76,20 +76,6 @@ import java.util.Locale
 
 private val tr = Locale.forLanguageTag("tr-TR")
 
-@Composable
-fun AddInstrumentDialog(
-    state: AppState,
-    onDismiss: () -> Unit,
-    onAdd: (Instrument) -> Unit,
-    onUndo: (Instrument) -> Unit,
-) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-            AddInstrumentScreen(state, onDismiss, onAdd, onUndo = onUndo)
-        }
-    }
-}
-
 internal sealed interface SearchState {
     data object Idle : SearchState
     data object Loading : SearchState
@@ -99,127 +85,6 @@ internal sealed interface SearchState {
 
 /** Arama sonucu: eklenecek gösterge + (varsa) canlı fiyatı. */
 internal data class Candidate(val instrument: Instrument, val price: Double?, val changePct: Double?)
-
-/**
- * Gösterge ekleme. Tek arama kutusu; kaynak, sembol biçimi veya form yok.
- * "ALTIN.S1", "gmstr.f", "trhpi", "konut", "aselsan", "BIST:THYAO" — hepsi aynı kutudan.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddInstrumentScreen(
-    state: AppState,
-    onDismiss: () -> Unit,
-    onAdd: (Instrument) -> Unit,
-    onUndo: (Instrument) -> Unit = {},
-    initialQuery: String = "",
-    searcher: suspend (String) -> List<SearchHit> = ::defaultSearch,
-    autoFocus: Boolean = true,
-) {
-    var query by remember { mutableStateOf(initialQuery) }
-    var filter by remember { mutableStateOf<Category?>(null) }
-    var manualOpen by remember { mutableStateOf(false) }
-    val search = rememberSymbolSearch(query, searcher)
-    val snackbar = remember { SnackbarHostState() }
-    val scope = rememberCoroutineScope()
-    val focus = remember { FocusRequester() }
-    if (autoFocus) LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-
-    fun add(ins: Instrument) {
-        onAdd(ins)
-        scope.launch {
-            snackbar.currentSnackbarData?.dismiss()
-            val r = snackbar.showSnackbar("✓ ${ins.name} eklendi", actionLabel = "Geri al", duration = SnackbarDuration.Short)
-            if (r == SnackbarResult.ActionPerformed) onUndo(ins)
-        }
-    }
-
-    val needle = query.trim()
-    val results = candidates(state, needle, search, filter)
-
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Ekle") },
-                navigationIcon = { IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Kapat") } },
-                actions = { TextButton(onClick = onDismiss) { Text("Bitti") } },
-            )
-        },
-    ) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(bottom = 96.dp)) {
-            item {
-                Column(Modifier.padding(horizontal = 16.dp)) {
-                    OutlinedTextField(
-                        query, { query = it }, Modifier.fillMaxWidth().focusRequester(focus), singleLine = true,
-                        leadingIcon = { Icon(Icons.Default.Search, null) },
-                        trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { query = "" }) { Icon(Icons.Default.Close, "Temizle") } },
-                        placeholder = { Text("Hisse, fon, döviz, emtia, gösterge…") },
-                        shape = RoundedCornerShape(28.dp),
-                    )
-                    if (needle.isEmpty()) {
-                        Text(
-                            "TradingView'daki her sembol: ALTIN.S1 · GMSTR.F · TRHPI · BIST:THYAO · Apple",
-                            Modifier.padding(start = 16.dp, top = 6.dp),
-                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        item { FilterChip(selected = filter == null, onClick = { filter = null }, label = { Text("Tümü") }) }
-                        items(Category.entries) { c ->
-                            FilterChip(selected = filter == c, onClick = { filter = if (filter == c) null else c }, label = { Text(c.label) })
-                        }
-                    }
-                }
-            }
-
-            if (needle.isEmpty()) {
-                // Boşken: önerilenler, kategori kategori
-                Category.entries.filter { filter == null || it == filter }.forEach { cat ->
-                    val list = Catalog.all.filter { it.category == cat }
-                    if (list.isEmpty()) return@forEach
-                    item(key = "c_${cat.name}") { SectionHeader(cat.label) }
-                    items(list, key = { "k_${it.key}" }) { ins ->
-                        val q = state.quotes[ins.key].takeIf { state.instrument(ins.key)?.symbol == ins.symbol }
-                        PickRow(Candidate(ins, q?.price, q?.prevClose?.let { (q.price / it - 1) * 100 }), state.isTracked(ins)) { add(ins) }
-                    }
-                }
-            } else {
-                items(results, key = { "r_${it.instrument.source}_${it.instrument.symbol}" }) { c ->
-                    PickRow(c, state.isTracked(c.instrument)) { add(c.instrument) }
-                }
-                item {
-                    when (search) {
-                        SearchState.Idle, SearchState.Loading -> if (needle.length >= 2) {
-                            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-                                Spacer(Modifier.width(10.dp))
-                                Text("Tüm piyasalarda aranıyor…", style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                        }
-                        is SearchState.Failed -> Hint(search.message)
-                        is SearchState.Done -> if (results.isEmpty()) {
-                            Hint("“$needle” için sonuç yok. Farklı yazmayı deneyin: kod (ASELS), ad (Aselsan) ya da TradingView sembolü (BIST:ASELS).")
-                        }
-                    }
-                }
-            }
-
-            // ---- Gelişmiş (kapalı)
-            item {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                    Text(
-                        if (manualOpen) "Gelişmiş ▴" else "Gelişmiş: TCMB kuru veya Yahoo sembolü ▾",
-                        Modifier.clickable { manualOpen = !manualOpen }.padding(vertical = 8.dp),
-                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
-                    )
-                    if (manualOpen) ManualForm(state, { state.isTracked(it) }, ::add)
-                }
-            }
-        }
-    }
-}
 
 /** Katalogda Türkçe ad, anahtar kelime veya kodla eşleşenler. */
 internal fun catalogMatches(needle: String): List<Instrument> {
@@ -311,15 +176,26 @@ fun CategoryBadge(category: Category, size: Int = 36) {
     }
 }
 
-/** Bir sonuç satırı: dokununca eklenir. Sağda canlı fiyat ve değişim. */
+/**
+ * Bir sonuç satırı: dokununca eklenir. Sağda canlı fiyat ve değişim.
+ * @param insert formül yazılırken: satır formüle girer (sağda "↵").
+ */
 @Composable
-internal fun PickRow(c: Candidate, added: Boolean, onAdd: () -> Unit) {
+internal fun PickRow(c: Candidate, added: Boolean, insert: Boolean = false, onAdd: () -> Unit) {
     val ins = c.instrument
+    val isFormula = ins.symbol.startsWith("ƒ")
     Row(
-        Modifier.fillMaxWidth().clickable(enabled = !added, onClick = onAdd).padding(horizontal = 16.dp, vertical = 9.dp),
+        Modifier.fillMaxWidth().clickable(enabled = !added || insert, onClick = onAdd).padding(horizontal = 16.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryBadge(ins.category)
+        if (isFormula || ins.key == "OZ") {
+            Box(
+                Modifier.size(36.dp).background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) { Text(if (isFormula) "ƒ" else "oz", color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Bold) }
+        } else {
+            CategoryBadge(ins.category)
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(ins.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -338,24 +214,33 @@ internal fun PickRow(c: Candidate, added: Boolean, onAdd: () -> Unit) {
             }
         }
         Spacer(Modifier.width(12.dp))
-        Box(
-            Modifier.size(32.dp).background(
-                if (added) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer, CircleShape,
-            ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                if (added) Icons.Default.Check else Icons.Default.Add,
-                contentDescription = if (added) "Ekli" else "Ekle",
-                Modifier.size(18.dp),
-                tint = if (added) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
-            )
+        if (insert) {
+            Box(
+                Modifier.size(32.dp).background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("↵", color = MaterialTheme.colorScheme.onTertiaryContainer, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        } else {
+            Box(
+                Modifier.size(32.dp).background(
+                    if (added) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer, CircleShape,
+                ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (added) Icons.Default.Check else Icons.Default.Add,
+                    contentDescription = if (added) "Ekli" else "Ekle",
+                    Modifier.size(18.dp),
+                    tint = if (added) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ManualForm(state: AppState, isAdded: (Instrument) -> Boolean, onAdd: (Instrument) -> Unit) {
+internal fun ManualForm(state: AppState, isAdded: (Instrument) -> Boolean, onAdd: (Instrument) -> Unit) {
     var source by remember { mutableStateOf(Source.YAHOO) }
     var symbol by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }

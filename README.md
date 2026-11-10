@@ -38,9 +38,28 @@ Uygulamanın kendi ekranı yalnızca ayar içindir. Veriler widget'ta gösterili
 - ⟳ simgesi verileri hemen yeniler. Arka planda 15, 30, 60 veya 120 dakikada bir otomatik yenilenir.
 - Gece ve gündüz temaları sistemi izler.
 
-## Gösterge ekleme
+## Ekle: sembol ve formül tek ekranda
 
-Tek arama kutusu var. Kaynak seçmek, sembol biçimi öğrenmek ya da form doldurmak gerekmez; ne biliyorsanız onu yazarsınız:
+Uygulamada tek bir liste ve tek bir yuvarlak **+** düğmesi vardır. **+** ile açılan ekranın üstünde hesap makinesi gibi bir ekran, altında tanıdık bir **hesap makinesi tuş takımı** bulunur. Ne yaptığınızı seçmezsiniz; uygulama yazdığınızdan anlar:
+
+| Yaptığınız | Sonuç |
+|---|---|
+| `aselsan` yazıp sonuca dokunmak | Sembol listeye eklenir (✓ · Geri al) |
+| `ons` **×** `dolar` **÷** `oz` **=** | Formül kaydedilir: ad “Gram Altın”, birim ₺ önerilir |
+| `xu100 / usdtry` yazıp Enter | Formül kaydedilir: “BIST 100 ($)” |
+| `OANDA:XAUUSD*FX:USDTRY/31.1` | TradingView yazımı da olduğu gibi çalışır |
+
+- **Operatöre basmak, yazılan kelimeyi en iyi eşleşen sembole dönüştürür** (TradingView'daki gibi): önce listendekiler (formüllerin dahil), sonra katalog ve tüm piyasalar. Listende olmayan bir sembol formülde kullanılırsa kaydederken listeye de eklenir.
+- Yazarken **canlı ara sonuç** soluk renkte görünür; ifade tamamlanınca koyulaşır. Günlük değişim ve TradingView karşılığı da gösterilir.
+- Tuş takımı: `C ( ) ÷ / 7 8 9 × / 4 5 6 − / 1 2 3 + / ƒ 0 , ⌫ / abc =`. `ƒ` menüsünde % fark, günlük %, önceki kapanış, ortalama, min/max, yuvarla ve OZ bulunur. `abc` harf klavyesini açar; klavye açıkken tuş takımı gizlenir.
+- `=`, ad (otomatik önerilir), birim (yok / ₺ / $ / € / %) ve ondalık seçimi sunar. Formülü düzenlemek için listede uzun basıp *Düzenle*'yi seçin; aynı ekran açılır.
+- Boş ekranda örnek formüller ve önerilen semboller görünür. TCMB kuru veya Yahoo sembolü için *Gelişmiş* bölümü en altta durur.
+
+![ekle: hesap makinesi](docs/ekle-hesap-makinesi.png)
+
+### Sembol arama
+
+Kaynak seçmek, sembol biçimi öğrenmek ya da form doldurmak gerekmez; ne biliyorsanız onu yazarsınız:
 
 | Yazdığınız | Bulunan |
 |---|---|
@@ -55,24 +74,6 @@ Tek arama kutusu var. Kaynak seçmek, sembol biçimi öğrenmek ya da form doldu
 - Türkçe kelimeler İngilizce karşılıklarıyla da aranır (altın → gold, konut → house price, enflasyon → inflation).
 - Arama sırası: önce kesin kod eşleşmesi, sonra Türkiye, emtia, döviz, ABD (birincil listeler, piyasa değerine göre), ekonomik göstergeler ve kripto (spot, büyük borsalar).
 - Kategori, ondalık, birim (₺ / $ / €) ve formül anahtarı otomatik belirlenir.
-- TCMB kuru veya Yahoo sembolü için *Gelişmiş* bölümü en altta, kapalı durur.
-- Formül kurucudaki arama da aynıdır: listede olmayan bir sonuca dokununca o sembol hem listeye eklenir hem formüle girer.
-
-![gösterge ekle](docs/gosterge-ekle.png)
-
-## Formül kurucu
-
-Formül yazmak gerekmez:
-
-- Semboller arama kutusu ve kategori filtreleriyle (Formüller, ABD, TR, Emtia, Döviz) listeden seçilir. Listede her sembolün güncel değeri ve değişimi görünür.
-- Formül kutucuklar halinde görünür (`Ons Altın` `×` `Dolar/TL` `÷` `OZ`). Bir kutucuğa dokununca imleç oraya gelir; ◀ ▶ ile imleç kaydırılır, ⌫ ile kutucuk silinir.
-- İşlem tuşları (+ − × ÷ ( )), virgülle de yazılabilen sayı ekleme alanı ve fonksiyon menüsü (% fark, günlük %, önceki kapanış, min/max/ortalama, yuvarlama) vardır.
-- **Hızlı şablonlar:** `A × B`, `A ÷ B`, `% Fark`, `TL / gram`, `Günlük %`, `Ortalama`. Şablonu seçtikten sonra listeden A ve B'yi seçmek yeterlidir.
-- Sonuç, günlük değişim ve TradingView karşılığı canlı görünür. Sembol listesinde aşağı kaydırırken özet çubuğu üstte kalır.
-- Ad boş bırakılırsa formülden otomatik üretilir. Anahtar, ondalık ve birim (₺, $, €, %) *Ayrıntılar* altındadır.
-- İleri düzey kullanıcılar ✎ ile metin olarak da düzenleyebilir.
-
-![formül kurucu](docs/formul-kurucu.png)
 
 ## Formül dili
 
@@ -119,7 +120,7 @@ model/     Modeller, katalog, FormulaEngine, görüntü/biçim (tr-TR), TradingV
 data/      DataStore durum deposu, Actions, Repository, kaynaklar (Yahoo, gold-api, TCMB)
 widget/    Glance widget'ı, alıcı, yenileme aksiyonu, mini grafik
 config/    Widget başına yapılandırma ekranı
-ui/        Uygulama ekranları (Piyasalar, Formüller, Ayarlar)
+ui/        Liste, birleşik Ekle ekranı (Composer: arama + hesap makinesi), sembol arama, ayarlar
 work/      Periyodik / anlık yenileme (WorkManager)
 ```
 

@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.dp
 import com.piyasa.widget.data.appStore
 import com.piyasa.widget.model.AppState
 import com.piyasa.widget.model.Quote
-import com.piyasa.widget.ui.FormulaBuilderScreen
+import com.piyasa.widget.ui.ComposerScreen
 import com.piyasa.widget.ui.PiyasaTheme
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -55,22 +55,6 @@ class BuilderPreviewTest {
         File(dir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    @Test
-    fun editGramGold() {
-        assumeTrue(System.getProperty("previews") == "true")
-        render("builder_edit") {
-            FormulaBuilderScreen(state, state.formula("GRAM_ALTIN"), {}, {}, {})
-        }
-    }
-
-    @Test
-    fun newWithTemplate() {
-        assumeTrue(System.getProperty("previews") == "true")
-        render("builder_template") {
-            FormulaBuilderScreen(state, null, {}, {}, {}, initialTemplate = 2)
-        }
-    }
-
     private val tvHits = listOf(
         com.piyasa.widget.data.source.SearchHit("BIST:ALTIN", "DARPHANE ALTIN SERTIFIKASI", "stock", "BIST", "Hisse", "ALTIN", 71.34, -1.36, 100.0, "TRY"),
         com.piyasa.widget.data.source.SearchHit("OANDA:XAUUSD", "Gold", "commodity", "OANDA", "Emtia", "XAUUSD", 4021.85, -2.87, 1000.0, "USD"),
@@ -80,35 +64,45 @@ class BuilderPreviewTest {
         com.piyasa.widget.data.source.SearchHit("ECONOMICS:TRHPI", "Turkey House Price Index", "economic", "ECONOMICS", "Ekonomik gösterge", "TRHPI", 239.38, 1.22, null, null),
     )
 
-    @Test
-    fun builderSearchAddsNew() {
-        assumeTrue(System.getProperty("previews") == "true")
-        val hits = listOf(
-            com.piyasa.widget.data.source.SearchHit("ASELS.IS", "ASELSAN", "EQUITY", "Istanbul", "Equity"),
-            com.piyasa.widget.data.source.SearchHit("ASML", "ASML Holding N.V.", "EQUITY", "NASDAQ", "Equity"),
+    // ---- Birleşik "Ekle" ekranı (sembol + formül), telefon boyutunda
+    private fun composer(
+        name: String,
+        tokens: List<String>? = null,
+        query: String = "",
+        editing: com.piyasa.widget.model.Formula? = null,
+    ) = render(name) {
+        ComposerScreen(
+            state, editing, {}, {}, {}, { _, _, _ -> }, {},
+            searcher = { tvHits }, initialTokens = tokens, initialQuery = query, autoFocus = false,
         )
-        render("builder_search") {
-            FormulaBuilderScreen(state, null, {}, {}, {}, initialSearch = "altın", searcher = { tvHits })
-        }
     }
 
     @Test
-    fun addInstrumentSearch() {
+    @Config(qualifiers = "w400dp-h860dp-xxhdpi")
+    fun composerEmpty() {
         assumeTrue(System.getProperty("previews") == "true")
-        val hits = listOf(
-            com.piyasa.widget.data.source.SearchHit("ASELS.IS", "ASELSAN", "EQUITY", "Istanbul", "Equity"),
-            com.piyasa.widget.data.source.SearchHit("ASTOR.IS", "ASTOR ENERJI", "EQUITY", "Istanbul", "Equity"),
-            com.piyasa.widget.data.source.SearchHit("ASML", "ASML Holding N.V.", "EQUITY", "NASDAQ", "Equity"),
-        )
-        render("add_search") {
-            com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}, initialQuery = "altın", searcher = { tvHits }, autoFocus = false)
-        }
+        composer("composer_empty")
     }
 
     @Test
-    fun addInstrumentBrowse() {
+    @Config(qualifiers = "w400dp-h860dp-xxhdpi")
+    fun composerSymbolSearch() {
         assumeTrue(System.getProperty("previews") == "true")
-        render("add_browse") { com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}, autoFocus = false) }
+        composer("composer_search", query = "altın")
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h860dp-xxhdpi")
+    fun composerFormula() {
+        assumeTrue(System.getProperty("previews") == "true")
+        composer("composer_formula", tokens = listOf("ONS", "*", "USDTRY", "/", "OZ"))
+    }
+
+    @Test
+    @Config(qualifiers = "w400dp-h860dp-xxhdpi")
+    fun composerFormulaTyping() {
+        assumeTrue(System.getProperty("previews") == "true")
+        composer("composer_formula_typing", tokens = listOf("ONS", "*"), query = "dolar")
     }
 
     private val editorConfig = com.piyasa.widget.model.WidgetConfig(
