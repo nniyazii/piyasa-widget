@@ -32,12 +32,23 @@ Uygulamanın kendi ekranı yalnızca ayar içindir. Veriler widget'ta gösterili
 
 ## Gösterge ekleme
 
-- **Canlı arama:** “aselsan”, “apple”, “gümüş” gibi bir şey yazınca hem katalogda hem tüm piyasalarda (Yahoo Finance) aranır. Sembol kodunu bilmek gerekmez.
-- Kategori filtreleri: Amerika, Türkiye, Emtia, Döviz, Kripto. Her satırda kategori rozeti ve borsa bilgisi bulunur.
-- **Tek dokunuşla “+ Ekle”.** Ekran açık kalır, art arda birçok gösterge eklenebilir; ekli olanlar “✓ Ekli” görünür.
-- Kategori, ondalık, birim (₺ / $) ve formül anahtarı sembolden otomatik çıkarılır: `ASELS.IS` → Türkiye, ₺, `ASELS`.
-- *Listede yok mu?* bölümünden Yahoo, spot metal veya TCMB sembolü elle girilebilir; kategori ve TradingView sembolü de değiştirilebilir.
-- Formül kurucudaki arama da aynı şekilde çalışır. Listede olmayan bir sembole dokununca sembol hem izleme listesine eklenir hem formüle girer.
+Tek arama kutusu var. Kaynak seçmek, sembol biçimi öğrenmek ya da form doldurmak gerekmez; ne biliyorsanız onu yazarsınız:
+
+| Yazdığınız | Bulunan |
+|---|---|
+| `ALTIN.S1` | BIST:ALTIN, Darphane Altın Sertifikası |
+| `gmstr.f` | BIST:GMSTR, Gümüş Fonu |
+| `trhpi` veya `konut` | ECONOMICS:TRHPI, Konut Fiyat Endeksi |
+| `altın` | Darphane sertifikası, Altın Fonu, Ons Altın… |
+| `aselsan`, `BIST:THYAO`, `apple`, `bitcoin` | … |
+
+- Sonuçlar canlı fiyat ve günlük değişimle gelir; doğru şeyi bulduğunuzu eklemeden önce görürsünüz.
+- **Satıra dokunmak = eklendi.** Altta “✓ eklendi · Geri al” bildirimi çıkar ve ekran açık kalır.
+- Türkçe kelimeler İngilizce karşılıklarıyla da aranır (altın → gold, konut → house price, enflasyon → inflation).
+- Arama sırası: önce kesin kod eşleşmesi, sonra Türkiye, emtia, döviz, ABD (birincil listeler, piyasa değerine göre), ekonomik göstergeler ve kripto (spot, büyük borsalar).
+- Kategori, ondalık, birim (₺ / $ / €) ve formül anahtarı otomatik belirlenir.
+- TCMB kuru veya Yahoo sembolü için *Gelişmiş* bölümü en altta, kapalı durur.
+- Formül kurucudaki arama da aynıdır: listede olmayan bir sonuca dokununca o sembol hem listeye eklenir hem formüle girer.
 
 ![gösterge ekle](docs/gosterge-ekle.png)
 
@@ -73,17 +84,19 @@ Hazır formüller: Gram Altın, Çeyrek (has), Gram Gümüş, BIST 100 ($), Alt�
 
 | Kaynak | Kapsam | Not |
 |---|---|---|
-| Yahoo Finance chart API | Endeksler, hisseler, döviz, enerji vadelileri | Resmi olmayan uç nokta, API anahtarı gerekmez. BIST verisi ~15 dk gecikmeli |
-| [gold-api.com](https://gold-api.com) | Spot XAU, XAG, XPT, XPD, HG | Önceki kapanış vermez. Günlük değişim, uygulamanın önceki gün gördüğü son fiyata göre hesaplanır |
-| TCMB `today.xml` | Gösterge kurları (alış/satış, efektif) | Günde bir kez yayımlanır |
+| TradingView tarayıcı servisi (`scanner.tradingview.com`) | Hisse, endeks, fon, sertifika, döviz, emtia, kripto, ekonomik göstergeler | Varsayılan kaynak. Tüm semboller tek istekte, anahtar gerekmez. Resmi olmayan bir uç noktadır; BIST ~15 dk gecikmeli olabilir |
+| TCMB `today.xml` | Resmi gösterge kurları | Günde bir kez yayımlanır |
+| Yahoo Finance, gold-api.com | Eski kurulumlar ve *Gelişmiş* girişler | 0.1 sürümünden kalan katalog göstergeleri açılışta otomatik olarak TradingView'a taşınır; anahtarlar ve formüller değişmez |
 
-Katalogda olmayan bir sembol *Özel sembol* sekmesinden eklenebilir (ör. `ASELS.IS`, `NVDA`, `SI=F`, `GBPTRY=X`). İsteğe bağlı olarak TradingView sembolü de girilebilir.
+Mini grafik gün içinde yapılan her yenilemede bir nokta ekler; ilk nokta önceki kapanıştır. Böylece grafik ilk yenilemeden itibaren günün yönünü gösterir.
 
 ## Derleme
 
 ```bash
 ./gradlew assembleDebug          # app/build/outputs/apk/debug/app-debug.apk
-./gradlew testDebugUnitTest      # formül motoru, kurucu parçalayıcı, TradingView çeviri testleri
+./gradlew testDebugUnitTest      # birim testleri
+./gradlew testDebugUnitTest -Plive=true      # gerçek TradingView servisine karşı arama/fiyat testleri
+./gradlew testDebugUnitTest -Ppreviews=true  # widget ve ekran önizlemeleri (app/build/widget-previews)
 ```
 
 GitHub Actions her push'ta testleri ve lint'i çalıştırır, APK'yı *Artifacts* altına koyar. `v*` etiketi (ör. `v0.1.0`) atıldığında APK bir GitHub Release'e eklenir. Release APK'sı kolay kurulum için debug anahtarıyla imzalanır. Play Store'a çıkmadan önce kendi keystore'unuzu tanımlayın.

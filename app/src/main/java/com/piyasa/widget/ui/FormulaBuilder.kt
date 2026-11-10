@@ -81,7 +81,7 @@ import com.piyasa.widget.model.TradingView
 import com.piyasa.widget.model.Catalog
 import com.piyasa.widget.model.Instrument
 import com.piyasa.widget.data.source.SearchHit
-import com.piyasa.widget.data.source.YahooSource
+import com.piyasa.widget.data.source.TradingViewSource
 import java.util.Locale
 
 private val trLocale = Locale.forLanguageTag("tr-TR")
@@ -167,7 +167,7 @@ fun FormulaBuilderScreen(
     initialTemplate: Int? = null,
     initialSearch: String = "",
     onAddInstrument: (Instrument) -> Unit = {},
-    searcher: suspend (String) -> List<SearchHit> = { YahooSource.search(it) },
+    searcher: suspend (String) -> List<SearchHit> = ::defaultSearch,
 ) {
     // Bu ekrandan yeni eklenen göstergeler, depo güncellenene kadar da formülde kullanılabilsin.
     val justAdded = remember { mutableStateListOf<Instrument>() }
@@ -528,18 +528,16 @@ fun FormulaBuilderScreen(
                 // ---- Listede olmayanlar: katalog + canlı arama; dokununca hem listeye eklenir hem formüle girer
                 if (needle.length >= 2) {
                     val cat = filter.category
-                    val fromCatalog = if (filter == Filter.FORMULA) emptyList() else Catalog.all
-                        .filter { !state.isTracked(it) && state.instrument(it.key) == null }
-                        .filter { cat == null || it.category == cat }
-                        .filter { ins -> listOfNotNull(ins.name, ins.key, ins.symbol, ins.note).any { it.lowercase(trLocale).contains(needle) } }
-                    val hits = if (filter == Filter.FORMULA) emptyList()
-                    else searchHitsToInstruments(liveSearch, state, cat).filter { !state.isTracked(it) }
+                    val fresh = if (filter == Filter.FORMULA) emptyList()
+                    else candidates(state, search.trim(), liveSearch, cat).filter { !state.isTracked(it.instrument) && state.instrument(it.instrument.key) == null }
+                    val fromCatalog = fresh
+                    val hits = emptyList<Candidate>()
                     item { SectionHeader("Listende olmayanlar · dokun: ekle ve formüle koy") }
-                    items(fromCatalog + hits, key = { "n_${it.source}_${it.symbol}" }) { ins ->
-                        PickRow(ins, added = false) {
-                            justAdded += ins
-                            onAddInstrument(ins)
-                            pick(ins.key)
+                    items(fresh, key = { "n_${it.instrument.source}_${it.instrument.symbol}" }) { c ->
+                        PickRow(c, added = false) {
+                            justAdded += c.instrument
+                            onAddInstrument(c.instrument)
+                            pick(c.instrument.key)
                         }
                     }
                     if ((fromCatalog.isNotEmpty() || hits.isNotEmpty()) && liveSearch !is SearchState.Done && liveSearch !is SearchState.Failed) {
@@ -554,10 +552,7 @@ fun FormulaBuilderScreen(
                                     Text("Tüm piyasalarda aranıyor…", style = MaterialTheme.typography.bodySmall)
                                 }
                                 is SearchState.Failed -> Hint(ls.message)
-                                is SearchState.Done -> Hint(
-                                    "“${search.trim()}” bulunamadı. Yahoo Finance'te olmayan semboller (ör. yalnızca TradingView'da olan " +
-                                        "ekonomik göstergeler) eklenemez. Sembolü biliyorsanız Piyasalar → + → “Listede yok mu?” ile elle girin.",
-                                )
+                                is SearchState.Done -> Hint("“${search.trim()}” için sonuç yok. Kod (ASELS), ad (Aselsan) ya da TradingView sembolü (BIST:ASELS) deneyin.")
                             }
                         }
                     }

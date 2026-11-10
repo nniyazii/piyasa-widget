@@ -8,7 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import okhttp3.OkHttpClient
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.xmlpull.v1.XmlPullParser
 import java.io.IOException
 import java.io.StringReader
@@ -24,6 +26,18 @@ object Http {
         .build()
 
     private val userAgent = "PiyasaWidget/${BuildConfig.VERSION_NAME} (Android)"
+
+    suspend fun postJson(url: String, json: String): String = withContext(Dispatchers.IO) {
+        val request = Request.Builder()
+            .url(url)
+            .header("User-Agent", userAgent)
+            .post(json.toRequestBody("application/json".toMediaType()))
+            .build()
+        client.newCall(request).execute().use { resp ->
+            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}")
+            resp.body?.string() ?: throw IOException("Boş yanıt")
+        }
+    }
 
     suspend fun get(url: String): String = withContext(Dispatchers.IO) {
         val request = Request.Builder()
@@ -81,14 +95,22 @@ private class YSearchQuote(
     val typeDisp: String? = null,
 )
 
-/** Yahoo sembol araması sonucu. */
+/** Sembol araması sonucu (TradingView veya Yahoo). */
 data class SearchHit(
+    /** Kaynağın tam sembolü: TradingView'da "BIST:ALTIN", Yahoo'da "ASELS.IS". */
     val symbol: String,
     val name: String,
     val quoteType: String?,
     val exchange: String?,
     val typeLabel: String?,
-)
+    val ticker: String? = null,
+    val price: Double? = null,
+    val changePct: Double? = null,
+    val pricescale: Double? = null,
+    val currency: String? = null,
+) {
+    val isTradingView: Boolean get() = symbol.contains(':')
+}
 
 object YahooSource {
     private val hosts = listOf("query1.finance.yahoo.com", "query2.finance.yahoo.com")

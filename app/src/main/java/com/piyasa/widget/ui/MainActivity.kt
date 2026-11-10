@@ -175,6 +175,7 @@ private fun MainScreen() {
                 state = s,
                 onDismiss = { showAdd = false },
                 onAdd = { ins -> scope.launch { Actions.addInstrument(context, ins) } },
+                onUndo = { ins -> scope.launch { Actions.removeInstrument(context, ins.key) } },
             )
         }
         editing?.let { target ->
@@ -314,9 +315,8 @@ private fun SettingsScreen(state: AppState) {
         HorizontalDivider()
         Text("Veri kaynakları", style = MaterialTheme.typography.titleSmall)
         Text(
-            "• Endeks, hisse, döviz, enerji: Yahoo Finance (resmi olmayan uç nokta; BIST ~15 dk gecikmeli)\n" +
-                "• Spot altın/gümüş/platin/paladyum/bakır: gold-api.com (günlük değişim, uygulamanın önceki gün gördüğü son fiyata göre hesaplanır)\n" +
-                "• TCMB gösterge kurları: tcmb.gov.tr\n\nBu uygulama yatırım tavsiyesi vermez.",
+            "• TradingView: hisse, endeks, fon, sertifika, döviz, emtia, kripto ve ekonomik göstergeler. TradingView'da gördüğünüz her sembol (ALTIN.S1, GMSTR.F, TRHPI, BIST:THYAO…) aramayla eklenebilir. BIST verisi ~15 dk gecikmeli olabilir.\n" +
+                "• TCMB gösterge kurları: tcmb.gov.tr (Gelişmiş bölümünden)\n\nBu uygulama yatırım tavsiyesi vermez.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

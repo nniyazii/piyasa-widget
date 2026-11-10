@@ -9,10 +9,18 @@ enum class Category(val label: String, val short: String) {
     COMMODITY("Emtia", "EMT"),
     FX("Döviz", "FX"),
     CRYPTO("Kripto", "KRP"),
+    ECONOMY("Ekonomi", "EKO"),
+    WORLD("Dünya", "DÜN"),
 }
 
 @Serializable
 enum class Source(val label: String) {
+    /**
+     * TradingView tarayıcı (scanner) servisi: hisse, endeks, fon, sertifika, döviz, emtia, kripto ve
+     * ekonomik göstergeler. Sembol biçimi TradingView ile aynıdır: "BIST:ALTIN", "ECONOMICS:TRHPI".
+     */
+    TRADINGVIEW("TradingView"),
+
     /** Yahoo Finance chart API (anahtar gerektirmez, TR hisseleri ~15 dk gecikmeli). */
     YAHOO("Yahoo Finance"),
 
@@ -85,6 +93,8 @@ data class AppState(
     val lastRefresh: Long = 0L,
     val refreshing: Boolean = false,
     val lastError: String? = null,
+    /** Durum şeması sürümü; eski kurulumlar açılışta taşınır (bkz. Migrations). */
+    val schema: Int = 1,
 ) {
     fun instrument(key: String): Instrument? = instruments.firstOrNull { it.key == key }
     fun formula(key: String): Formula? = formulas.firstOrNull { it.key == key }

@@ -69,6 +69,15 @@ class BuilderPreviewTest {
         }
     }
 
+    private val tvHits = listOf(
+        com.piyasa.widget.data.source.SearchHit("BIST:ALTIN", "DARPHANE ALTIN SERTIFIKASI", "stock", "BIST", "Hisse", "ALTIN", 71.34, -1.36, 100.0, "TRY"),
+        com.piyasa.widget.data.source.SearchHit("OANDA:XAUUSD", "Gold", "commodity", "OANDA", "Emtia", "XAUUSD", 4021.85, -2.87, 1000.0, "USD"),
+        com.piyasa.widget.data.source.SearchHit("BIST:GLDTR", "GOLDIST - Istanbul Gold ETF", "fund", "BIST", "Fon", "GLDTR", 545.75, -1.62, 100.0, "TRY"),
+        com.piyasa.widget.data.source.SearchHit("BIST:TRALT", "Turk Altin Isletmeleri A.S.", "stock", "BIST", "Hisse", "TRALT", 41.2, 2.1, 100.0, "TRY"),
+        com.piyasa.widget.data.source.SearchHit("TVC:GOLDSILVER", "Gold/Silver Ratio", "index", "TVC", "Endeks", "GOLDSILVER", 78.4, 1.1, 100.0, null),
+        com.piyasa.widget.data.source.SearchHit("ECONOMICS:TRHPI", "Turkey House Price Index", "economic", "ECONOMICS", "Ekonomik gösterge", "TRHPI", 239.38, 1.22, null, null),
+    )
+
     @Test
     fun builderSearchAddsNew() {
         assumeTrue(System.getProperty("previews") == "true")
@@ -77,7 +86,7 @@ class BuilderPreviewTest {
             com.piyasa.widget.data.source.SearchHit("ASML", "ASML Holding N.V.", "EQUITY", "NASDAQ", "Equity"),
         )
         render("builder_search") {
-            FormulaBuilderScreen(state, null, {}, {}, {}, initialSearch = "as", searcher = { hits })
+            FormulaBuilderScreen(state, null, {}, {}, {}, initialSearch = "altın", searcher = { tvHits })
         }
     }
 
@@ -90,13 +99,13 @@ class BuilderPreviewTest {
             com.piyasa.widget.data.source.SearchHit("ASML", "ASML Holding N.V.", "EQUITY", "NASDAQ", "Equity"),
         )
         render("add_search") {
-            com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}, initialQuery = "as", searcher = { hits })
+            com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}, initialQuery = "altın", searcher = { tvHits }, autoFocus = false)
         }
     }
 
     @Test
     fun addInstrumentBrowse() {
         assumeTrue(System.getProperty("previews") == "true")
-        render("add_browse") { com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}) }
+        render("add_browse") { com.piyasa.widget.ui.AddInstrumentScreen(state, {}, {}, autoFocus = false) }
     }
 }

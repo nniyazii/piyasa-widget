@@ -2,6 +2,8 @@ package com.piyasa.widget.data
 
 import android.content.Context
 import com.piyasa.widget.data.source.GoldApiSource
+import com.piyasa.widget.data.source.TradingViewSource
+import com.piyasa.widget.model.Migrations
 import com.piyasa.widget.data.source.TcmbSource
 import com.piyasa.widget.data.source.YahooSource
 import com.piyasa.widget.model.Instrument
@@ -27,7 +29,7 @@ object Repository {
         if (mutex.isLocked) return
         mutex.withLock {
             val store = context.appStore
-            store.updateData { it.copy(refreshing = true) }
+            store.updateData { Migrations.apply(it).copy(refreshing = true) }
             try {
                 val instruments = store.data.first().instruments
                 val fetched = fetchAll(instruments)
@@ -58,14 +60,22 @@ object Repository {
 
     private suspend fun fetchAll(instruments: List<Instrument>): Map<String, Result<Quote>> = coroutineScope {
         val limit = Semaphore(6)
-        val single = instruments.filter { it.source != Source.TCMB }.map { ins ->
+        val tvInstruments = instruments.filter { it.source == Source.TRADINGVIEW }
+        val tv = async {
+            if (tvInstruments.isEmpty()) return@async emptyList()
+            val res = runCatching { TradingViewSource.quotes(tvInstruments.map { it.symbol }) }
+            tvInstruments.map { ins ->
+                ins.key to res.mapCatching { it[ins.symbol.uppercase()] ?: it[ins.symbol] ?: error("TradingView'da ${ins.symbol} yok") }
+            }
+        }
+        val single = instruments.filter { it.source == Source.YAHOO || it.source == Source.GOLD_API }.map { ins ->
             async {
                 limit.withPermit {
                     ins.key to runCatching {
                         when (ins.source) {
                             Source.YAHOO -> YahooSource.fetch(ins.symbol)
                             Source.GOLD_API -> GoldApiSource.fetch(ins.symbol)
-                            Source.TCMB -> error("unreachable")
+                            Source.TCMB, Source.TRADINGVIEW -> error("unreachable")
                         }
                     }
                 }
@@ -79,21 +89,23 @@ object Repository {
                 ins.key to res.mapCatching { it[ins.symbol] ?: error("TCMB'de ${ins.symbol} yok") }
             }
         }
-        (single.awaitAll() + tcmb.await()).toMap()
+        (single.awaitAll() + tcmb.await() + tv.await()).toMap()
     }
 
     /**
-     * Önceki kapanış vermeyen kaynaklar (spot metal, TCMB) için günlük referans ve
-     * gün içi mini grafik uygulama tarafından tutulur.
+     * Gün içi mini grafik ve (sağlanmıyorsa) günlük referans uygulama tarafından tutulur.
+     * Yahoo gün içi seriyi kendisi verir; TradingView/gold-api/TCMB için her yenilemede nokta eklenir.
+     * Günün ilk noktası önceki kapanıştır, böylece grafik ilk yenilemede de yönü gösterir.
      */
     private fun withReference(old: Quote?, new: Quote): Quote {
-        if (new.prevClose != null) return new
+        if (new.spark.isNotEmpty()) return new
         val today = day(new.time)
-        if (old == null) return new.copy(spark = listOf(new.price))
+        if (old == null) return new.copy(spark = listOfNotNull(new.prevClose, new.price))
         if (old.time == new.time && old.price == new.price) return old
         val sameDay = day(old.time) == today
-        val prev = if (sameDay) old.prevClose else old.price
-        val spark = if (sameDay) (old.spark + new.price).takeLast(40) else listOf(old.price, new.price)
+        val prev = new.prevClose ?: if (sameDay) old.prevClose else old.price
+        val spark = if (sameDay && old.spark.isNotEmpty()) (old.spark + new.price).takeLast(40)
+        else listOfNotNull(prev, new.price)
         return new.copy(prevClose = prev, spark = spark)
     }
 

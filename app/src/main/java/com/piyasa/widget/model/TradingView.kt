@@ -17,9 +17,9 @@ object TradingView {
         "VIX" to "TVC:VIX", "US10Y" to "TVC:US10Y",
         "AAPL" to "NASDAQ:AAPL", "MSFT" to "NASDAQ:MSFT", "NVDA" to "NASDAQ:NVDA", "GOOGL" to "NASDAQ:GOOGL",
         "AMZN" to "NASDAQ:AMZN", "META" to "NASDAQ:META", "TSLA" to "NASDAQ:TSLA",
-        "ONS" to "OANDA:XAUUSD", "GUMUS" to "OANDA:XAGUSD", "PLATIN" to "OANDA:XPTUSD",
-        "PALADYUM" to "OANDA:XPDUSD", "BAKIR" to "COMEX:HG1!",
-        "BRENT" to "TVC:UKOIL", "WTI" to "TVC:USOIL", "DOGALGAZ" to "NYMEX:NG1!",
+        "ONS" to "OANDA:XAUUSD", "GUMUS" to "TVC:SILVER", "PLATIN" to "TVC:PLATINUM",
+        "PALADYUM" to "TVC:PALLADIUM", "BAKIR" to "COMEX:HG1!",
+        "BRENT" to "FX:UKOIL", "WTI" to "FX:USOIL", "DOGALGAZ" to "NYMEX:NG1!",
         "USDTRY" to "FX:USDTRY", "EURTRY" to "FX:EURTRY", "GBPTRY" to "FX:GBPTRY", "CHFTRY" to "FX_IDC:CHFTRY",
         "EURUSD" to "FX:EURUSD", "GBPUSD" to "FX:GBPUSD", "USDJPY" to "FX:USDJPY", "DXY" to "TVC:DXY",
         "TCMB_USD" to "FX:USDTRY", "TCMB_EUR" to "FX:EURTRY",
@@ -29,6 +29,7 @@ object TradingView {
     /** Kullanıcının verdiği sembol > katalog eşlemesi > kaynak sembolünden tahmin. */
     fun symbolOf(ins: Instrument): String? {
         ins.tvSymbol?.takeIf { it.isNotBlank() }?.let { return it.trim() }
+        if (ins.source == Source.TRADINGVIEW) return ins.symbol
         catalogSymbols[ins.key]?.let { return it }
         val s = ins.symbol.trim()
         return when (ins.source) {
@@ -42,6 +43,7 @@ object TradingView {
             }
             Source.GOLD_API -> if (s.equals("HG", true)) "COMEX:HG1!" else "OANDA:${s.uppercase()}USD"
             Source.TCMB -> "FX:${s.substringBefore(':').uppercase()}TRY"
+            Source.TRADINGVIEW -> s
         }
     }
 

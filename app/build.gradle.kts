@@ -13,8 +13,8 @@ android {
         applicationId = "com.piyasa.widget"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -38,8 +38,9 @@ android {
             // ./gradlew testDebugUnitTest -Ppreviews=true  -> app/build/widget-previews/*.png
             it.systemProperty("previews", project.findProperty("previews")?.toString() ?: "false")
             it.systemProperty("previews.dir", layout.buildDirectory.dir("widget-previews").get().asFile.absolutePath)
+            it.systemProperty("live", project.findProperty("live")?.toString() ?: "false")
             it.systemProperty("previews.debug", project.findProperty("previewsDebug")?.toString() ?: "false")
-            it.testLogging.showStandardStreams = project.hasProperty("previewsDebug")
+            it.testLogging.showStandardStreams = project.hasProperty("previewsDebug") || project.hasProperty("live")
             project.findProperty("robolectricRepo")?.let { url -> it.systemProperty("robolectric.dependency.repo.url", url.toString()) }
         }
     }
