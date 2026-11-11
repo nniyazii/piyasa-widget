@@ -116,6 +116,21 @@ describe('geçmişte test', () => {
   })
 })
 
+describe('koşul istatistikleri', () => {
+  it('her koşulun hesaplanabildiği ve sağlandığı günleri sayar', () => {
+    // F/K hiç hesaplanamaz (kâr yok); fiyat koşulu her gün sağlanır
+    const r = runBacktest({
+      screen: screen({ conditions: [{ left: 'PRICE', op: 'GT', right: null, value: 10 }, { left: 'PE', op: 'LT', right: null, value: 10 }] }),
+      symbols: [sym('BIST:A', Array(300).fill(50)), sym('BIST:B', Array(300).fill(5))],
+      startDay: START + 100, endDay: START + 299,
+    })
+    expect(r.episodes).toHaveLength(0)
+    expect(r.symbolDays).toBe(400)
+    expect(r.conditions[0]).toEqual({ known: 400, passed: 200, symbols: 2, passedSymbols: 1 })
+    expect(r.conditions[1]).toEqual({ known: 0, passed: 0, symbols: 0, passedSymbols: 0 })
+  })
+})
+
 describe('asOfRatios', () => {
   // THYAO'nun gerçek rakamları (milyar TL): piyasa değeri 427,8; firma değeri 1048,1; PD/DD 0,4227
   const sym = {

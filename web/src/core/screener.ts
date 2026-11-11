@@ -366,9 +366,15 @@ export function rightOf(c: Condition, row: Row, screen: Screen, usdTry: number |
 }
 
 export function test(c: Condition, row: Row, screen: Screen, usdTry: number | undefined, history: Map<string, HistoryStats>) {
+  return conditionState(c, row, screen, usdTry, history) === 'pass'
+}
+
+/** Koşulun durumu: iki yanı da hesaplanamadıysa 'na' (ör. 5 yıllık ortalama F/K için yeterli kârlı yıl yok). */
+export function conditionState(c: Condition, row: Row, screen: Screen, usdTry: number | undefined, history: Map<string, HistoryStats>): 'pass' | 'fail' | 'na' {
   const l = valueOf(row, c.left, screen, usdTry, history)
   const r = rightOf(c, row, screen, usdTry, history)
-  return l != null && r != null && testOp(c.op, l, r)
+  if (l == null || r == null) return 'na'
+  return testOp(c.op, l, r) ? 'pass' : 'fail'
 }
 
 export function matches(row: Row, screen: Screen, usdTry: number | undefined, history: Map<string, HistoryStats>) {

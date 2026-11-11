@@ -34,6 +34,8 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
     - *Listede kaldıkça:* her gün listedekilere eşit ağırlık; listeden çıkan satılır.
     - *1 ay tut* ve *3 ay tut:* listeye giren hisse alınır ve süre dolunca satılır.
   - **Girişler:** tüm girişler aranabilir, sıralanabilir tabloda; CSV olarak indirilebilir.
+  - **Koşullar ne sıklıkla sağlandı:** her koşulun kaç hisse-günde hesaplanabildiği ve sağlandığı. Hiç giriş yoksa engelleyen koşul tek cümleyle yazılır (ör. "hiçbir gün sağlanmadı" ya da "en az 3 kârlı mali yıl gerekir").
+  - **Listem listeleri** yalnızca listendeki hisselerle sınırlı kalmaz: *Tüm BIST* ya da *ABD* seçilirse aynı koşullar geniş evrende denenir (listen değişmez). Listende 10'dan az hisse varken bu öneri kendiliğinden çıkar.
   - **Doğruluk düzeyi:** her koşulun geçmişte nasıl hesaplandığı açıkça yazılır.
     - *Tam:* fiyat, ortalamalar, RSI, getiriler.
     - *Yaklaşık:* 52 hafta ve 5 yıl dip/zirve kapanış bazında. Piyasa değeri bugünkü hisse sayısıyla.

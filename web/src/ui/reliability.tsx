@@ -36,7 +36,7 @@ export function ReliabilityPanel({ rel, years, bench }: { rel: Reliability; year
   const horizon = rel.edge3m != null ? '3 ay' : '1 ay'
   const t = [rel.t1m, rel.t3m].filter((x): x is number => x != null)
   const tAvg = t.length ? t.reduce((a, b) => a + b, 0) / t.length : undefined
-  const strength = tAvg == null ? 'ölçülemedi' : tAvg >= 2 ? 'güçlü' : tAvg >= 1 ? 'orta' : tAvg >= 0 ? 'zayıf; şans eseri olabilir' : 'ters yönde'
+  const strength = tAvg == null ? 'ölçülemedi' : tAvg >= 2 ? 'güçlü' : tAvg >= 1 ? 'orta' : tAvg > -1 ? 'zayıf; şans eseri olabilir' : 'ters yönde'
   return (
     <section className={'bt-sect rel-panel ' + tier(rel)}>
       <h2>Güvenilirlik</h2>

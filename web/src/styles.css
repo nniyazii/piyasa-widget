@@ -692,3 +692,5 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
 .rel-score span { color: var(--ink-3); font-size: 14px; }
 .rel-score em { font-style: normal; font-weight: 650; color: var(--c); margin-left: 4px; }
 .rel-kv dd { font-size: 16px; }
+.bt-try { margin: 18px 0 0; padding: 14px 16px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); max-width: 720px; }
+.bt-try p { margin: 0 0 10px; font-size: 14.5px; line-height: 1.5; }

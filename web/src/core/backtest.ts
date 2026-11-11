@@ -6,7 +6,7 @@
  * kapanışlardan hesaplanır; geçmişi bilinmeyen temel oranlar bugünkü değerle sabit alınır.
  */
 import {
-  conditionFields, derived, field, historyStats, matches, peAverage,
+  conditionFields, conditionState, derived, field, historyStats, peAverage,
   type Bar, type FieldId, type Fundamentals, type HistoryStats, type Row, type Screen,
 } from './screener'
 
@@ -93,12 +93,18 @@ export interface BtResult {
   /** Portföy türlerine göre özet: listede kaldıkça / girince 1 ay / girince 3 ay tut */
   portfolios?: Record<'list' | 'hold1m' | 'hold3m', { total?: number; maxDrawdown?: number; avgMembers?: number; daysInvested: number; costPaid?: number }>
   portfolio: { total?: number; bench?: number; maxDrawdown?: number; avgMembers?: number; daysInvested: number; costPaid?: number }
+  /** Koşul başına: hesaplanabildiği ve sağlandığı hisse-gün sayısı, en az bir gün hesaplanabildiği hisse sayısı */
+  conditions: ConditionStat[]
+  /** Değerlendirilen toplam hisse-gün */
+  symbolDays: number
   tested: number
   skipped: number
   startDay: number
   endDay: number
   notes: string[]
 }
+
+export interface ConditionStat { known: number; passed: number; symbols: number; passedSymbols: number }
 
 export type Support = 'exact' | 'approx' | 'constant'
 
@@ -268,7 +274,9 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
 
   const memberships = new Map<string, { sym: BtSymbol; member: Uint8Array; from: number; to: number }>()
   const episodes: Episode[] = []
-  let tested = 0, skipped = 0
+  let tested = 0, skipped = 0, symbolDays = 0
+  const conds = screen.conditions
+  const cstats: ConditionStat[] = conds.map(() => ({ known: 0, passed: 0, symbols: 0, passedSymbols: 0 }))
   const bench = input.benchmark?.series
 
   input.symbols.forEach((sym, si) => {
@@ -300,6 +308,7 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
     for (let i = 0; i < from; i++) { runMin = Math.min(runMin, c[i]); runMax = Math.max(runMax, c[i]) }
 
     const member = new Uint8Array(n)
+    const symKnown = new Uint8Array(conds.length), symPassed = new Uint8Array(conds.length)
     let histMonth = -1
     let hist: HistoryStats = {}
     let curMonth = -1, monthLow = Infinity, monthHigh = -Infinity
@@ -372,8 +381,17 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
 
       const usd = screen.currency === 'USD' && usdTry ? usdTry.close[Math.max(0, indexAtOrBefore(usdTry.days, day))] : undefined
       const row: Row = { symbol: sym.symbol, name: sym.name, currency: sym.currency, pricescale: sym.pricescale, values, epsFy: sym.epsFy, fyEnd: sym.fyEnd }
-      if (matches(row, screen, usd, new Map([[sym.symbol, dayHist]]))) member[i] = 1
+      const hm = new Map([[sym.symbol, dayHist]])
+      let all = true, any = false
+      for (let k = 0; k < conds.length; k++) {
+        const st = conditionState(conds[k], row, screen, usd, hm)
+        if (st !== 'na') { cstats[k].known++; symKnown[k] = 1 }
+        if (st === 'pass') { cstats[k].passed++; symPassed[k] = 1; any = true } else all = false
+      }
+      symbolDays++
+      if (!conds.length || (screen.matchAll ? all : any)) member[i] = 1
     }
+    for (let k = 0; k < conds.length; k++) { cstats[k].symbols += symKnown[k]; cstats[k].passedSymbols += symPassed[k] }
     memberships.set(sym.symbol, { sym, member, from, to })
 
     // Dönemler
@@ -526,6 +544,7 @@ export function runBacktest(input: BtInput, onProgress?: (done: number, total: n
       costPaid,
     },
     portfolios: { list: stats('list'), hold1m: stats('hold1m'), hold3m: stats('hold3m') },
+    conditions: cstats, symbolDays,
     tested, skipped, startDay, endDay, notes,
   }
 }

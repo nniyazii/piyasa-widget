@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { horizonLabel, reliability, supportSummary, type BtResult, type Episode, type HorizonStat } from '../core/backtest'
+import { horizonLabel, reliability, supportSummary, type BtResult, type ConditionStat, type Episode, type HorizonStat } from '../core/backtest'
 import * as Fmt from '../core/format'
-import { describe, type Screen } from '../core/screener'
+import { describe, type Condition, type Screen, type Universe } from '../core/screener'
 import { chartUrl } from '../core/tradingview'
 import { runScreenBacktest, type BtRun, type BtStep } from '../data/backtest'
 import { dailyAvailable } from '../data/daily'
@@ -24,7 +24,9 @@ export function BacktestView({ id }: { id: string }) {
   const state = useApp()
   const screen = state.screens.find((s) => s.id === id)
   const [years, setYears] = useState(1)
-  const key = screen ? `${id}|${years}|${JSON.stringify(screen.conditions)}|${screen.universe}|${screen.currency}|${screen.category}|${screen.onlyStocks}|${screen.matchAll}` : ''
+  // "Listem" listeleri tüm BIST'te ya da ABD'de de denenebilir: listede az hisse varken geçmiş seyrek kalır
+  const [uni, setUni] = useState<Universe>(screen?.universe ?? 'MY_LIST')
+  const key = screen ? `${id}|${years}|${uni}|${JSON.stringify(screen.conditions)}|${screen.universe}|${screen.currency}|${screen.category}|${screen.onlyStocks}|${screen.matchAll}` : ''
   const [run, setRun] = useState<BtRun | undefined>(() => cache.get(key))
   const [step, setStep] = useState<BtStep | null>(null)
   const [error, setError] = useState<string>()
@@ -36,8 +38,13 @@ export function BacktestView({ id }: { id: string }) {
 
   if (!screen) return <div className="empty"><h2>Liste bulunamadı</h2><p><a href="#/listeler">Dinamik listelere dön</a></p></div>
   const support = supportSummary(screen)
+  const mine = screen.universe === 'MY_LIST'
+  const target = (u: Universe): Screen => (u === screen.universe ? screen : { ...screen, universe: u, category: null })
 
-  const start = async () => {
+  const start = async (u: Universe = uni) => {
+    if (u !== uni) setUni(u)
+    const eff = target(u)
+    const runKey = key.replace(`|${uni}|`, `|${u}|`)
     abort.current?.abort()
     const ac = new AbortController()
     abort.current = ac
@@ -45,11 +52,12 @@ export function BacktestView({ id }: { id: string }) {
     setRun(undefined)
     setStep({ step: 'universe' })
     try {
-      const r = await runScreenBacktest(screen, state.instruments, years, setStep, ac.signal)
-      cache.set(key, r)
+      const r = await runScreenBacktest(eff, state.instruments, years, setStep, ac.signal)
+      cache.set(runKey, r)
       setRun(r)
       const p = r.result.portfolios
-      saveLocalScore(screen, {
+      // Skor yalnızca listenin kendi evreninde kaydedilir (rozet o tanıma aittir)
+      if (u === screen.universe) saveLocalScore(screen, {
         rel: reliability(r.result, screen), years, at: Date.now(),
         portfolios: { list: p?.list.total, hold1m: p?.hold1m.total, hold3m: p?.hold3m.total, bench: r.result.portfolio.bench },
       })
@@ -69,10 +77,11 @@ export function BacktestView({ id }: { id: string }) {
 
       <div className="bt-controls">
         <Segmented value={years} onChange={setYears} label="Dönem" options={[{ value: 0.5, label: 'Son 6 ay' }, { value: 1, label: '1 yıl' }, { value: 2, label: '2 yıl' }, { value: 3, label: '3 yıl' }]} />
+        {mine && <Segmented value={uni} onChange={setUni} label="Evren" options={[{ value: 'MY_LIST', label: 'Listem' }, { value: 'BIST', label: 'Tüm BIST' }, { value: 'US', label: 'ABD' }]} />}
         {step ? (
           <button className="btn" onClick={() => abort.current?.abort()}><Icon name="close" />Durdur</button>
         ) : (
-          <button className="btn primary" onClick={start} disabled={available === false}><Icon name="play" />{run ? 'Yeniden test et' : 'Testi başlat'}</button>
+          <button className="btn primary" onClick={() => void start()} disabled={available === false}><Icon name="play" />{run ? 'Yeniden test et' : 'Testi başlat'}</button>
         )}
       </div>
       {available === false && <p className="note" style={{ color: 'var(--down)' }}>Bu yayında günlük fiyat geçmişi yok; geçmişte test için uygulamayı sunucuyla çalıştırın (npm start).</p>}
@@ -90,7 +99,8 @@ export function BacktestView({ id }: { id: string }) {
 
       {step && <Progress step={step} />}
       {error && <p className="note" style={{ color: 'var(--down)' }}>{error}</p>}
-      {run && !step && <Results run={run} screen={screen} />}
+      {error && mine && uni === 'MY_LIST' && !step && <TryWider count={0} onTry={(u) => void start(u)} />}
+      {run && !step && <Results run={run} screen={target(uni)} onTry={mine && uni === 'MY_LIST' ? (u) => void start(u) : undefined} />}
     </div>
   )
 }
@@ -118,19 +128,40 @@ const MODES: { value: Mode; label: string; note: string }[] = [
   { value: 'hold3m', label: '3 ay tut', note: 'Listeye giren her hisse girdiği günün kapanışında alınır ve 3 ay (63 işlem günü) tutulur; eldekilere eşit ağırlık.' },
 ]
 
-function Results({ run, screen }: { run: BtRun; screen: Screen }) {
+function TryWider({ count, onTry }: { count: number; onTry: (u: Universe) => void }) {
+  return (
+    <div className="bt-try">
+      <p>{count ? `Listende bu koşulların uygulanabildiği ${count} hisse var.` : 'Listende test edilecek hisse yok.'} Koşulların geçmişte nasıl çalıştığını görmek için aynı koşulları geniş bir evrende dene; listen değişmez.</p>
+      <div className="row-actions">
+        <button className="btn" onClick={() => onTry('BIST')}>Tüm BIST’te dene</button>
+        <button className="btn" onClick={() => onTry('US')}>ABD’de dene</button>
+      </div>
+    </div>
+  )
+}
+
+function Results({ run, screen, onTry }: { run: BtRun; screen: Screen; onTry?: (u: Universe) => void }) {
   const r = run.result
   const [mode, setMode] = useState<Mode>('list')
   const rel = useMemo(() => reliability(r, screen), [r, screen])
   const port = r.portfolios?.[mode] ?? r.portfolio
   const span = run.years === 0.5 ? 'Son 6 ayda' : `Son ${run.years} yılda`
   const bench = run.benchmarkName
+  // Listemde az hisse: aynı koşulları geniş evrende denemeyi öner
+  const tryWider = onTry && r.tested < 10 && <TryWider count={r.tested} onTry={onTry} />
   if (!r.episodes.length) {
     return (
-      <div className="empty" style={{ paddingTop: 30 }}>
-        <h2>{span} bu listeye giren olmadı</h2>
-        <p>{r.tested} hisse her gün tarandı. Koşulları gevşetmeyi ya da dönemi uzatmayı dene.</p>
-      </div>
+      <>
+        <div className="empty" style={{ paddingTop: 30, paddingBottom: 10 }}>
+          <h2>{span} bu listeye giren olmadı</h2>
+          <p>{r.tested} hisse her gün tarandı. {blocker(screen, r)}</p>
+        </div>
+        {tryWider}
+        <section className="bt-sect">
+          <h2>Koşullar ne sıklıkla sağlandı</h2>
+          <ConditionTable screen={screen} result={r} />
+        </section>
+      </>
     )
   }
   return (
@@ -143,6 +174,7 @@ function Results({ run, screen }: { run: BtRun; screen: Screen }) {
       </p>
       <p className="note">{r.tested} hisse test edildi{run.missing ? `, ${run.missing} hissenin günlük geçmişi yok` : ''}. {fmtDay(r.startDay)} – {fmtDay(r.endDay)}.</p>
 
+      {tryWider}
       <ReliabilityPanel rel={rel} years={run.years} bench={bench} />
 
       <section className="bt-sect">
@@ -168,12 +200,63 @@ function Results({ run, screen }: { run: BtRun; screen: Screen }) {
           {port.costPaid != null && port.costPaid > 0 && <div><dt>İşlem ücreti</dt><dd className="num">{pct1(-port.costPaid)}</dd></div>}
         </dl>
       </section>
+      <details className="bt-how" style={{ marginTop: 22 }}>
+        <summary>Koşullar ne sıklıkla sağlandı</summary>
+        <ConditionTable screen={screen} result={r} />
+      </details>
       <section className="bt-sect">
         <h2>Girişler</h2>
         <EpisodeTable episodes={r.episodes} />
       </section>
       {r.notes.map((n, i) => <p key={i} className="note">{n}</p>)}
     </>
+  )
+}
+
+const pct0 = (v: number) => '%' + Fmt.number(v * 100, v > 0 && v < 0.01 ? 1 : 0)
+
+/** Hiç giriş olmadığında nedenini tek cümleyle: hesaplanamayan ya da en seyrek sağlanan koşul. */
+function blocker(screen: Screen, r: BtResult): string {
+  const c = screen.conditions, st = r.conditions
+  if (!c.length || !st?.length) return 'Koşulları gevşetmeyi ya da dönemi uzatmayı dene.'
+  const never = c.findIndex((_, k) => st[k].known === 0)
+  if (never >= 0) return `“${describe(c[never])}” hiçbir hissede hesaplanamadı${naReason(c[never]) ? `: ${naReason(c[never])}` : ''}.`
+  const none = c.findIndex((_, k) => st[k].passed === 0)
+  if (none >= 0) return `“${describe(c[none])}” hiçbir gün sağlanmadı; eşiği gevşetmeyi dene.`
+  if (screen.matchAll) return 'Koşullar tek tek sağlanıyor ama aynı gün birlikte sağlanmadı. Aşağıdaki tabloda en seyrek olanı gevşetmeyi dene.'
+  return 'Koşulları gevşetmeyi ya da dönemi uzatmayı dene.'
+}
+
+function naReason(c: Condition): string | undefined {
+  const f = [c.left, c.right].filter((x): x is NonNullable<typeof x> => !!x)
+  if (f.includes('PE_5Y_AVG')) return 'en az 3 kârlı mali yıl ve aylık fiyat geçmişi gerekir'
+  if (f.some((x) => ['LOW_5Y', 'HIGH_5Y', 'PERF_5Y'].includes(x))) return 'aylık fiyat geçmişi gerekir'
+  if (f.some((x) => ['PE', 'PS', 'EV_EBITDA', 'DIV_YIELD', 'PB', 'ROE', 'NET_MARGIN', 'DEBT_EQ', 'EPS_GROWTH_1Y', 'EPS_CAGR_5Y', 'REV_GROWTH_1Y'].includes(x)))
+    return 'yıllık bilanço verisi gerekir (endeks, fon ve sertifikalarda yok)'
+  return undefined
+}
+
+function ConditionTable({ screen, result }: { screen: Screen; result: BtResult }) {
+  const st: ConditionStat[] = result.conditions ?? []
+  const days = result.symbolDays || 1
+  return (
+    <table className="result-table bt-table">
+      <thead><tr><th>Koşul</th><th className="r">Hesaplanabildi</th><th className="r">Sağlandı</th><th className="r hide-s">Sağlayan hisse</th></tr></thead>
+      <tbody>
+        {screen.conditions.map((c, k) => {
+          const s = st[k]
+          if (!s) return null
+          return (
+            <tr key={k}>
+              <td>{describe(c)}{s.known === 0 && naReason(c) ? <span className="s">{naReason(c)}</span> : null}</td>
+              <td className="r num">{pct0(s.known / days)}<span className="s">{s.symbols} hisse</span></td>
+              <td className={'r num' + (s.passed === 0 ? ' neg' : '')}>{s.known ? pct0(s.passed / s.known) : '—'}<span className="s">günlerin</span></td>
+              <td className="r num hide-s">{s.passedSymbols}</td>
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
   )
 }
 

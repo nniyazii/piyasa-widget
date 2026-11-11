@@ -130,6 +130,16 @@ await step('güvenilirlik: kendi testin listede rozet olarak görünür', async 
   await page.locator('.screen-item', { hasText: 'aşırı satılmış' }).first().locator('.rel-badge').waitFor()
 })
 
+await step('listem: az hisse → geniş evrende dene, koşul tablosu', async () => {
+  await page.goto(BASE + '/#/listeler/d_my_pe_half/test')
+  await page.locator('.bt-controls .btn.primary').click()
+  await page.locator('.bt-try').waitFor({ timeout: 120000 })
+  await page.locator('.bt-sect table, details.bt-how table').last().locator('tbody tr').nth(1).waitFor({ state: 'attached' })
+  await page.locator('.bt-try .btn', { hasText: 'Tüm BIST' }).click()
+  await page.locator('.bt-lead').waitFor({ timeout: 180000 })
+  if (!/kez listeye girdi/.test((await page.locator('.bt-lead').textContent()) ?? '')) throw new Error('BIST’te giriş yok')
+})
+
 await step('ayarlar: koyu tema', async () => {
   await page.goto(BASE + '/#/ayarlar')
   await page.locator('.segmented button', { hasText: 'Koyu' }).click()
