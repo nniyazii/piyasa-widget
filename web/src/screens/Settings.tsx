@@ -104,7 +104,7 @@ export function Settings() {
         <dl className="kv">
           <dt><kbd>/</kbd> ya da <kbd>Ctrl</kbd> <kbd>K</kbd></dt><dd>Ara ya da formül yaz</dd>
           <dt><kbd>R</kbd></dt><dd>Fiyatları yenile</dd>
-          <dt><kbd>1</kbd>–<kbd>4</kbd></dt><dd>Piyasalar, Panolar, Dinamik listeler, Ayarlar</dd>
+          <dt><kbd>1</kbd>–<kbd>5</kbd></dt><dd>Piyasalar, Panolar, Dinamik listeler, Sözlük, Ayarlar</dd>
           <dt><kbd>Esc</kbd></dt><dd>Paneli ya da pencereyi kapat</dd>
         </dl>
       </section>

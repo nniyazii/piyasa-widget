@@ -15,6 +15,7 @@ import { actions, allKeys, getState, refreshScreen, useApp, useLive } from '../d
 import { Icon } from '../ui/Icon'
 import { ChangeBadge } from '../ui/market'
 import { Dialog, MoreButton, Segmented, Switch, useToast } from '../ui/overlay'
+import { CondChips } from '../ui/conds'
 import { ReliabilityBadge } from '../ui/reliability'
 import { navigate } from '../ui/router'
 import { sensorsConfig } from './Watchlist'
@@ -109,7 +110,7 @@ export function ScreenView({ id, onEdit }: { id: string; onEdit: (s: Screen) => 
   return (
     <>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '0 0 6px' }}>
-        <ul className="conds">{screen.conditions.map((c, i) => <li key={i}>{describe(c)}</li>)}</ul>
+        <CondChips conditions={screen.conditions} />
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', color: 'var(--ink-3)', fontSize: 13.5 }}>
         <span>{summary(screen)}{screen.matchAll ? '' : ', koşullardan herhangi biri'}</span>

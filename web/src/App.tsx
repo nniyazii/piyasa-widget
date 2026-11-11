@@ -7,6 +7,7 @@ import { Composer } from './screens/Composer'
 import { BacktestView } from './screens/Backtest'
 import { Detail } from './screens/Detail'
 import { ScreenEditor, ScreensIndex, ScreenView } from './screens/ScreensPage'
+import { Glossary } from './screens/Glossary'
 import { Settings } from './screens/Settings'
 import { Watchlist } from './screens/Watchlist'
 import { Icon } from './ui/Icon'
@@ -28,6 +29,7 @@ const NAV = [
   { path: '', label: 'Piyasalar', icon: 'list' },
   { path: 'panolar', label: 'Panolar', icon: 'boards' },
   { path: 'listeler', label: 'Dinamik listeler', short: 'Listeler', icon: 'filter' },
+  { path: 'sozluk', label: 'Sözlük', icon: 'book' },
   { path: 'ayarlar', label: 'Ayarlar', icon: 'settings' },
 ]
 
@@ -53,7 +55,7 @@ function Shell() {
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === '/') { e.preventDefault(); setCompose({}) }
       else if (e.key === 'r' || e.key === 'R') void refreshQuotes()
-      else if (['1', '2', '3', '4'].includes(e.key)) navigate(NAV[Number(e.key) - 1].path)
+      else if (['1', '2', '3', '4', '5'].includes(e.key)) navigate(NAV[Number(e.key) - 1].path)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -128,6 +130,7 @@ function Shell() {
           {section === 'listeler' && !screenId && <ScreensIndex onNew={() => setScreenEdit({})} />}
           {section === 'listeler' && screenId && !testing && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
           {testing && screenId && <BacktestView id={screenId} />}
+          {section === 'sozluk' && <Glossary target={route.path[1]} />}
           {section === 'ayarlar' && <Settings />}
         </div>
       </main>

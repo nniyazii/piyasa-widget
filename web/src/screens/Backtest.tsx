@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { horizonLabel, reliability, supportSummary, type BtResult, type ConditionStat, type Episode, type HorizonStat } from '../core/backtest'
 import * as Fmt from '../core/format'
+import { termForField } from '../core/glossary'
 import { describe, type Condition, type Screen, type Universe } from '../core/screener'
 import { chartUrl } from '../core/tradingview'
 import { runScreenBacktest, type BtRun, type BtStep } from '../data/backtest'
@@ -10,6 +11,7 @@ import { useApp } from '../data/store'
 import { fold } from '../data/tv'
 import { Icon } from '../ui/Icon'
 import { Segmented } from '../ui/overlay'
+import { CondChips } from '../ui/conds'
 import { ReliabilityPanel } from '../ui/reliability'
 
 // Sayfadan çıkıp dönünce sonuç kaybolmasın (oturum boyunca)
@@ -70,7 +72,7 @@ export function BacktestView({ id }: { id: string }) {
 
   return (
     <div className="bt">
-      <ul className="conds">{screen.conditions.map((c, i) => <li key={i}>{describe(c)}</li>)}</ul>
+      <CondChips conditions={screen.conditions} />
       <p className="lede" style={{ marginTop: 10 }}>
         Liste geçmişte her işlem gününün kapanışıyla yeniden hesaplanır. Hangi hisse ne zaman girdi, kaç gün kaldı, girdikten ve çıktıktan sonra ne oldu, görürsün.
       </p>
@@ -90,7 +92,7 @@ export function BacktestView({ id }: { id: string }) {
         <summary>Koşullar geçmişte nasıl hesaplanıyor</summary>
         <ul>
           {support.map((s) => (
-            <li key={s.id}><span className={'lvl ' + s.level}>{s.level === 'exact' ? 'Tam' : s.level === 'approx' ? 'Yaklaşık' : 'Sabit'}</span><b>{s.label}</b>: {s.how}</li>
+            <li key={s.id}><span className={'lvl ' + s.level}>{s.level === 'exact' ? 'Tam' : s.level === 'approx' ? 'Yaklaşık' : 'Sabit'}</span><b>{termForField(s.id) ? <a href={`#/sozluk/${termForField(s.id)!.id}`}>{s.label}</a> : s.label}</b>: {s.how}</li>
           ))}
           <li><span className="lvl approx">Not</span>Evren bugünkü hisselerden oluşur{screen.universe === 'US' ? ' (ABD’de piyasa değeri en büyük 400)' : ''}; bu sürede borsadan çıkanlar dahil değildir.</li>
           <li><span className="lvl exact">Not</span>Giriş ve çıkış o günün kapanışıyla. Portföylerde her alım ve satışta %0,15 işlem ücreti düşülür; temettüler dahil değildir.</li>

@@ -5,6 +5,7 @@ import { useSyncExternalStore } from 'react'
  *   #/                 Piyasalar (liste)        #/?s=USDTRY   seçili satır
  *   #/panolar          Panolar                  #/pano/:id     tam ekran pano
  *   #/listeler         Dinamik listeler         #/listeler/:id liste sonucu
+ *   #/sozluk           Terimler sözlüğü         #/sozluk/:id   terime git
  *   #/ayarlar          Ayarlar
  */
 export interface Route { path: string[]; query: URLSearchParams }

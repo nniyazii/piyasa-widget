@@ -140,6 +140,16 @@ await step('listem: az hisse → geniş evrende dene, koşul tablosu', async () 
   if (!/kez listeye girdi/.test((await page.locator('.bt-lead').textContent()) ?? '')) throw new Error('BIST’te giriş yok')
 })
 
+await step('sözlük: koşul çipinden terime, arama', async () => {
+  await page.goto(BASE + '/#/listeler/d_bist_oversold_big')
+  await page.locator('.conds a', { hasText: 'RSI' }).click()
+  await page.locator('#t-rsi').waitFor()
+  if (!page.url().includes('/sozluk/rsi')) throw new Error('adres: ' + page.url())
+  await page.fill('.gloss-search input', 'piyasa değeri')
+  await page.locator('#t-piyasa-degeri').waitFor()
+  if ((await page.locator('.term').count()) > 5) throw new Error('arama süzmedi')
+})
+
 await step('ayarlar: koyu tema', async () => {
   await page.goto(BASE + '/#/ayarlar')
   await page.locator('.segmented button', { hasText: 'Koyu' }).click()

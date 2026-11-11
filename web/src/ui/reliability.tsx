@@ -67,7 +67,7 @@ export function ReliabilityPanel({ rel, years, bench }: { rel: Reliability; year
           <li><b>Güç (%50)</b>: aylık farkların ortalamasının, dağınıklığına göre sıfırdan ne kadar uzak olduğu (t değeri). 3 aylık pencereler üst üste bindiği için örnek sayısı üçte bire indirilir.</li>
           <li><b>Tutarlılık (%30)</b>: farkın pozitif olduğu ayların oranı.</li>
           <li><b>Örnek (%20)</b>: giriş olan ay sayısı ve toplam giriş.</li>
-          <li>70 ve üstü güçlü, 50–69 orta, 30–49 zayıf, altı güvenilmez. Geçmişteki başarı geleceği garanti etmez; skor yalnızca listenin geçmişte tutarlı bir üstünlük gösterip göstermediğini özetler.</li>
+          <li>Terimlerin açıklaması <a href="#/sozluk/guvenilirlik">sözlükte</a>. 70 ve üstü güçlü, 50–69 orta, 30–49 zayıf, altı güvenilmez. Geçmişteki başarı geleceği garanti etmez; skor yalnızca listenin geçmişte tutarlı bir üstünlük gösterip göstermediğini özetler.</li>
         </ul>
       </details>
     </section>
