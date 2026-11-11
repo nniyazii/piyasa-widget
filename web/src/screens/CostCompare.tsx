@@ -30,10 +30,9 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
   const s: Scenario = { amount: Math.max(0, inp.amount || 0), years: inp.years, annualGrowth: (inp.growth || 0) / 100, commission: Math.max(0, inp.commission || 0) / 1000 }
 
   const routes = useMemo<Route[]>(() => {
-    const quoted = (banks?.banks ?? []).filter((b) => b[inp.metal])
-    const live = quoted.filter((b) => b.kind !== 'physical').map((b) => bankRoute(b.id, b.name, b[inp.metal]!))
+    const live = (banks?.banks ?? []).filter((b) => b[inp.metal]).map((b) => bankRoute(b.id, b.name, b[inp.metal]!))
     // Fiziki gümüşte ad maden adına göre: aynı kaynak hem gram altın hem gümüş fiyatı verir
-    const physical = quoted.filter((b) => b.kind === 'physical').map((b) => physicalRoute(b.id, gold ? b.name : b.name.replace('gram altın', 'gümüş'), b[inp.metal]!))
+    const physical = (banks?.physical ?? []).filter((b) => b[inp.metal]).map((b) => physicalRoute(b.id, gold ? b.name : b.name.replace('gram altın', 'gümüş'), b[inp.metal]!))
     const o = inp.own[inp.metal]
     const mine = o?.bid && o.ask && o.ask > o.bid && o.ask / o.bid < 1.2 ? [bankRoute('kendi', 'Kendi bankam', { bid: o.bid, ask: o.ask })] : []
     const bank = live.length || mine.length ? [...mine, ...live] : [bankRoute('banka', 'Banka (tipik makas)', FALLBACK_BANK)]
@@ -49,7 +48,7 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
   const bestBank = rows.find((r) => r.route.kind === 'bank')!
   const even = breakEven(fund.route, bestBank.route, s)
   const metal = gold ? 'altın' : 'gümüş'
-  const liveBanks = !!banks?.banks.some((b) => b.kind !== 'physical' && b[inp.metal])
+  const liveBanks = !!banks?.banks.some((b) => b[inp.metal])
 
   return (
     <section className="bt-sect cost">

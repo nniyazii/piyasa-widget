@@ -11,6 +11,7 @@ import { Glossary } from './screens/Glossary'
 import { Premiums } from './screens/Premiums'
 import { Settings } from './screens/Settings'
 import { Watchlist } from './screens/Watchlist'
+import { useNewVersion } from './data/version'
 import { Icon } from './ui/Icon'
 import { ToastHost, useToast } from './ui/overlay'
 import { href, navigate, useRoute } from './ui/router'
@@ -45,6 +46,7 @@ function Shell() {
   const [screenEdit, setScreenEdit] = useState<{ screen?: Screen } | null>(null)
   const [boardNew, setBoardNew] = useState(false)
   const toast = useToast()
+  const newVersion = useNewVersion()
   const section = route.path[0] ?? ''
   const selected = section === '' ? route.query.get('s') ?? undefined : undefined
 
@@ -105,6 +107,12 @@ function Shell() {
         <button className="icon-btn" onClick={() => setCompose({})} aria-label="Ara ya da formül yaz"><Icon name="search" /></button>
       </div>
 
+      {newVersion && (
+        <div className="update-bar" role="status">
+          <span>Piyasa’nın yeni sürümü yayımlandı. Bu sekme eski sürümle çalışıyor.</span>
+          <button className="btn small" onClick={() => location.reload()}>Yenile</button>
+        </div>
+      )}
       <main className="main" id="main">
         <div className={'page' + (section === 'panolar' ? ' wide' : '')}>
           <header className="page-head">

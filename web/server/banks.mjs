@@ -1,7 +1,7 @@
 /**
  * Bankaların kendi sitelerinde yayımladığı gram altın ve gram gümüş alış/satış fiyatları.
- *   Çıktı: { generated, banks: [{ id, name, kind?: 'physical', gold?: { bid, ask }, silver?: { bid, ask } }] }
- * kind 'physical': kuyumcudan fiziki alım (banka hesabı değil).
+ *   Çıktı: { generated, banks: [{ id, name, gold?, silver? }], physical: [{ id, name, gold?, silver? }] }   (fiyat: { bid, ask })
+ * banks: kaydi hesap (alımda BSMV); physical: kuyumcudan fiziki alım.
  * bid = bankanın alış fiyatı (sen satarken), ask = bankanın satış fiyatı (sen alırken). TL / gram.
  * Bir banka okunamazsa atlanır; hiçbir banka gelmezse boş liste döner.
  */
@@ -97,8 +97,8 @@ export function parseAltinkaynak(json) {
 async function altinkaynak() {
   const r = parseAltinkaynak(await get('https://static.altinkaynak.com/public/Gold'))
   return [
-    { id: 'fiziki-gram', name: 'Fiziki gram altın (Altınkaynak)', kind: 'physical', gold: r.gram, silver: r.silver },
-    { id: 'fiziki-kulce', name: 'Fiziki külçe altın (Altınkaynak)', kind: 'physical', gold: r.bar },
+    { id: 'fiziki-gram', name: 'Fiziki gram altın (Altınkaynak)', gold: r.gram, silver: r.silver },
+    { id: 'fiziki-kulce', name: 'Fiziki külçe altın (Altınkaynak)', gold: r.bar },
   ].filter((x) => x.gold || x.silver)
 }
 
@@ -119,6 +119,8 @@ export async function fetchBanks() {
     } catch (e) { console.log(`banka fiyatı alınamadı: ${s.name} (${e.message})`) }
   }))
   banks.sort((a, b) => SOURCES.findIndex((s) => s.id === a.id) - SOURCES.findIndex((s) => s.id === b.id))
-  try { banks.push(...(await altinkaynak())) } catch (e) { console.log(`fiziki fiyat alınamadı: Altınkaynak (${e.message})`) }
-  return { generated: Date.now(), banks }
+  // Fiziki fiyatlar ayrı alanda: banka satırı gibi (BSMV'li) okunmasınlar
+  let physical = []
+  try { physical = await altinkaynak() } catch (e) { console.log(`fiziki fiyat alınamadı: Altınkaynak (${e.message})`) }
+  return { generated: Date.now(), banks, physical }
 }
