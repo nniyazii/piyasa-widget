@@ -56,6 +56,12 @@ export function saveLocalScore(screen: Screen, entry: Omit<ScoreEntry, 'source'>
 
 /** Bu listenin bilinen skoru: kendi testin (daha yeni ya da daha uzun dönemse) ya da yayımlanan. */
 export function useReliability(screen: Screen | undefined): ScoreEntry | undefined {
+  const get = useScores()
+  return screen ? get(screen) : undefined
+}
+
+/** Herhangi bir listenin skorunu veren işlev (sıralama gibi toplu kullanım için). */
+export function useScores(): (screen: Screen) => ScoreEntry | undefined {
   const [pub, setPub] = useState<Published | undefined>()
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -65,12 +71,14 @@ export function useReliability(screen: Screen | undefined): ScoreEntry | undefin
     listeners.add(f)
     return () => { alive = false; listeners.delete(f) }
   }, [])
-  if (!screen) return undefined
-  const fp = fingerprint(screen)
-  const local = readLocal()[fp]
-  const p = pub?.scores[fp]
-  const fromPub: ScoreEntry | undefined = p && pub ? { ...p, years: pub.years, at: pub.generated, source: 'published' } : undefined
-  const fromLocal: ScoreEntry | undefined = local ? { ...local, source: 'local' } : undefined
-  if (fromPub && fromLocal) return fromLocal.years >= fromPub.years ? fromLocal : fromPub
-  return fromLocal ?? fromPub
+  const locals = readLocal()
+  return (screen) => {
+    const fp = fingerprint(screen)
+    const local = locals[fp]
+    const p = pub?.scores[fp]
+    const fromPub: ScoreEntry | undefined = p && pub ? { ...p, years: pub.years, at: pub.generated, source: 'published' } : undefined
+    const fromLocal: ScoreEntry | undefined = local ? { ...local, source: 'local' } : undefined
+    if (fromPub && fromLocal) return fromLocal.years >= fromPub.years ? fromLocal : fromPub
+    return fromLocal ?? fromPub
+  }
 }

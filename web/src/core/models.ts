@@ -92,7 +92,11 @@ export interface Settings {
   refreshSeconds: number
   /** Fiyat değişiminde rakam vurgusu. */
   tickFlash: boolean
+  /** Dinamik listeler sayfasındaki sıralama (yoksa kullanıcının kendi sırası). */
+  screenSort?: ScreenListSort
 }
+
+export type ScreenListSort = 'manual' | 'score' | 'matches' | 'name'
 
 export interface AppState {
   version: number
@@ -115,6 +119,8 @@ export interface LiveData {
   error?: string
   screenResults: Record<string, ScreenResult>
   screensRunning: Record<string, boolean>
+  /** "Hepsini tara" sürerken ilerleme */
+  scanAll?: { done: number; total: number }
 }
 
 export const newId = (prefix: string) => prefix + '_' + Math.random().toString(36).slice(2, 9)

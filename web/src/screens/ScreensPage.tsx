@@ -4,13 +4,13 @@ import { CSS } from '@dnd-kit/utilities'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { instrumentFromHit } from '../core/catalog'
 import * as Fmt from '../core/format'
-import { CATEGORIES, defaultBoard, newId, screenEntry, type Category } from '../core/models'
+import { CATEGORIES, defaultBoard, newId, screenEntry, type Category, type ScreenListSort } from '../core/models'
 import {
   describe, field, FIELDS, metricText, OPS, SCREEN_TEMPLATES, SORTS, summary, units, UNIVERSES,
   type Condition, type FieldId, type Screen, type ScreenResult,
 } from '../core/screener'
 import { chartUrl } from '../core/tradingview'
-import { useReliability } from '../data/reliability'
+import { useReliability, useScores } from '../data/reliability'
 import { actions, allKeys, getState, refreshScreen, useApp, useLive } from '../data/store'
 import { Icon } from '../ui/Icon'
 import { ChangeBadge } from '../ui/market'
@@ -25,9 +25,19 @@ export function ScreensIndex({ onNew }: { onNew: () => void }) {
   const live = useLive()
   const sensors = useSensors(...sensorsConfig())
   const [order, setOrder] = useState<string[] | null>(null)
-  const ids = order ?? state.screens.map((s) => s.id)
+  const scoreOf = useScores()
+  const sort: ScreenListSort = state.settings.screenSort ?? 'manual'
+  const manualIds = order ?? state.screens.map((s) => s.id)
+  // Sıralama yalnızca görünümü değiştirir; kullanıcının kendi sırası ("Sıram") saklı kalır
+  const ids = sort === 'manual' ? manualIds : [...state.screens].sort((a, b) => {
+    if (sort === 'name') return a.name.localeCompare(b.name, 'tr')
+    if (sort === 'matches') return (live.screenResults[b.id]?.rows.length ?? -1) - (live.screenResults[a.id]?.rows.length ?? -1)
+    return (scoreOf(b)?.rel.score ?? -1) - (scoreOf(a)?.rel.score ?? -1)
+  }).map((s) => s.id)
+  const times = state.screens.map((s) => live.screenResults[s.id]?.time).filter((t): t is number => !!t)
   const onDragEnd = (e: DragEndEvent) => {
     if (!e.over || e.active.id === e.over.id) return
+    if (sort !== 'manual') return
     const next = arrayMove(ids, ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id)))
     setOrder(next)
     actions.reorderGroup('screens', next)
@@ -45,8 +55,16 @@ export function ScreensIndex({ onNew }: { onNew: () => void }) {
   return (
     <>
       <p className="lede">Koşullarla tanımlanan, kendiliğinden güncellenen listeler. Borsa İstanbul’u, ABD’yi ya da kendi listeni tarar; sonuçlar fiyat değiştikçe yeniden hesaplanır.</p>
+      <div className="screen-tools">
+        <Segmented value={sort} onChange={(screenSort) => actions.setSettings({ screenSort })} label="Sırala"
+          options={[{ value: 'manual', label: 'Sıram' }, { value: 'score', label: 'Güvenilirlik' }, { value: 'matches', label: 'Eşleşme' }, { value: 'name', label: 'Ad' }]} />
+        <span className="note" aria-live="polite">
+          {live.scanAll ? `Taranıyor: ${live.scanAll.done} / ${live.scanAll.total}` : times.length ? `Son tarama ${Fmt.time(Math.min(...times))}` : 'Henüz taranmadı'}
+          {sort === 'manual' ? '' : '. Sürükleyerek sıralamak için “Sıram”ı seç.'}
+        </span>
+      </div>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={ids} strategy={verticalListSortingStrategy}>
+        <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={sort !== 'manual'}>
           <ul className="screen-list">
             {ids.map((id) => {
               const s = state.screens.find((x) => x.id === id)
@@ -64,7 +82,7 @@ function ScreenItem({ screen, result, running }: { screen: Screen; result?: Scre
   const top = result?.rows.slice(0, 4).map((r) => r.name).join(', ')
   const rel = useReliability(screen)
   return (
-    <li ref={setNodeRef} className={'screen-item' + (isDragging ? ' dragging' : '')} style={{ transform: CSS.Translate.toString(transform), transition }}
+    <li ref={setNodeRef} className={'screen-item' + (isDragging ? ' dragging' : '') + (running ? ' running' : '')} aria-busy={running || undefined} style={{ transform: CSS.Translate.toString(transform), transition }}
       {...attributes} {...listeners} role="link" tabIndex={0}
       onClick={() => navigate(`listeler/${screen.id}`)} onKeyDown={(e) => e.key === 'Enter' && navigate(`listeler/${screen.id}`)}>
       <h3>{screen.name}{rel && <> <ReliabilityBadge entry={rel} /></>}</h3>
@@ -92,6 +110,7 @@ export function ScreenView({ id, onEdit }: { id: string; onEdit: (s: Screen) => 
   const result = live.screenResults[id]
   const running = !!live.screensRunning[id]
   const rel = useReliability(screen)
+  const [col, setCol] = useState<{ key: 'name' | 'price' | 'change'; desc: boolean } | null>(null)
   useEffect(() => {
     if (screen && (!result || Date.now() - result.time > 5 * 60_000)) void refreshScreen(screen.id)
   }, [id])
@@ -107,6 +126,17 @@ export function ScreenView({ id, onEdit }: { id: string; onEdit: (s: Screen) => 
     actions.addInstrument({ ...ins, name })
     toast(`${name} listene eklendi`)
   }
+  // Sütun başlığına basınca o sütuna göre; aynı başlığa yeniden basınca ters, üçüncüde listenin kendi sırası
+  const rows = !result || !col ? result?.rows ?? [] : [...result.rows].sort((a, b) => {
+    const d = col.key === 'name' ? a.name.localeCompare(b.name, 'tr') : (a[col.key] ?? -Infinity) - (b[col.key] ?? -Infinity)
+    return col.desc ? -d : d
+  })
+  const ariaSort = (k: NonNullable<typeof col>['key']) => (col?.key === k ? (col.desc ? 'descending' : 'ascending') : undefined)
+  const sortBtn = (k: NonNullable<typeof col>['key'], label: string) => (
+    <button className="sort" onClick={() => setCol((c) => (c?.key !== k ? { key: k, desc: k !== 'name' } : c.desc === (k !== 'name') ? { key: k, desc: !c.desc } : null))}>
+      {label}{col?.key === k ? (col.desc ? ' ↓' : ' ↑') : ''}
+    </button>
+  )
   return (
     <>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', margin: '0 0 6px' }}>
@@ -137,9 +167,15 @@ export function ScreenView({ id, onEdit }: { id: string; onEdit: (s: Screen) => 
       {result && result.rows.length === 0 && !result.error && <div className="empty"><h2>Şu an koşulları sağlayan yok</h2><p>Liste her yenilemede yeniden taranır; koşulları gevşetmek için Düzenle’ye bas.</p></div>}
       {result && result.rows.length > 0 && (
         <table className="result-table">
-          <thead><tr><th>Ad</th><th className="hide-s">Koşula göre</th><th className="r">Fiyat</th><th className="r">Bugün</th><th className="r hide-s"><span className="sr-only">İşlemler</span></th></tr></thead>
+          <thead><tr>
+            <th aria-sort={ariaSort('name')}>{sortBtn('name', 'Ad')}</th>
+            <th className="hide-s" aria-sort={col ? undefined : 'other'}><button className="sort" onClick={() => setCol(null)} title="Listenin kendi sırası">Koşula göre</button></th>
+            <th className="r" aria-sort={ariaSort('price')}>{sortBtn('price', 'Fiyat')}</th>
+            <th className="r" aria-sort={ariaSort('change')}>{sortBtn('change', 'Bugün')}</th>
+            <th className="r hide-s"><span className="sr-only">İşlemler</span></th>
+          </tr></thead>
           <tbody>
-            {result.rows.map((r) => {
+            {rows.map((r) => {
               const [pre, suf] = units(r.currency)
               const inList = state.instruments.some((i) => i.symbol === r.symbol)
               return (

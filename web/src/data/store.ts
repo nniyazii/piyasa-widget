@@ -160,19 +160,39 @@ export async function refreshScreen(id: string, override?: Screen): Promise<Scre
   return result
 }
 
-let screensBusy = false
-/** Tüm listeleri (ya da verilenleri) sırayla, en fazla 3 eşzamanlı çalıştırır. */
-export async function refreshScreens(ids = state.screens.map((s) => s.id)) {
-  if (screensBusy) return
-  screensBusy = true
-  try {
-    const queue = [...ids]
-    await Promise.all(Array.from({ length: 3 }, async () => {
-      while (queue.length) await refreshScreen(queue.shift()!)
-    }))
-  } finally {
-    screensBusy = false
+const scanQueue: string[] = []
+const scanning = new Set<string>()
+let scanWorkers: Promise<void> | null = null
+let manual: { left: Set<string>; total: number } | null = null
+
+/**
+ * Verilen listeleri (varsayılan: hepsi) en fazla 3 eşzamanlı tarar. Süren bir tarama varsa istenenler
+ * kuyruğa eklenir; hiçbir istek yok sayılmaz. [byUser] ise ilerleme yayımlanır ve özet döner.
+ */
+export async function refreshScreens(ids = state.screens.map((s) => s.id), byUser = false): Promise<{ total: number; failed: number }> {
+  for (const id of ids) if (!scanQueue.includes(id) && !scanning.has(id)) scanQueue.push(id)
+  if (byUser) {
+    manual = { left: new Set(ids), total: ids.length }
+    setLive({ scanAll: { done: 0, total: ids.length } })
   }
+  scanWorkers ??= Promise.all(Array.from({ length: 3 }, async () => {
+    while (scanQueue.length) {
+      const id = scanQueue.shift()!
+      scanning.add(id)
+      try {
+        await refreshScreen(id)
+      } finally {
+        scanning.delete(id)
+        if (manual?.left.delete(id)) setLive({ scanAll: { done: manual.total - manual.left.size, total: manual.total } })
+      }
+    }
+  })).then(() => { scanWorkers = null })
+  await scanWorkers
+  if (byUser) {
+    manual = null
+    setLive({ scanAll: undefined })
+  }
+  return { total: ids.length, failed: ids.filter((id) => live.screenResults[id]?.error).length }
 }
 
 /** Ekranda görünen panolardaki ve listede kullanılan taramalar eskiyse çalıştırır. */

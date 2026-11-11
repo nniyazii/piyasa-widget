@@ -140,6 +140,29 @@ await step('listem: az hisse → geniş evrende dene, koşul tablosu', async () 
   if (!/kez listeye girdi/.test((await page.locator('.bt-lead').textContent()) ?? '')) throw new Error('BIST’te giriş yok')
 })
 
+await step('hepsini tara: ilerleme ve sonuç bildirimi', async () => {
+  await page.goto(BASE + '/#/listeler')
+  await page.waitForTimeout(2500) // açılıştaki otomatik tarama sürerken de basış yok sayılmamalı
+  const btn = page.locator('.page-head .btn.ghost')
+  await btn.click()
+  await page.locator('.page-head .btn.ghost', { hasText: 'Taranıyor' }).waitFor({ timeout: 3000 })
+  await page.locator('.toast', { hasText: /liste tarandı/ }).waitFor({ timeout: 90000 })
+  await page.locator('.screen-tools .note', { hasText: 'Son tarama' }).waitFor()
+})
+
+await step('sıralama: listeler ada göre, sonuçlar fiyata göre', async () => {
+  await page.locator('.screen-tools .segmented button', { hasText: /^Ad$/ }).click()
+  const names = await page.locator('.screen-item h3').evaluateAll((els) => els.map((e) => e.childNodes[0].textContent.trim()))
+  const sorted = [...names].sort((a, b) => a.localeCompare(b, 'tr'))
+  if (names.join('|') !== sorted.join('|')) throw new Error('ada göre sıralı değil: ' + names.slice(0, 3).join(', '))
+  await page.locator('.screen-tools .segmented button', { hasText: 'Sıram' }).click()
+  await page.goto(BASE + '/#/listeler/d_us_quality')
+  await page.locator('.result-table tbody tr').nth(2).waitFor({ timeout: 30000 })
+  await page.locator('.result-table .sort', { hasText: 'Fiyat' }).click()
+  const prices = await page.locator('.result-table tbody tr td:nth-child(3)').evaluateAll((els) => els.map((e) => parseFloat(e.textContent.replace(/[^0-9,]/g, '').replace(',', '.'))))
+  if (prices.some((p, i) => i && p > prices[i - 1])) throw new Error('fiyata göre azalan değil: ' + prices.slice(0, 4).join(', '))
+})
+
 await step('sözlük: koşul çipinden terime, arama', async () => {
   await page.goto(BASE + '/#/listeler/d_bist_oversold_big')
   await page.locator('.conds a', { hasText: 'RSI' }).click()

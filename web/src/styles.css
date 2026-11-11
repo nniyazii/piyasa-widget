@@ -544,8 +544,8 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
 .bt-sect h2 { margin: 0 0 8px; font-size: 16px; font-weight: 700; }
 .bt-table td.pos { color: var(--up); }
 .bt-table td.neg { color: var(--down); }
-.bt-table .sort { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
-.bt-table .sort:hover { color: var(--ink); }
+.result-table .sort { border: 0; background: none; padding: 0; font: inherit; color: inherit; cursor: pointer; }
+.result-table .sort:hover { color: var(--ink); }
 .bt-scroll { overflow-x: auto; margin-top: 4px; }
 .bt-chart { margin-top: 6px; border: 1px solid var(--rule-2); border-radius: var(--radius); background: var(--surface); padding: 8px 8px 4px; }
 .bt-chart svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
@@ -734,3 +734,9 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
   .gloss-index ul { display: none; }
   .gloss-index .g, .gloss-index > div:first-child .g { margin: 0; padding: 6px 11px; border-radius: 8px; background: var(--sunken); white-space: nowrap; font-weight: 600; font-size: 13.5px; }
 }
+
+/* ------------------------------------------------------------ liste sıralama ve tarama durumu */
+.screen-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 14px 0 4px; }
+.screen-tools .note { margin: 0; }
+.screen-item.running .tally b { opacity: 0.35; }
+.screen-item.running .top { color: var(--ink-3); }

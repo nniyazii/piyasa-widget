@@ -17,7 +17,8 @@ export async function scan(market: string, body: unknown, signal?: AbortSignal):
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
     body: JSON.stringify(body),
-    signal,
+    // Yanıt gelmezse tarama sonsuza dek "sürüyor" kalmasın
+    signal: signal ?? AbortSignal.timeout(20_000),
   })
   if (!res.ok) throw new Error(`TradingView yanıt vermedi (${res.status})`)
   const json = (await res.json()) as { data?: ScanRow[] }

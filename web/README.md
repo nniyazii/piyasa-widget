@@ -24,6 +24,8 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
   - Bir pano **tam ekran** açılır (ekran panosu; ekran kararmaz).
 - **Dinamik listeler.** Koşullu taramalar: "F/K’sı 5 yıllık ortalamasının yarısına inenler", "USD cinsinden 5 yıllık dibe yakın BIST" ve 16 tane daha.
   - Her listenin yanında **güvenilirlik skoru** (0–100): liste geçmişte endeksi tutarlı biçimde geçti mi? Hazır listelerin skoru her gün son 3 yılla yeniden hesaplanır; kendi listelerin, geçmişte test ettiğinde skor alır.
+  - **Sıralama:** listeler kendi sırana (sürükle-bırak), güvenilirlik skoruna, eşleşme sayısına ya da ada göre dizilir. Liste sonuçlarında *Ad*, *Fiyat* ve *Bugün* başlıklarına basınca o sütuna göre sıralanır; *Koşula göre* listenin kendi sırasına döner.
+  - **Hepsini tara:** ilerlemeyi düğmede gösterir ("Taranıyor 7/18"), bitince kaç listenin tarandığını bildirir; son tarama saati listenin üstünde yazar.
   - Düzenleyicide yazarken canlı önizleme gösterilir.
   - Liste tek tıkla panoya eklenir.
 - **Geçmişte test (backtest).** Her dinamik listede *Geçmişte test et*: son 6 ay / 1 / 2 / 3 yılın her işlem günü liste o günün kapanışıyla yeniden hesaplanır.

@@ -11,7 +11,7 @@ import { Glossary } from './screens/Glossary'
 import { Settings } from './screens/Settings'
 import { Watchlist } from './screens/Watchlist'
 import { Icon } from './ui/Icon'
-import { ToastHost } from './ui/overlay'
+import { ToastHost, useToast } from './ui/overlay'
 import { href, navigate, useRoute } from './ui/router'
 import { defaultBoard, newId } from './core/models'
 
@@ -40,6 +40,7 @@ function Shell() {
   const [compose, setCompose] = useState<ComposeState>(null)
   const [screenEdit, setScreenEdit] = useState<{ screen?: Screen } | null>(null)
   const [boardNew, setBoardNew] = useState(false)
+  const toast = useToast()
   const section = route.path[0] ?? ''
   const selected = section === '' ? route.query.get('s') ?? undefined : undefined
 
@@ -120,7 +121,13 @@ function Shell() {
             {section === 'panolar' && <button className="btn primary" onClick={() => setBoardNew(true)}><Icon name="plus" />Yeni pano</button>}
             {section === 'listeler' && !screen && (
               <>
-                <button className="btn ghost" onClick={() => void refreshScreens()}><Icon name="refresh" />Hepsini tara</button>
+                <button className="btn ghost" disabled={!!live.scanAll} aria-live="polite" onClick={async () => {
+                  const r = await refreshScreens(undefined, true)
+                  toast(r.failed ? `${r.total - r.failed} liste tarandı, ${r.failed} liste taranamadı` : `${r.total} liste tarandı`)
+                }}>
+                  <Icon name="refresh" className={live.scanAll ? 'spin' : undefined} />
+                  {live.scanAll ? `Taranıyor ${live.scanAll.done}/${live.scanAll.total}` : 'Hepsini tara'}
+                </button>
                 <button className="btn primary" onClick={() => setScreenEdit({})}><Icon name="plus" />Yeni liste</button>
               </>
             )}
