@@ -172,6 +172,11 @@ await step('avantajlı fiyatlar: sertifika primi ve fon farkı hesaplanır', asy
   if (!/[+−]?%\d/.test(await cell('ALTIN.S1', 3))) throw new Error('sertifika farkı yok')
   if (!/gr gümüş/.test(await cell('GMSTR.F', 2))) throw new Error('GMSTR içeriği: ' + (await cell('GMSTR.F', 2)))
   if (!/Al sinyali|Olağan|Pahalı|Primli|BIST kapalı/.test(await cell('GMSTR.F', 4))) throw new Error('durum yok')
+  // Birikim önerileri: ev/altın, ev/dolar, altın/gümüş
+  await page.locator('.adv').nth(2).waitFor({ timeout: 20000 })
+  const acts = await page.locator('.adv-act').allInnerTexts()
+  const ok = [/Altın boz, ev al|Altın biriktir/, /Dolar boz, ev al|Dolar biriktir/, /Altın sat, gümüş al|Gümüş sat, altın al/]
+  ok.forEach((re, i) => { if (!re.test(acts[i] ?? '')) throw new Error('öneri ' + (i + 1) + ': ' + acts[i]) })
 })
 
 await step('sözlük: koşul çipinden terime, arama', async () => {

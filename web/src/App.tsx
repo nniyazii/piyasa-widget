@@ -112,7 +112,7 @@ function Shell() {
             {premiums && <a className="icon-btn" href="#/listeler" aria-label="Dinamik listelere dön"><Icon name="back" /></a>}
             <div style={{ minWidth: 0 }}>
               <h1>{screen ? screen.name : premiums ? 'Avantajlı fiyatlar' : current.label}</h1>
-              {premiums && <div className="sub">Altın ve gümüş ürünleri, içlerindeki değere göre</div>}
+              {premiums && <div className="sub">Prim ve iskonto, birikim önerileri</div>}
               {testing && <div className="sub">Geçmişte test</div>}
               {section === '' && <div className="sub" aria-live="polite">{status.text}</div>}
             </div>

@@ -4,6 +4,7 @@
  *   GET /api/yahoo/chart/:symbol?range=6y&interval=1mo  → Yahoo Finance chart yanıtı (önbellekli)
  *   GET /api/tv/daily?symbols=BIST:THYAO,NASDAQ:AAPL     → günlük kapanışlar (geçmişte test)
  *   GET /api/tv/monthly?symbols=…                         → aylık çubuklar (5 yıllık dip/zirve, ortalama F/K)
+ *   GET /api/ratios                                       → uzun dönem aylık seriler (konut endeksi, altın, gümüş, dolar)
  *
  * TradingView geçmişi diskte saklanır (DATA_DIR, varsayılan web/.data): sunucu yeniden başlasa da
  * yeniden çekilmez; 6 saatten eski kayıtlara yalnızca son günler eklenir.
@@ -37,6 +38,14 @@ export async function handleApi(req, res) {
   try {
     const url = new URL(req.url, 'http://local')
     if (url.pathname === '/api/health') return send(res, 200, { ok: true, yahoo: true, daily: true, monthly: true })
+    if (url.pathname === '/api/ratios') {
+      const hit = cache.get('ratios')
+      if (hit && Date.now() - hit.time < TTL) return send(res, 200, hit.body)
+      const { longRatios } = await import('./ratios.mjs')
+      const body = await longRatios()
+      cache.set('ratios', { time: Date.now(), body })
+      return send(res, 200, body)
+    }
     if (url.pathname === '/api/tv/daily') return history(url, res, 'daily')
     if (url.pathname === '/api/tv/monthly') return history(url, res, 'monthly')
     const m = url.pathname.match(/^\/api\/yahoo\/chart\/([^/]+)$/)

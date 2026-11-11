@@ -753,3 +753,19 @@ a.screen-item { text-decoration: none; color: inherit; }
 .prem-st { display: inline-block; padding: 3px 9px; border-radius: 7px; background: var(--sunken); color: var(--ink-2); font-size: 12.5px; font-weight: 620; white-space: nowrap; }
 .prem-st.buy { background: var(--up-bg); color: var(--up); }
 .prem-st.high { background: var(--down-bg); color: var(--down); }
+.adv-inline { display: block; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; }
+.adv-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-top: 10px; }
+.adv { padding: 16px 16px 12px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); }
+.adv h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--ink-3); }
+.adv-act { margin: 6px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+.adv-str { display: inline-block; margin-left: 10px; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 620; letter-spacing: 0; vertical-align: 3px; background: var(--sunken); color: var(--ink-3); }
+.adv.strong .adv-str { background: var(--brass-bg); color: var(--brass); }
+.adv-why { margin: 10px 0 0; font-size: 14.5px; line-height: 1.55; color: var(--ink-2); }
+.adv-why b { color: var(--ink); }
+.adv-bar { position: relative; height: 8px; margin: 16px 5px 0; border-radius: 4px; background: var(--sunken); }
+.adv-bar .band { position: absolute; top: 0; bottom: 0; background: var(--rule); }
+.adv-bar .med { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink-3); }
+.adv-bar .now { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--surface); }
+.adv.strong .adv-bar .now { background: var(--brass); }
+.adv-ends { display: flex; justify-content: space-between; margin-top: 7px; font-size: 12px; color: var(--ink-3); }
+.adv-note { margin: 10px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-3); }

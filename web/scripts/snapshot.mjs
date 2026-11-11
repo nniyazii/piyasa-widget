@@ -108,6 +108,19 @@ for (const [name, list] of Object.entries(groups)) {
   totals.yahoo += yahoo
   console.log(`${name}: ${counts[name]} sembol (son günler eklendi ${r.stats.incremental}, baştan çekildi ${r.stats.full}, eskisi korundu ${r.stats.kept}, Yahoo ${yahoo}); günlük ${Object.keys(r.daily).length}`)
 }
+// Öneriler için uzun dönem aylık seriler (konut endeksi, altın, gümüş, dolar); olmazsa önceki kopya korunur
+try {
+  const { longRatios } = await import('../server/ratios.mjs')
+  const ratios = await longRatios()
+  writeFileSync(join(OUT, 'ratios.json'), JSON.stringify(ratios))
+  console.log(`ratios: ${Object.entries(ratios.series).map(([k, v]) => `${k} ${v.length} ay`).join(', ')}`)
+} catch (e) {
+  console.log(`ratios alınamadı (${e.message}); önceki kopya denenecek`)
+  try {
+    const r = BASE ? await fetch(`${BASE}/ratios.json`) : null
+    if (r?.ok) writeFileSync(join(OUT, 'ratios.json'), await r.text())
+  } catch { /* önceki kopya da yok */ }
+}
 const fresh = totals.incremental + totals.full + totals.yahoo
 writeFileSync(join(OUT, 'history', 'meta.json'), JSON.stringify({ generated: Date.now(), counts, fresh, ...totals, source: tvOk ? 'tradingview' : 'yahoo' }))
 console.log(`Bitti: ${Math.round((Date.now() - started) / 1000)} sn, ${fresh} sembol güncel`)

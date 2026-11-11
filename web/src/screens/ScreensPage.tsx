@@ -87,12 +87,13 @@ function PremiumCard() {
   return (
     <a className="screen-item prem-card" href="#/listeler/avantajli">
       <h3>Avantajlı fiyatlar</h3>
-      <div className="cond">Altın ve gümüş sertifikası ile fonları, içlerindeki madenin değerine göre</div>
+      <div className="cond">Altın ve gümüş ürünlerinde prim ve iskonto; ev, altın, dolar ve gümüş arasında birikim önerileri</div>
       <div className="top">
         {!p.rows.length ? (p.error ?? 'Fiyatlar alınıyor…')
           : !p.open ? 'BIST kapalı; sinyal seans içinde verilir'
             : n ? `${p.rows.filter((r) => r.signal === 'buy').map((r) => r.pair.code).join(', ')}: değerinin altında`
               : cheapest[0] ? `Değerinin altında olan yok; en yakını ${cheapest[0].pair.code}` : 'Şu an değerinin altında olan yok'}
+        {p.advices.length > 0 && <span className="adv-inline">{p.advices.map((a) => a.action).join(' · ')}</span>}
       </div>
       <div className="tally"><b className={'num' + (n ? ' pos' : '')}>{p.rows.length ? n : '…'}</b><small>{p.rows.length ? 'al sinyali' : ''}</small></div>
     </a>

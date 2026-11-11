@@ -3,15 +3,32 @@
  * günlük kapanış geçmişi. Sayfalar arasında paylaşılır; 60 saniyeden eskiyse yenilenir.
  */
 import { useEffect, useSyncExternalStore } from 'react'
+import { advices, type Advice, type RatioData } from '../core/advice'
 import { bistOpen, METALS, PREMIUM_PAIRS, premiumRow, typicalGrams, USDTRY, type PremiumRow } from '../core/premium'
 import { dailyCloses } from './daily'
 import { scan } from './tv'
 
-export interface PremiumState { rows: PremiumRow[]; time: number; open: boolean; loading: boolean; error?: string }
+export interface PremiumState { rows: PremiumRow[]; advices: Advice[]; time: number; open: boolean; loading: boolean; error?: string }
 
-let state: PremiumState = { rows: [], time: 0, open: bistOpen(), loading: false }
+let state: PremiumState = { rows: [], advices: [], time: 0, open: bistOpen(), loading: false }
 const listeners = new Set<() => void>()
 const set = (p: Partial<PremiumState>) => { state = { ...state, ...p }; listeners.forEach((l) => l()) }
+
+let ratios: Promise<RatioData | undefined> | undefined
+/** Uzun dönem aylık seriler: statik kopya, yoksa sunucu */
+function loadRatios() {
+  ratios ??= (async () => {
+    for (const url of ['data/ratios.json', 'api/ratios']) {
+      try {
+        const r = await fetch(url, { cache: 'no-cache' })
+        if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) return (await r.json()) as RatioData
+      } catch { /* sıradaki kaynak */ }
+    }
+    ratios = undefined // sonraki yenilemede yeniden denensin
+    return undefined
+  })()
+  return ratios
+}
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 
@@ -21,10 +38,11 @@ export async function refreshPremiums(): Promise<void> {
   try {
     const metals = Object.values(METALS).map((m) => m.symbol)
     const symbols = [...PREMIUM_PAIRS.map((p) => p.symbol), ...metals, USDTRY]
-    const [quotes, daily] = await Promise.all([
+    const [quotes, daily, long] = await Promise.all([
       scan('global', { symbols: { tickers: symbols }, columns: ['close'] }),
       // Geçmiş yoksa (bu yayında günlük veri yok) sertifika yine hesaplanır, fonlar "bilinmiyor" kalır
       dailyCloses(symbols).catch(() => new Map()),
+      loadRatios(),
     ])
     const price = new Map(quotes.map((r) => [r.s.toUpperCase(), num(r.d[0])]))
     const fx = price.get(USDTRY)
@@ -33,7 +51,8 @@ export async function refreshPremiums(): Promise<void> {
       const typical = p.grams == null ? typicalGrams(daily.get(p.symbol), daily.get(m), daily.get(USDTRY)) : undefined
       return premiumRow(p, price.get(p.symbol), price.get(m), fx, typical)
     })
-    set({ rows, time: Date.now(), open: bistOpen(), loading: false, error: fx == null ? 'Fiyatlar alınamadı' : undefined })
+    const adv = long ? advices(long, { gold: price.get(METALS.GOLD.symbol), silver: price.get(METALS.SILVER.symbol), usdTry: fx }) : []
+    set({ rows, advices: adv, time: Date.now(), open: bistOpen(), loading: false, error: fx == null ? 'Fiyatlar alınamadı' : undefined })
   } catch (e) {
     set({ loading: false, error: navigator.onLine === false ? 'Çevrimdışısınız' : (e as Error).message || 'Fiyatlar alınamadı' })
   }
