@@ -1,0 +1,39 @@
+name: Banka fiyatları
+
+# Bankaların sitelerinde yayımladığı gram altın ve gümüş alış/satış fiyatlarını yarım saatte bir okur,
+# yayındaki sitenin data/banks.json dosyasını günceller ("Banka mı, fon mu?" karşılaştırması için).
+on:
+  schedule:
+    - cron: '7,37 5-18 * * 1-5' # hafta içi 08:07–21:37 TSİ
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-pages
+  cancel-in-progress: false
+
+jobs:
+  banks:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Banka fiyatlarını oku
+        run: node scripts/banks.mjs out/data/banks.json
+      - name: Yayına ekle (diğer dosyalar korunur)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: web/out
+          publish_branch: gh-pages
+          keep_files: true
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_message: Banka fiyatları

@@ -121,6 +121,14 @@ try {
     if (r?.ok) writeFileSync(join(OUT, 'ratios.json'), await r.text())
   } catch { /* önceki kopya da yok */ }
 }
+// Banka alış/satış fiyatları (ayrıca yarım saatte bir banks.yml ile yenilenir)
+try {
+  const { fetchBanks } = await import('../server/banks.mjs')
+  const banks = await fetchBanks()
+  if (banks.banks.length) writeFileSync(join(OUT, 'banks.json'), JSON.stringify(banks))
+  else if (BASE) { const r = await fetch(`${BASE}/banks.json`); if (r.ok) writeFileSync(join(OUT, 'banks.json'), await r.text()) }
+  console.log(`banks: ${banks.banks.map((b) => b.name).join(', ') || 'okunamadı'}`)
+} catch (e) { console.log(`banks alınamadı (${e.message})`) }
 const fresh = totals.incremental + totals.full + totals.yahoo
 writeFileSync(join(OUT, 'history', 'meta.json'), JSON.stringify({ generated: Date.now(), counts, fresh, ...totals, source: tvOk ? 'tradingview' : 'yahoo' }))
 console.log(`Bitti: ${Math.round((Date.now() - started) / 1000)} sn, ${fresh} sembol güncel`)

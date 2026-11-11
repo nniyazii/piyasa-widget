@@ -413,6 +413,18 @@ export const GLOSSARY: TermGroup[] = [
         related: ['sertifika-primi', 'byf', 'gram-altin'],
       },
       {
+        id: 'masraflar', term: 'Makas, BSMV ve stopaj', aka: ['makas', 'alış satış farkı', 'BSMV', 'kambiyo vergisi', 'stopaj', 'komisyon', 'banka mı fon mu', 'vergi'],
+        short: 'Altın ve gümüş alıp satarken ödenen masraflar: alış-satış farkı, alım vergisi, aracı kurum komisyonu ve kazanç vergisi.',
+        body: [
+          'Makas: satış fiyatı ile alış fiyatı arasındaki fark. Bankadan aldığın anda geri satsan makas kadar kaybedersin.',
+          'BSMV (kambiyo vergisi): bankadan kaydi altın ve gümüş alırken tutarın binde 2’si. Aracı kurum komisyonunun üzerine de %5 BSMV eklenir.',
+          'Stopaj: kazançtan kaynakta kesilen vergi. Altın ve gümüş fonlarında (borsa yatırım fonları dahil) 9 Temmuz 2025 ve sonrasında alınan paylar için %17,5; Darphane altın sertifikasında %0; banka hesabındaki fiyat artışında yok.',
+        ],
+        example: '100.000 ₺ ile alınan fon 130.000 ₺’ye satılırsa 30.000 ₺ kazancın %17,5’i, yani 5.250 ₺ stopaj kesilir.',
+        inApp: '“Avantajlı fiyatlar” listesindeki “Banka mı, fon mu?” hesabı bu masrafların hepsini toplar. Oranlar Kasım 2026 itibarıyladır ve Cumhurbaşkanı kararıyla değişebilir.',
+        related: ['prim-iskonto', 'byf'],
+      },
+      {
         id: 'altin-gumus', term: 'Altın/gümüş rasyosu', aka: ['rasyo', 'gümüş sat altın al', 'altın sat gümüş al'],
         short: 'Bir ons altınla kaç ons gümüş alınabildiği.', formula: ['Rasyo = Ons altın ÷ Ons gümüş'],
         body: ['Uzun dönem ortancasının üstündeyken gümüş altına göre ucuz, altındayken altın gümüşe göre ucuz sayılır. Rasyo yıllarca ortancadan uzak kalabilir.'],

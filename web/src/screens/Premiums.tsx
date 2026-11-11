@@ -4,6 +4,7 @@ import { FUND_BUY, METALS, TYPICAL_DAYS, type PremiumRow } from '../core/premium
 import { chartUrl } from '../core/tradingview'
 import { refreshPremiums, usePremiums } from '../data/premium'
 import { Icon } from '../ui/Icon'
+import { CostCompare } from './CostCompare'
 
 const pct = (v?: number) => (v == null ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), 1))
 const tl = (v?: number, d = 2) => (v == null ? '—' : Fmt.number(v, d) + ' ₺')
@@ -56,6 +57,8 @@ export function Premiums() {
           </tbody>
         </table>
       )}
+
+      {s.rows.length > 0 && <CostCompare banks={s.banks} certPremium={s.rows.find((r) => r.pair.symbol === 'BIST:ALTIN')?.premium} />}
 
       {s.advices.length > 0 && (
         <section className="bt-sect">

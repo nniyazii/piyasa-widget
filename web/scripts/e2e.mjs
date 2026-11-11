@@ -172,6 +172,16 @@ await step('avantajlı fiyatlar: sertifika primi ve fon farkı hesaplanır', asy
   if (!/[+−]?%\d/.test(await cell('ALTIN.S1', 3))) throw new Error('sertifika farkı yok')
   if (!/gr gümüş/.test(await cell('GMSTR.F', 2))) throw new Error('GMSTR içeriği: ' + (await cell('GMSTR.F', 2)))
   if (!/Al sinyali|Olağan|Pahalı|Primli|BIST kapalı/.test(await cell('GMSTR.F', 4))) throw new Error('durum yok')
+  // Banka mı, fon mu: masraf tablosu, gümüşe geçince fon satırı değişir
+  await page.locator('.cost-table tbody tr').nth(1).waitFor()
+  if (!/stopaj %17,5/.test(await page.locator('.cost-table').innerText())) throw new Error('fon satırı yok')
+  const before = await page.locator('.cost .prem-lead').innerText()
+  await page.locator('.cost-form .segmented button', { hasText: 'Gümüş' }).click()
+  if (!/GMSTR/.test(await page.locator('.cost-table').innerText())) throw new Error('gümüş fonu yok')
+  await page.locator('.cost-form input').nth(1).fill('5')
+  if ((await page.locator('.cost .prem-lead').innerText()) === before) throw new Error('özet değişmedi')
+  await page.locator('.cost-form .segmented button', { hasText: 'Altın' }).click()
+  await page.locator('.cost-form input').nth(1).fill('30')
   // Birikim önerileri: ev/altın, ev/dolar, altın/gümüş
   await page.locator('.adv').nth(2).waitFor({ timeout: 20000 })
   const acts = await page.locator('.adv-act').allInnerTexts()

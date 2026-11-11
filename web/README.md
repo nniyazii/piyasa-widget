@@ -30,6 +30,10 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
     - *ALTIN.S1* her zaman 0,01 gram altındır; gram altının altına inerse al sinyali.
     - *GLDTR, ZGOLD, ISGLK, GMSTR* fonlarında pay başına maden miktarı sabit değildir (GMSTR ≈ 6 gram gümüş, yılda yaklaşık %2 azalır). Olağan miktar son 20 işlem gününün ortancasıdır; fon bunun en az %2 altına inerse al sinyali.
     - BIST kapalıyken sinyal verilmez (maden fiyatı değişirken borsa fiyatı durur).
+    - **Banka mı, fon mu?** Aynı parayla altın ya da gümüş alıp bir süre sonra satmanın tüm masrafları: makas, BSMV, komisyon, yönetim gideri, stopaj.
+      - Banka: bankaların sitelerinde yayımladığı alış/satış fiyatları (Kuveyt Türk, Enpara; yarım saatte bir `data/banks.json`, sunucuda `/api/banks`), alımda binde 2 BSMV.
+      - Fon: komisyon (+%5 BSMV), borsa makası, yıllık gider ve kazançtan %17,5 stopaj. Sertifika: stopaj %0, ama primli.
+      - Tutar, süre, beklenen yıllık artış ve komisyon değiştirilebilir; başa baş artış oranı gösterilir.
     - **Birikim önerileri** (aynı listede), her biri oranın kendi geçmiş ortancasına göre:
       - *Altın boz, ev al / Altın biriktir:* konut fiyat endeksi (TRHPI) ÷ gram altın, 2010'dan bu yana.
       - *Dolar boz, ev al / Dolar biriktir:* konut fiyat endeksi ÷ Dolar/TL.
@@ -54,7 +58,7 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
     - *Sabit:* PEG ve beklenen F/K gibi geçmişi bilinmeyenler bugünkü değerle alınır (ileriye bakma yanlılığı); bu listelerin skoru dörtte bir düşürülür.
 
   ![geçmişte test](../docs/web-gecmiste-test.png)
-- **Sözlük** (`#/sozluk`). RSI, F/K, EPS büyümesi, piyasa değeri, FD/FAVÖK, güvenilirlik skoru gibi 60 terim. Her terimde ne olduğu, hesap formülü, sayılı bir örnek ve Piyasa'nın değeri nereden aldığı var. Aranabilir; listelerdeki koşul çiplerine dokununca ilgili terim açılır.
+- **Sözlük** (`#/sozluk`). RSI, F/K, EPS büyümesi, piyasa değeri, FD/FAVÖK, güvenilirlik skoru gibi 61 terim. Her terimde ne olduğu, hesap formülü, sayılı bir örnek ve Piyasa'nın değeri nereden aldığı var. Aranabilir; listelerdeki koşul çiplerine dokununca ilgili terim açılır.
 - **Ayarlar.** Tema (sistem/açık/koyu), yenileme aralığı, dışa/içe aktarma (Android'in durum dosyası dahil), sıfırlama.
 - **Kurulabilir (PWA).** Tarayıcıdan "Ana ekrana ekle" ile uygulama gibi açılır; uygulama kabuğu çevrimdışı da açılır.
 

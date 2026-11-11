@@ -8,7 +8,10 @@ import { bistOpen, METALS, PREMIUM_PAIRS, premiumRow, typicalGrams, USDTRY, type
 import { dailyCloses } from './daily'
 import { scan } from './tv'
 
-export interface PremiumState { rows: PremiumRow[]; advices: Advice[]; time: number; open: boolean; loading: boolean; error?: string }
+export interface BankQuote { bid: number; ask: number }
+export interface BanksData { generated: number; banks: { id: string; name: string; gold?: BankQuote; silver?: BankQuote }[] }
+
+export interface PremiumState { rows: PremiumRow[]; advices: Advice[]; banks?: BanksData; time: number; open: boolean; loading: boolean; error?: string }
 
 let state: PremiumState = { rows: [], advices: [], time: 0, open: bistOpen(), loading: false }
 const listeners = new Set<() => void>()
@@ -30,6 +33,17 @@ function loadRatios() {
   return ratios
 }
 
+/** Banka alış/satış fiyatları: yarım saatte bir yenilenen kopya, sunucuda canlı */
+async function loadBanks(): Promise<BanksData | undefined> {
+  for (const url of ['data/banks.json', 'api/banks']) {
+    try {
+      const r = await fetch(url, { cache: 'no-cache' })
+      if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) return (await r.json()) as BanksData
+    } catch { /* sıradaki kaynak */ }
+  }
+  return undefined
+}
+
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 
 export async function refreshPremiums(): Promise<void> {
@@ -38,11 +52,12 @@ export async function refreshPremiums(): Promise<void> {
   try {
     const metals = Object.values(METALS).map((m) => m.symbol)
     const symbols = [...PREMIUM_PAIRS.map((p) => p.symbol), ...metals, USDTRY]
-    const [quotes, daily, long] = await Promise.all([
+    const [quotes, daily, long, banks] = await Promise.all([
       scan('global', { symbols: { tickers: symbols }, columns: ['close'] }),
       // Geçmiş yoksa (bu yayında günlük veri yok) sertifika yine hesaplanır, fonlar "bilinmiyor" kalır
       dailyCloses(symbols).catch(() => new Map()),
       loadRatios(),
+      loadBanks(),
     ])
     const price = new Map(quotes.map((r) => [r.s.toUpperCase(), num(r.d[0])]))
     const fx = price.get(USDTRY)
@@ -52,7 +67,7 @@ export async function refreshPremiums(): Promise<void> {
       return premiumRow(p, price.get(p.symbol), price.get(m), fx, typical)
     })
     const adv = long ? advices(long, { gold: price.get(METALS.GOLD.symbol), silver: price.get(METALS.SILVER.symbol), usdTry: fx }) : []
-    set({ rows, advices: adv, time: Date.now(), open: bistOpen(), loading: false, error: fx == null ? 'Fiyatlar alınamadı' : undefined })
+    set({ rows, advices: adv, banks: banks ?? state.banks, time: Date.now(), open: bistOpen(), loading: false, error: fx == null ? 'Fiyatlar alınamadı' : undefined })
   } catch (e) {
     set({ loading: false, error: navigator.onLine === false ? 'Çevrimdışısınız' : (e as Error).message || 'Fiyatlar alınamadı' })
   }
