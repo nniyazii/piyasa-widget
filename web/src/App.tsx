@@ -8,6 +8,7 @@ import { BacktestView } from './screens/Backtest'
 import { Detail } from './screens/Detail'
 import { ScreenEditor, ScreensIndex, ScreenView } from './screens/ScreensPage'
 import { Glossary } from './screens/Glossary'
+import { Premiums } from './screens/Premiums'
 import { Settings } from './screens/Settings'
 import { Watchlist } from './screens/Watchlist'
 import { Icon } from './ui/Icon'
@@ -24,6 +25,9 @@ export function App() {
     </ToastHost>
   )
 }
+
+/** #/listeler/avantajli: koşullu tarama değil, hazır bir karşılaştırma listesi */
+const PREMIUMS_ROUTE = 'avantajli'
 
 const NAV = [
   { path: '', label: 'Piyasalar', icon: 'list' },
@@ -67,7 +71,8 @@ function Shell() {
   const current = NAV.find((n) => n.path === section) ?? NAV[0]
   const screenId = section === 'listeler' ? route.path[1] : undefined
   const testing = section === 'listeler' && route.path[2] === 'test'
-  const screen = screenId ? state.screens.find((s) => s.id === screenId) : undefined
+  const premiums = screenId === PREMIUMS_ROUTE
+  const screen = screenId && !premiums ? state.screens.find((s) => s.id === screenId) : undefined
   const status = statusOf(live)
 
   return (
@@ -104,8 +109,10 @@ function Shell() {
         <div className={'page' + (section === 'panolar' ? ' wide' : '')}>
           <header className="page-head">
             {screen && <a className="icon-btn" href={testing ? `#/listeler/${screen.id}` : '#/listeler'} aria-label={testing ? 'Listeye dön' : 'Dinamik listelere dön'}><Icon name="back" /></a>}
+            {premiums && <a className="icon-btn" href="#/listeler" aria-label="Dinamik listelere dön"><Icon name="back" /></a>}
             <div style={{ minWidth: 0 }}>
-              <h1>{screen ? screen.name : current.label}</h1>
+              <h1>{screen ? screen.name : premiums ? 'Avantajlı fiyatlar' : current.label}</h1>
+              {premiums && <div className="sub">Altın ve gümüş ürünleri, içlerindeki değere göre</div>}
               {testing && <div className="sub">Geçmişte test</div>}
               {section === '' && <div className="sub" aria-live="polite">{status.text}</div>}
             </div>
@@ -119,7 +126,7 @@ function Shell() {
               </>
             )}
             {section === 'panolar' && <button className="btn primary" onClick={() => setBoardNew(true)}><Icon name="plus" />Yeni pano</button>}
-            {section === 'listeler' && !screen && (
+            {section === 'listeler' && !screenId && (
               <>
                 <button className="btn ghost" disabled={!!live.scanAll} aria-live="polite" onClick={async () => {
                   const r = await refreshScreens(undefined, true)
@@ -135,8 +142,9 @@ function Shell() {
           {section === '' && <Watchlist onCompose={(query) => setCompose({ query })} onEditFormula={(editKey) => setCompose({ editKey })} />}
           {section === 'panolar' && <Boards />}
           {section === 'listeler' && !screenId && <ScreensIndex onNew={() => setScreenEdit({})} />}
-          {section === 'listeler' && screenId && !testing && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
-          {testing && screenId && <BacktestView id={screenId} />}
+          {premiums && <Premiums />}
+          {section === 'listeler' && screenId && !premiums && !testing && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
+          {testing && screenId && !premiums && <BacktestView id={screenId} />}
           {section === 'sozluk' && <Glossary target={route.path[1]} />}
           {section === 'ayarlar' && <Settings />}
         </div>

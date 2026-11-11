@@ -26,6 +26,10 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
   - Her listenin yanında **güvenilirlik skoru** (0–100): liste geçmişte endeksi tutarlı biçimde geçti mi? Hazır listelerin skoru her gün son 3 yılla yeniden hesaplanır; kendi listelerin, geçmişte test ettiğinde skor alır.
   - **Sıralama:** listeler kendi sırana (sürükle-bırak), güvenilirlik skoruna, eşleşme sayısına ya da ada göre dizilir. Liste sonuçlarında *Ad*, *Fiyat* ve *Bugün* başlıklarına basınca o sütuna göre sıralanır; *Koşula göre* listenin kendi sırasına döner.
   - **Hepsini tara:** ilerlemeyi düğmede gösterir ("Taranıyor 7/18"), bitince kaç listenin tarandığını bildirir; son tarama saati listenin üstünde yazar.
+  - **Avantajlı fiyatlar** (listenin en üstünde): altın ve gümüş ürünleri içlerindeki madenin değerine göre primli mi iskontolu mu?
+    - *ALTIN.S1* her zaman 0,01 gram altındır; gram altının altına inerse al sinyali.
+    - *GLDTR, ZGOLD, ISGLK, GMSTR* fonlarında pay başına maden miktarı sabit değildir (GMSTR ≈ 6 gram gümüş, yılda yaklaşık %2 azalır). Olağan miktar son 20 işlem gününün ortancasıdır; fon bunun en az %2 altına inerse al sinyali.
+    - BIST kapalıyken sinyal verilmez (maden fiyatı değişirken borsa fiyatı durur).
   - Düzenleyicide yazarken canlı önizleme gösterilir.
   - Liste tek tıkla panoya eklenir.
 - **Geçmişte test (backtest).** Her dinamik listede *Geçmişte test et*: son 6 ay / 1 / 2 / 3 yılın her işlem günü liste o günün kapanışıyla yeniden hesaplanır.
@@ -45,7 +49,7 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
     - *Sabit:* PEG ve beklenen F/K gibi geçmişi bilinmeyenler bugünkü değerle alınır (ileriye bakma yanlılığı); bu listelerin skoru dörtte bir düşürülür.
 
   ![geçmişte test](../docs/web-gecmiste-test.png)
-- **Sözlük** (`#/sozluk`). RSI, F/K, EPS büyümesi, piyasa değeri, FD/FAVÖK, güvenilirlik skoru gibi 58 terim. Her terimde ne olduğu, hesap formülü, sayılı bir örnek ve Piyasa'nın değeri nereden aldığı var. Aranabilir; listelerdeki koşul çiplerine dokununca ilgili terim açılır.
+- **Sözlük** (`#/sozluk`). RSI, F/K, EPS büyümesi, piyasa değeri, FD/FAVÖK, güvenilirlik skoru gibi 59 terim. Her terimde ne olduğu, hesap formülü, sayılı bir örnek ve Piyasa'nın değeri nereden aldığı var. Aranabilir; listelerdeki koşul çiplerine dokununca ilgili terim açılır.
 - **Ayarlar.** Tema (sistem/açık/koyu), yenileme aralığı, dışa/içe aktarma (Android'in durum dosyası dahil), sıfırlama.
 - **Kurulabilir (PWA).** Tarayıcıdan "Ana ekrana ekle" ile uygulama gibi açılır; uygulama kabuğu çevrimdışı da açılır.
 

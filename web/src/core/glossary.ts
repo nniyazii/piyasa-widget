@@ -400,6 +400,18 @@ export const GLOSSARY: TermGroup[] = [
       { id: 'gram-altin', term: 'Gram altın', short: 'Bir gram saf altının TL fiyatı.', formula: ['Gram altın = Ons altın ($) × Dolar/TL ÷ 31,1034768'], example: 'Ons 2.400 $, Dolar/TL 34 ise 2.400 × 34 ÷ 31,1035 ≈ 2.623 ₺.', related: ['ons'] },
       { id: 'ceyrek', term: 'Çeyrek altın', short: '1,75 gram, 22 ayar ziynet altını; içinde yaklaşık 1,6067 gram saf altın vardır.', formula: ['Çeyrek (saf altın değeri) = Gram altın × 1,6067'], body: ['Kuyumcu fiyatı işçilik ve makas nedeniyle bu değerden farklıdır.'] },
       { id: 'sertifika-primi', term: 'Sertifika primi', aka: ['ALTIN.S1', 'altın sertifikası'], short: 'Borsadaki Darphane altın sertifikasının, içindeki altının değerine göre ne kadar pahalı ya da ucuz işlem gördüğü.', formula: ['1 sertifika = 0,01 gram altın', 'Prim % = (Sertifika fiyatı × 100 ÷ Gram altın − 1) × 100'], example: 'Sertifika 27 ₺, gram altın 2.600 ₺ ise 2.700 ÷ 2.600 − 1 = %3,8 prim.' },
+      {
+        id: 'prim-iskonto', term: 'Prim ve iskonto', aka: ['avantajlı fiyatlar', 'içindeki değer', 'al sinyali', 'GMSTR', 'GLDTR', 'ZGOLD', 'ISGLK'],
+        short: 'Bir borsa ürününün, içindeki varlığın değerinden pahalıya (primli) ya da ucuza (iskontolu) işlem görmesi.',
+        formula: ['Fark % = (Ürünün fiyatı ÷ İçindeki madenin değeri − 1) × 100', 'İçindeki değer = Gram fiyatı × Pay başına gram'],
+        body: [
+          'Sertifikada pay başına miktar sabittir (ALTIN.S1: 0,01 gram). Fonlarda sabit değildir; yönetim ücretiyle yavaşça azalır. GMSTR’nin bir payı 1 gram değil, yaklaşık 6 gram gümüşe denktir.',
+          'İskonto, ürünün madene göre ucuz olduğunu gösterir; madenin yükseleceğini göstermez.',
+        ],
+        example: 'Gram gümüş 85 ₺, GMSTR’nin olağan karşılığı 6,2 gram ise içindeki değer 527 ₺. Fiyat 515 ₺ ise fark −%2,3: iskontolu.',
+        inApp: 'Dinamik listelerdeki “Avantajlı fiyatlar” farkı canlı izler. Fonlarda olağan miktar son 20 işlem gününün ortancasıdır; fon bunun en az %2 altına, sertifika gram altının altına inince al sinyali verilir. BIST kapalıyken sinyal verilmez.',
+        related: ['sertifika-primi', 'byf', 'gram-altin'],
+      },
       { id: 'altin-gumus', term: 'Altın/gümüş rasyosu', short: 'Bir ons altınla kaç ons gümüş alınabildiği.', formula: ['Rasyo = Ons altın ÷ Ons gümüş'], body: ['Tarihsel ortalamasının çok üstündeyken gümüş altına göre ucuz sayılır.'] },
       { id: 'dxy', term: 'Dolar endeksi', aka: ['DXY'], short: 'Doların euro, yen, sterlin gibi altı büyük para birimine karşı ortalama değeri.' },
       { id: 'vix', term: 'VIX korku endeksi', aka: ['VIX'], short: 'S&P 500 opsiyonlarından hesaplanan, önümüzdeki 30 gün için beklenen oynaklık. Yükseldikçe piyasada tedirginlik artmıştır.' },

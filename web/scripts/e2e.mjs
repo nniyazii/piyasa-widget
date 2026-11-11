@@ -152,7 +152,7 @@ await step('hepsini tara: ilerleme ve sonuç bildirimi', async () => {
 
 await step('sıralama: listeler ada göre, sonuçlar fiyata göre', async () => {
   await page.locator('.screen-tools .segmented button', { hasText: /^Ad$/ }).click()
-  const names = await page.locator('.screen-item h3').evaluateAll((els) => els.map((e) => e.childNodes[0].textContent.trim()))
+  const names = await page.locator('.screen-list .screen-item h3').evaluateAll((els) => els.map((e) => e.childNodes[0].textContent.trim()))
   const sorted = [...names].sort((a, b) => a.localeCompare(b, 'tr'))
   if (names.join('|') !== sorted.join('|')) throw new Error('ada göre sıralı değil: ' + names.slice(0, 3).join(', '))
   await page.locator('.screen-tools .segmented button', { hasText: 'Sıram' }).click()
@@ -161,6 +161,17 @@ await step('sıralama: listeler ada göre, sonuçlar fiyata göre', async () => 
   await page.locator('.result-table .sort', { hasText: 'Fiyat' }).click()
   const prices = await page.locator('.result-table tbody tr td:nth-child(3)').evaluateAll((els) => els.map((e) => parseFloat(e.textContent.replace(/[^0-9,]/g, '').replace(',', '.'))))
   if (prices.some((p, i) => i && p > prices[i - 1])) throw new Error('fiyata göre azalan değil: ' + prices.slice(0, 4).join(', '))
+})
+
+await step('avantajlı fiyatlar: sertifika primi ve fon farkı hesaplanır', async () => {
+  await page.goto(BASE + '/#/listeler')
+  await page.locator('.prem-card').click()
+  await page.locator('.prem-table tbody tr').nth(4).waitFor({ timeout: 20000 })
+  const cell = (code, n) => page.locator('.prem-table tbody tr', { hasText: code }).locator('td').nth(n).textContent()
+  if (!/0,01 gr altın/.test(await cell('ALTIN.S1', 2))) throw new Error('sertifika içeriği: ' + (await cell('ALTIN.S1', 2)))
+  if (!/[+−]?%\d/.test(await cell('ALTIN.S1', 3))) throw new Error('sertifika farkı yok')
+  if (!/gr gümüş/.test(await cell('GMSTR.F', 2))) throw new Error('GMSTR içeriği: ' + (await cell('GMSTR.F', 2)))
+  if (!/Al sinyali|Olağan|Pahalı|Primli|BIST kapalı/.test(await cell('GMSTR.F', 4))) throw new Error('durum yok')
 })
 
 await step('sözlük: koşul çipinden terime, arama', async () => {

@@ -72,7 +72,7 @@ const us = await scan('america', {
   columns: ['name'], range: [0, 1200], sort: { sortBy: 'market_cap_basic', sortOrder: 'desc' },
 })
 // Kur, karşılaştırma endeksleri ve hazır listedeki semboller
-const misc = ['FX:USDTRY', 'FX:EURTRY', 'BIST:XU100', 'BIST:XU030', 'SP:SPX', 'NASDAQ:NDX', 'BIST:ALTIN', 'BIST:GLDTR', 'BIST:GMSTR', 'OANDA:XAUUSD', 'TVC:SILVER']
+const misc = ['FX:USDTRY', 'FX:EURTRY', 'BIST:XU100', 'BIST:XU030', 'SP:SPX', 'NASDAQ:NDX', 'BIST:ALTIN', 'BIST:GLDTR', 'BIST:GMSTR', 'BIST:ZGOLD', 'BIST:ISGLK', 'OANDA:XAUUSD', 'TVC:SILVER']
 const groups = { misc, bist, us }
 console.log(`Semboller: BIST ${bist.length}, ABD ${us.length}, diğer ${misc.length}`)
 

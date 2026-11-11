@@ -740,3 +740,16 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
 .screen-tools .note { margin: 0; }
 .screen-item.running .tally b { opacity: 0.35; }
 .screen-item.running .top { color: var(--ink-3); }
+
+/* ------------------------------------------------------------ avantajlı fiyatlar */
+a.screen-item { text-decoration: none; color: inherit; }
+.prem-card { border-left: 3px solid var(--brass); padding-left: 12px; margin-top: 10px; border-top: 1px solid var(--rule-2); }
+.prem-card + .screen-list, .prem-card ~ * .screen-list { margin-top: 0; }
+.tally b.pos { color: var(--up); }
+.prem-lead { margin: 16px 0 0; font-size: 19px; line-height: 1.5; max-width: 62ch; }
+.prem-table { margin-top: 10px; }
+.prem-table td.pos { color: var(--up); }
+.prem-table tr.is-buy td:first-child { box-shadow: inset 3px 0 0 var(--up); }
+.prem-st { display: inline-block; padding: 3px 9px; border-radius: 7px; background: var(--sunken); color: var(--ink-2); font-size: 12.5px; font-weight: 620; white-space: nowrap; }
+.prem-st.buy { background: var(--up-bg); color: var(--up); }
+.prem-st.high { background: var(--down-bg); color: var(--down); }

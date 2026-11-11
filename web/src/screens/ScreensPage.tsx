@@ -10,6 +10,7 @@ import {
   type Condition, type FieldId, type Screen, type ScreenResult,
 } from '../core/screener'
 import { chartUrl } from '../core/tradingview'
+import { buyCount, usePremiums } from '../data/premium'
 import { useReliability, useScores } from '../data/reliability'
 import { actions, allKeys, getState, refreshScreen, useApp, useLive } from '../data/store'
 import { Icon } from '../ui/Icon'
@@ -63,6 +64,7 @@ export function ScreensIndex({ onNew }: { onNew: () => void }) {
           {sort === 'manual' ? '' : '. Sürükleyerek sıralamak için “Sıram”ı seç.'}
         </span>
       </div>
+      <PremiumCard />
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={ids} strategy={verticalListSortingStrategy} disabled={sort !== 'manual'}>
           <ul className="screen-list">
@@ -74,6 +76,26 @@ export function ScreensIndex({ onNew }: { onNew: () => void }) {
         </SortableContext>
       </DndContext>
     </>
+  )
+}
+
+/** Avantajlı fiyatlar: koşullu tarama değil, hazır karşılaştırma; her zaman en üstte. */
+function PremiumCard() {
+  const p = usePremiums()
+  const n = buyCount(p)
+  const cheapest = [...p.rows].filter((r) => r.premium != null).sort((a, b) => a.premium! - b.premium!)
+  return (
+    <a className="screen-item prem-card" href="#/listeler/avantajli">
+      <h3>Avantajlı fiyatlar</h3>
+      <div className="cond">Altın ve gümüş sertifikası ile fonları, içlerindeki madenin değerine göre</div>
+      <div className="top">
+        {!p.rows.length ? (p.error ?? 'Fiyatlar alınıyor…')
+          : !p.open ? 'BIST kapalı; sinyal seans içinde verilir'
+            : n ? `${p.rows.filter((r) => r.signal === 'buy').map((r) => r.pair.code).join(', ')}: değerinin altında`
+              : cheapest[0] ? `Değerinin altında olan yok; en yakını ${cheapest[0].pair.code}` : 'Şu an değerinin altında olan yok'}
+      </div>
+      <div className="tally"><b className={'num' + (n ? ' pos' : '')}>{p.rows.length ? n : '…'}</b><small>{p.rows.length ? 'al sinyali' : ''}</small></div>
+    </a>
   )
 }
 
