@@ -43,7 +43,7 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
     - *Sabit:* PEG ve beklenen F/K gibi geçmişi bilinmeyenler bugünkü değerle alınır (ileriye bakma yanlılığı); bu listelerin skoru dörtte bir düşürülür.
 
   ![geçmişte test](../docs/web-gecmiste-test.png)
-- **Sözlük** (`#/sozluk`). RSI, F/K, EPS büyümesi, piyasa değeri, FD/FAVÖK, güvenilirlik skoru gibi 60'tan fazla terim. Her terimde ne olduğu, hesap formülü, sayılı bir örnek ve Piyasa'nın değeri nereden aldığı var. Aranabilir; listelerdeki koşul çiplerine dokununca ilgili terim açılır.
+- **Sözlük** (`#/sozluk`). RSI, F/K, EPS büyümesi, piyasa değeri, FD/FAVÖK, güvenilirlik skoru gibi 58 terim. Her terimde ne olduğu, hesap formülü, sayılı bir örnek ve Piyasa'nın değeri nereden aldığı var. Aranabilir; listelerdeki koşul çiplerine dokununca ilgili terim açılır.
 - **Ayarlar.** Tema (sistem/açık/koyu), yenileme aralığı, dışa/içe aktarma (Android'in durum dosyası dahil), sıfırlama.
 - **Kurulabilir (PWA).** Tarayıcıdan "Ana ekrana ekle" ile uygulama gibi açılır; uygulama kabuğu çevrimdışı da açılır.
 
