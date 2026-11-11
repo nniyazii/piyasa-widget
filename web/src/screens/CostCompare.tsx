@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { bankRoute, breakEven, certRoute, evaluate, fundRoute, RATES, type Outcome, type Route, type Scenario } from '../core/costs'
+import { bankRoute, breakEven, certRoute, evaluate, fundRoute, physicalRoute, RATES, type Outcome, type Route, type Scenario } from '../core/costs'
 import * as Fmt from '../core/format'
 import type { BanksData } from '../data/premium'
 import { Segmented } from '../ui/overlay'
@@ -30,12 +30,15 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
   const s: Scenario = { amount: Math.max(0, inp.amount || 0), years: inp.years, annualGrowth: (inp.growth || 0) / 100, commission: Math.max(0, inp.commission || 0) / 1000 }
 
   const routes = useMemo<Route[]>(() => {
-    const live = (banks?.banks ?? []).filter((b) => b[inp.metal]).map((b) => bankRoute(b.id, b.name, b[inp.metal]!))
+    const quoted = (banks?.banks ?? []).filter((b) => b[inp.metal])
+    const live = quoted.filter((b) => b.kind !== 'physical').map((b) => bankRoute(b.id, b.name, b[inp.metal]!))
+    // Fiziki gümüşte ad maden adına göre: aynı kaynak hem gram altın hem gümüş fiyatı verir
+    const physical = quoted.filter((b) => b.kind === 'physical').map((b) => physicalRoute(b.id, gold ? b.name : b.name.replace('gram altın', 'gümüş'), b[inp.metal]!))
     const o = inp.own[inp.metal]
     const mine = o?.bid && o.ask && o.ask > o.bid && o.ask / o.bid < 1.2 ? [bankRoute('kendi', 'Kendi bankam', { bid: o.bid, ask: o.ask })] : []
     const bank = live.length || mine.length ? [...mine, ...live] : [bankRoute('banka', 'Banka (tipik makas)', FALLBACK_BANK)]
     const fund = gold ? fundRoute('fon', 'Altın fonu (GLDTR, ZGOLD, ISGLK)', FUND_FEE, EXCHANGE_SPREAD) : fundRoute('fon', 'Gümüş fonu (GMSTR)', FUND_FEE, EXCHANGE_SPREAD)
-    return [...bank, fund, ...(gold ? [certRoute('sertifika', 'Altın sertifikası (ALTIN.S1)', EXCHANGE_SPREAD)] : [])]
+    return [...bank, ...physical, fund, ...(gold ? [certRoute('sertifika', 'Altın sertifikası (ALTIN.S1)', EXCHANGE_SPREAD)] : [])]
   }, [banks, inp.metal, gold, inp.own])
 
   const rows = useMemo(() => routes.map((r) => evaluate(r, s)).sort((a, b) => b.net - a.net), [routes, s.amount, s.years, s.annualGrowth, s.commission])
@@ -46,7 +49,7 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
   const bestBank = rows.find((r) => r.route.kind === 'bank')!
   const even = breakEven(fund.route, bestBank.route, s)
   const metal = gold ? 'altın' : 'gümüş'
-  const liveBanks = !!banks?.banks.some((b) => b[inp.metal])
+  const liveBanks = !!banks?.banks.some((b) => b.kind !== 'physical' && b[inp.metal])
 
   return (
     <section className="bt-sect cost">
@@ -76,7 +79,7 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
         </table>
       </div>
       <div className="cost-form cost-own">
-        <span className="cost-own-label">Bankan listede yoksa (ör. İş Bankası) uygulamasındaki gram {metal} fiyatını gir:</span>
+        <span className="cost-own-label">Bankan ya da kuyumcun listede yoksa (ör. İş Bankası) gram {metal} alış ve satış fiyatını gir:</span>
         <label>Bankanın alışı (₺)<input type="number" inputMode="decimal" min={0} step="any" value={inp.own[inp.metal]?.bid ?? ''} onChange={(e) => setOwn({ bid: Number(e.target.value) || undefined })} /></label>
         <label>Bankanın satışı (₺)<input type="number" inputMode="decimal" min={0} step="any" value={inp.own[inp.metal]?.ask ?? ''} onChange={(e) => setOwn({ ask: Number(e.target.value) || undefined })} /></label>
         {ownInvalid && <span className="note" style={{ margin: 0, color: 'var(--down)' }}>Satış fiyatı alıştan yüksek olmalı (bankanın sana sattığı fiyat).</span>}
@@ -89,10 +92,11 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
         <summary>Hesaba katılanlar ve varsayımlar</summary>
         <ul>
           <li><b>Banka (kaydi {metal} hesabı):</b> alış ve satış fiyatı arasındaki makas{liveBanks ? ', bankaların kendi sitelerinde yayımladığı fiyatlardan (Kuveyt Türk, Enpara, Akbank, Yapı Kredi, Ziraat; Ziraat’te internet kuru ve mevduat hesabı satırı). İş Bankası sitesinde otomatik okumaya izin vermediği için elle girilebilir' : ' (canlı banka fiyatı alınamadı; her yönde %1,3 varsayıldı)'}. Alımda {pct(RATES.bankBsmv)} BSMV (kambiyo vergisi). Satış kazancından vergi kesilmez, saklama ücreti yoktur.{banks?.generated ? ` Fiyatlar: ${Fmt.dateTime(banks.generated)}.` : ''}</li>
+          <li><b>Fiziki {metal} (kuyumcu):</b> yalnızca alış-satış makası; Altınkaynak’ın yayımladığı fiyatlardan{gold ? ' (paketsiz gram altın ve 995 ayar külçe)' : ''}. Alımda BSMV, satışta gelir vergisi yok; külçe tesliminde KDV yok. Hesapta olmayanlar: saklama (kasa kirası), çalınma riski, küçük gramajlı ve paketli ürünlerde daha geniş makas{gold ? '' : '. Fiziki gümüşte makas çok geniştir; mamul ve takıda ayrıca KDV vardır'}. Kuyumcular arasında fiyat farkı olur.</li>
           <li><b>Fon (borsa yatırım fonu):</b> aracı kurum komisyonu (alışta ve satışta, üzerine %5 BSMV), borsadaki alış-satış farkı (her yönde {pct(EXCHANGE_SPREAD)} varsayıldı), yıllık yönetim gideri ({pct(FUND_FEE, 2)}; GLDTR için yayımlanan oran, diğer fonlarda farklı olabilir) ve satışta kazanç üzerinden {pct(RATES.fundTax)} stopaj (9 Temmuz 2025 ve sonrasında alınan paylar).</li>
           <li><b>Altın sertifikası:</b> komisyon ve borsa makası; stopaj %0. Karşılığında gram altına göre değişken bir prim taşır.</li>
           <li>Stopaj TL kazanç üzerinden kesilir: fiyat ne kadar artarsa fonun vergisi o kadar büyür. Banka makası ise sabittir; bu yüzden az artışta fon, çok artışta banka öne geçer.</li>
-          <li>Bankaların makası mesai dışında ve hafta sonu genişler; mobil uygulamadaki fiyat sitedekinden farklı olabilir. Fiziki altında ayrıca işçilik ve saklama riski vardır; burada yalnızca kaydi hesap karşılaştırılır.</li>
+          <li>Bankaların makası mesai dışında ve hafta sonu genişler; mobil uygulamadaki fiyat sitedekinden farklı olabilir. Banka satırları kaydi hesap içindir; bankadan fiziki teslim alınırsa ayrıca ücret ödenir.</li>
           <li>Vergi oranları Cumhurbaşkanı kararıyla sık değişir (Kasım 2026 itibarıyla geçerli olanlar kullanıldı). Karar vermeden önce bankandan ve aracı kurumundan doğrula.</li>
         </ul>
       </details>
@@ -107,7 +111,7 @@ function Row({ r, best, amount }: { r: Outcome; best: boolean; amount: number })
     <tr className={best ? 'is-buy' : undefined}>
       <td>
         <span className="n">{r.route.name}</span>
-        <span className="s">{r.route.kind === 'bank' ? `makas ${pct(r.route.buySpread + r.route.sellSpread)}` : r.route.kind === 'fund' ? 'stopaj %17,5' : 'stopaj yok, primli'}</span>
+        <span className="s">{r.route.kind === 'bank' ? `makas ${pct(r.route.buySpread + r.route.sellSpread)}` : r.route.kind === 'physical' ? `makas ${pct(r.route.buySpread + r.route.sellSpread)}, vergi yok` : r.route.kind === 'fund' ? 'stopaj %17,5' : 'stopaj yok, primli'}</span>
       </td>
       {cell(p.spread)}{cell(p.buyTax)}{cell(p.commission)}{cell(p.fee)}{cell(p.gainTax)}
       <td className="r num">{tl(r.cost)}<span className="s">{amount > 0 ? pct(r.costRate) : ''}</span></td>

@@ -9,7 +9,7 @@ import { dailyCloses } from './daily'
 import { scan } from './tv'
 
 export interface BankQuote { bid: number; ask: number }
-export interface BanksData { generated: number; banks: { id: string; name: string; gold?: BankQuote; silver?: BankQuote }[] }
+export interface BanksData { generated: number; banks: { id: string; name: string; kind?: 'physical'; gold?: BankQuote; silver?: BankQuote }[] }
 
 export interface PremiumState { rows: PremiumRow[]; advices: Advice[]; banks?: BanksData; time: number; open: boolean; loading: boolean; error?: string }
 

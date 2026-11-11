@@ -7,6 +7,7 @@
  *
  * Oranlar (Kasım 2026, bireysel yatırımcı):
  *   Banka kıymetli maden hesabı: alımda binde 2 BSMV (kambiyo); satış kazancında vergi yok.
+ *   Fiziki altın ve gümüş (kuyumcu): BSMV yok, bireysel satışta gelir vergisi yok; külçe tesliminde KDV yok.
  *   Altın/gümüş borsa yatırım fonu: kazançtan %17,5 stopaj (9 Temmuz 2025 ve sonrası alımlar).
  *   Darphane altın sertifikası: stopaj %0.
  *   Aracı kurum komisyonu üzerinden %5 BSMV.
@@ -16,7 +17,7 @@ export const RATES = { bankBsmv: 0.002, fundTax: 0.175, certTax: 0, commissionBs
 export interface Route {
   id: string
   name: string
-  kind: 'bank' | 'fund' | 'cert'
+  kind: 'bank' | 'physical' | 'fund' | 'cert'
   /** Alırken orta fiyatın üstüne ödenen (oran) ve satarken altına razı olunan (oran) */
   buySpread: number
   sellSpread: number
@@ -78,6 +79,11 @@ export function evaluate(route: Route, s: Scenario): Outcome {
 export function bankRoute(id: string, name: string, q: { bid: number; ask: number }): Route {
   const mid = (q.bid + q.ask) / 2
   return { id, name, kind: 'bank', buySpread: q.ask / mid - 1, sellSpread: 1 - q.bid / mid, buyTax: RATES.bankBsmv, commission: false, annualFee: 0, gainTax: 0 }
+}
+
+/** Fiziki alım (kuyumcu): yalnızca makas; alımda BSMV ve satışta gelir vergisi yok (külçe teslimi KDV'den istisna) */
+export function physicalRoute(id: string, name: string, q: { bid: number; ask: number }): Route {
+  return { ...bankRoute(id, name, q), kind: 'physical', buyTax: 0 }
 }
 
 export function fundRoute(id: string, name: string, annualFee: number, exchangeSpread: number, note?: string): Route {

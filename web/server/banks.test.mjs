@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseAkbank, parseEnpara, parseKuveytTurk, parseYapiKredi, parseZiraat, trNum } from './banks.mjs'
+import { parseAltinkaynak, parseAkbank, parseEnpara, parseKuveytTurk, parseYapiKredi, parseZiraat, trNum } from './banks.mjs'
 
 describe('banka fiyatları', () => {
   it('Türkçe sayı', () => { expect(trNum('6.442,771307')).toBeCloseTo(6442.771307, 6) })
@@ -27,6 +27,10 @@ describe('banka fiyatları', () => {
     const r = parseZiraat(t('6483,48722', '6621,015737', '84,699615') + t('6486,728964', '6617,705229', '84,741965'))
     expect(r.gold).toEqual({ bid: 6486.728964, ask: 6617.705229 })
     expect(r.silver).toEqual({ bid: 84.741965, ask: 87.0 })
+  })
+  it('Altınkaynak: gram, külçe, gümüş', () => {
+    const r = parseAltinkaynak('[{"Alis":"6.494","Satis":"6.550","Kod":"CH_T"},{"Alis":"6.500","Satis":"6.619","Kod":"GA"},{"Alis":"79,78","Satis":"92,87","Kod":"AG_T"},{"Alis":"324.689","Satis":"334.008","Kod":"GA50"}]')
+    expect(r).toEqual({ gram: { bid: 6500, ask: 6619 }, bar: { bid: 6494, ask: 6550 }, silver: { bid: 79.78, ask: 92.87 } })
   })
   it('anlamsız fiyat çifti atılır', () => {
     expect(parseKuveytTurk('[{"Title":"ALT (gr)","BuyRate":6600,"SellRate":6500}]').gold).toBeUndefined()

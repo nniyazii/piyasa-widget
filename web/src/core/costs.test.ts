@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bankRoute, breakEven, certRoute, evaluate, fundRoute } from './costs'
+import { bankRoute, breakEven, certRoute, evaluate, fundRoute, physicalRoute } from './costs'
 
 const s = { amount: 100_000, years: 1, annualGrowth: 0.3, commission: 0.001 }
 
@@ -14,6 +14,12 @@ describe('banka mı, fon mu', () => {
     expect(r.parts.commission).toBe(0)
     expect(r.parts.spread + r.parts.buyTax).toBeCloseTo(130_000 - net, 6)
     expect(r.cost).toBeCloseTo(130_000 - net, 6)
+  })
+  it('fiziki: yalnızca makas', () => {
+    const r = evaluate(physicalRoute('p', 'Fiziki', { bid: 98, ask: 102 }), s)
+    expect(r.net).toBeCloseTo(100_000 / 1.02 * 1.3 * 0.98, 6)
+    expect(r.parts.buyTax).toBe(0)
+    expect(r.parts.gainTax).toBe(0)
   })
   it('fon: komisyon (+%5 BSMV), yönetim gideri ve kazançtan %17,5 stopaj', () => {
     const r = evaluate(fundRoute('f', 'Fon', 0.005, 0.001), s)

@@ -1,6 +1,7 @@
 /**
  * Bankaların kendi sitelerinde yayımladığı gram altın ve gram gümüş alış/satış fiyatları.
- *   Çıktı: { generated, banks: [{ id, name, gold?: { bid, ask }, silver?: { bid, ask } }] }
+ *   Çıktı: { generated, banks: [{ id, name, kind?: 'physical', gold?: { bid, ask }, silver?: { bid, ask } }] }
+ * kind 'physical': kuyumcudan fiziki alım (banka hesabı değil).
  * bid = bankanın alış fiyatı (sen satarken), ask = bankanın satış fiyatı (sen alırken). TL / gram.
  * Bir banka okunamazsa atlanır; hiçbir banka gelmezse boş liste döner.
  */
@@ -84,6 +85,23 @@ export function parseZiraat(html) {
 }
 const ziraat = async () => parseZiraat(await get('https://www.ziraatbank.com.tr/tr/fiyatlar-ve-oranlar'))
 
+/**
+ * Fiziki alım: Altınkaynak'ın yayımladığı fiyat listesi. GA = gram altın (24 ayar, paketsiz), CH_T = külçe (995, gram başına),
+ * AG_T = gümüş (gram başına). Küçük gramajlı paketlerde makas daha geniştir; burada en dar olanlar alınır.
+ */
+export function parseAltinkaynak(json) {
+  const rows = JSON.parse(json)
+  const of = (code) => { const x = rows.find((r) => r.Kod === code); return x ? pair(trNum(x.Alis), trNum(x.Satis)) : undefined }
+  return { gram: of('GA'), bar: of('CH_T'), silver: of('AG_T') }
+}
+async function altinkaynak() {
+  const r = parseAltinkaynak(await get('https://static.altinkaynak.com/public/Gold'))
+  return [
+    { id: 'fiziki-gram', name: 'Fiziki gram altın (Altınkaynak)', kind: 'physical', gold: r.gram, silver: r.silver },
+    { id: 'fiziki-kulce', name: 'Fiziki külçe altın (Altınkaynak)', kind: 'physical', gold: r.bar },
+  ].filter((x) => x.gold || x.silver)
+}
+
 const SOURCES = [
   { id: 'kuveytturk', name: 'Kuveyt Türk', run: kuveytTurk },
   { id: 'enpara', name: 'Enpara', run: enpara },
@@ -101,5 +119,6 @@ export async function fetchBanks() {
     } catch (e) { console.log(`banka fiyatı alınamadı: ${s.name} (${e.message})`) }
   }))
   banks.sort((a, b) => SOURCES.findIndex((s) => s.id === a.id) - SOURCES.findIndex((s) => s.id === b.id))
+  try { banks.push(...(await altinkaynak())) } catch (e) { console.log(`fiziki fiyat alınamadı: Altınkaynak (${e.message})`) }
   return { generated: Date.now(), banks }
 }

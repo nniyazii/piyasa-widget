@@ -175,6 +175,7 @@ await step('avantajlı fiyatlar: sertifika primi ve fon farkı hesaplanır', asy
   // Banka mı, fon mu: masraf tablosu, gümüşe geçince fon satırı değişir
   await page.locator('.cost-table tbody tr').nth(1).waitFor()
   if (!/stopaj %17,5/.test(await page.locator('.cost-table').innerText())) throw new Error('fon satırı yok')
+  if (!/Fiziki külçe altın/.test(await page.locator('.cost-table').innerText())) throw new Error('fiziki satır yok')
   const before = await page.locator('.cost .prem-lead').innerText()
   await page.locator('.cost-form .segmented button', { hasText: 'Gümüş' }).click()
   if (!/GMSTR/.test(await page.locator('.cost-table').innerText())) throw new Error('gümüş fonu yok')

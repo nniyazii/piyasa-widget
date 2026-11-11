@@ -32,6 +32,7 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
     - BIST kapalıyken sinyal verilmez (maden fiyatı değişirken borsa fiyatı durur).
     - **Banka mı, fon mu?** Aynı parayla altın ya da gümüş alıp bir süre sonra satmanın tüm masrafları: makas, BSMV, komisyon, yönetim gideri, stopaj.
       - Banka: bankaların sitelerinde yayımladığı alış/satış fiyatları (Kuveyt Türk, Enpara, Akbank, Yapı Kredi, Ziraat; listede olmayan banka elle girilir; yarım saatte bir `data/banks.json`, sunucuda `/api/banks`), alımda binde 2 BSMV.
+      - Fiziki: Altınkaynak'ın gram altın, külçe altın ve gümüş alış/satış fiyatları; yalnızca makas (BSMV ve gelir vergisi yok).
       - Fon: komisyon (+%5 BSMV), borsa makası, yıllık gider ve kazançtan %17,5 stopaj. Sertifika: stopaj %0, ama primli.
       - Tutar, süre, beklenen yıllık artış ve komisyon değiştirilebilir; başa baş artış oranı gösterilir.
     - **Birikim önerileri** (aynı listede), her biri oranın kendi geçmiş ortancasına göre:
