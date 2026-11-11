@@ -5,8 +5,9 @@ import type { BanksData } from '../data/premium'
 import { Segmented } from '../ui/overlay'
 
 type MetalKey = 'gold' | 'silver'
-interface Inputs { metal: MetalKey; amount: number; years: number; growth: number; commission: number }
-const DEFAULTS: Inputs = { metal: 'gold', amount: 100_000, years: 1, growth: 30, commission: 1 }
+/** own: kullanıcının kendi bankasından girdiği alış/satış fiyatı (TL/gram), maden başına */
+interface Inputs { metal: MetalKey; amount: number; years: number; growth: number; commission: number; own: Partial<Record<MetalKey, { bid?: number; ask?: number }>> }
+const DEFAULTS: Inputs = { metal: 'gold', amount: 100_000, years: 1, growth: 30, commission: 1, own: {} }
 const KEY = 'piyasa.costs.v1'
 /** Varsayımlar: borsada alış-satış farkının yarısı; fonların yıllık gideri (GLDTR için yayımlanan %0,47) */
 const EXCHANGE_SPREAD = 0.001
@@ -23,14 +24,19 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
   const [inp, setInp] = useState<Inputs>(load)
   const set = (p: Partial<Inputs>) => setInp((x) => { const n = { ...x, ...p }; try { localStorage.setItem(KEY, JSON.stringify(n)) } catch { /* yok say */ } return n })
   const gold = inp.metal === 'gold'
+  const setOwn = (p: { bid?: number; ask?: number }) => set({ own: { ...inp.own, [inp.metal]: { ...inp.own[inp.metal], ...p } } })
+  const ownQ = inp.own[inp.metal]
+  const ownInvalid = !!ownQ?.bid && !!ownQ.ask && !(ownQ.ask > ownQ.bid && ownQ.ask / ownQ.bid < 1.2)
   const s: Scenario = { amount: Math.max(0, inp.amount || 0), years: inp.years, annualGrowth: (inp.growth || 0) / 100, commission: Math.max(0, inp.commission || 0) / 1000 }
 
   const routes = useMemo<Route[]>(() => {
     const live = (banks?.banks ?? []).filter((b) => b[inp.metal]).map((b) => bankRoute(b.id, b.name, b[inp.metal]!))
-    const bank = live.length ? live : [bankRoute('banka', 'Banka (tipik makas)', FALLBACK_BANK)]
+    const o = inp.own[inp.metal]
+    const mine = o?.bid && o.ask && o.ask > o.bid && o.ask / o.bid < 1.2 ? [bankRoute('kendi', 'Kendi bankam', { bid: o.bid, ask: o.ask })] : []
+    const bank = live.length || mine.length ? [...mine, ...live] : [bankRoute('banka', 'Banka (tipik makas)', FALLBACK_BANK)]
     const fund = gold ? fundRoute('fon', 'Altın fonu (GLDTR, ZGOLD, ISGLK)', FUND_FEE, EXCHANGE_SPREAD) : fundRoute('fon', 'Gümüş fonu (GMSTR)', FUND_FEE, EXCHANGE_SPREAD)
     return [...bank, fund, ...(gold ? [certRoute('sertifika', 'Altın sertifikası (ALTIN.S1)', EXCHANGE_SPREAD)] : [])]
-  }, [banks, inp.metal, gold])
+  }, [banks, inp.metal, gold, inp.own])
 
   const rows = useMemo(() => routes.map((r) => evaluate(r, s)).sort((a, b) => b.net - a.net), [routes, s.amount, s.years, s.annualGrowth, s.commission])
   // Sertifika primliyken masrafı düşük görünse de prim riski taşır: özet banka ile fonu karşılaştırır
@@ -69,6 +75,12 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
           <tbody>{rows.map((r) => <Row key={r.route.id} r={r} best={r === best} amount={s.amount} />)}</tbody>
         </table>
       </div>
+      <div className="cost-form cost-own">
+        <span className="cost-own-label">Bankan listede yoksa (ör. İş Bankası) uygulamasındaki gram {metal} fiyatını gir:</span>
+        <label>Bankanın alışı (₺)<input type="number" inputMode="decimal" min={0} step="any" value={inp.own[inp.metal]?.bid ?? ''} onChange={(e) => setOwn({ bid: Number(e.target.value) || undefined })} /></label>
+        <label>Bankanın satışı (₺)<input type="number" inputMode="decimal" min={0} step="any" value={inp.own[inp.metal]?.ask ?? ''} onChange={(e) => setOwn({ ask: Number(e.target.value) || undefined })} /></label>
+        {ownInvalid && <span className="note" style={{ margin: 0, color: 'var(--down)' }}>Satış fiyatı alıştan yüksek olmalı (bankanın sana sattığı fiyat).</span>}
+      </div>
       {gold && certPremium != null && certPremium > 0.01 && (
         <p className="note">ALTIN.S1’in masrafı en düşük, ama şu an gram altının {pct(certPremium)} üstünde işlem görüyor. Tablodaki hesap bu primin satarken de aynı kalacağını varsayar; prim kapanırsa sertifika o kadar kaybettirir. Bu yüzden öneride sayılmadı.</p>
       )}
@@ -76,7 +88,7 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
       <details className="bt-how">
         <summary>Hesaba katılanlar ve varsayımlar</summary>
         <ul>
-          <li><b>Banka (kaydi {metal} hesabı):</b> alış ve satış fiyatı arasındaki makas{liveBanks ? ', bankaların kendi sitelerinde yayımladığı fiyatlardan' : ' (canlı banka fiyatı alınamadı; her yönde %1,3 varsayıldı)'}. Alımda {pct(RATES.bankBsmv)} BSMV (kambiyo vergisi). Satış kazancından vergi kesilmez, saklama ücreti yoktur.{banks?.generated ? ` Fiyatlar: ${Fmt.dateTime(banks.generated)}.` : ''}</li>
+          <li><b>Banka (kaydi {metal} hesabı):</b> alış ve satış fiyatı arasındaki makas{liveBanks ? ', bankaların kendi sitelerinde yayımladığı fiyatlardan (Kuveyt Türk, Enpara, Akbank, Yapı Kredi, Ziraat; Ziraat’te internet kuru ve mevduat hesabı satırı). İş Bankası sitesinde otomatik okumaya izin vermediği için elle girilebilir' : ' (canlı banka fiyatı alınamadı; her yönde %1,3 varsayıldı)'}. Alımda {pct(RATES.bankBsmv)} BSMV (kambiyo vergisi). Satış kazancından vergi kesilmez, saklama ücreti yoktur.{banks?.generated ? ` Fiyatlar: ${Fmt.dateTime(banks.generated)}.` : ''}</li>
           <li><b>Fon (borsa yatırım fonu):</b> aracı kurum komisyonu (alışta ve satışta, üzerine %5 BSMV), borsadaki alış-satış farkı (her yönde {pct(EXCHANGE_SPREAD)} varsayıldı), yıllık yönetim gideri ({pct(FUND_FEE, 2)}; GLDTR için yayımlanan oran, diğer fonlarda farklı olabilir) ve satışta kazanç üzerinden {pct(RATES.fundTax)} stopaj (9 Temmuz 2025 ve sonrasında alınan paylar).</li>
           <li><b>Altın sertifikası:</b> komisyon ve borsa makası; stopaj %0. Karşılığında gram altına göre değişken bir prim taşır.</li>
           <li>Stopaj TL kazanç üzerinden kesilir: fiyat ne kadar artarsa fonun vergisi o kadar büyür. Banka makası ise sabittir; bu yüzden az artışta fon, çok artışta banka öne geçer.</li>

@@ -182,6 +182,13 @@ await step('avantajlı fiyatlar: sertifika primi ve fon farkı hesaplanır', asy
   if ((await page.locator('.cost .prem-lead').innerText()) === before) throw new Error('özet değişmedi')
   await page.locator('.cost-form .segmented button', { hasText: 'Altın' }).click()
   await page.locator('.cost-form input').nth(1).fill('30')
+  // Kendi bankam: elle girilen alış/satış tabloya satır olarak girer
+  await page.locator('.cost-own input').nth(0).fill('6500')
+  await page.locator('.cost-own input').nth(1).fill('6540')
+  await page.locator('.cost-table tbody tr', { hasText: 'Kendi bankam' }).waitFor()
+  if (!/Kendi bankam/.test(await page.locator('.cost .prem-lead').innerText())) throw new Error('dar makaslı banka öne geçmedi')
+  await page.locator('.cost-own input').nth(0).fill('')
+  await page.locator('.cost-own input').nth(1).fill('')
   // Birikim önerileri: ev/altın, ev/dolar, altın/gümüş
   await page.locator('.adv').nth(2).waitFor({ timeout: 20000 })
   const acts = await page.locator('.adv-act').allInnerTexts()

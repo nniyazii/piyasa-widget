@@ -5,8 +5,8 @@
  * Bir banka okunamazsa atlanır; hiçbir banka gelmezse boş liste döner.
  */
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
-const get = async (url) => {
-  const r = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'tr-TR,tr;q=0.9' }, signal: AbortSignal.timeout(20_000) })
+const get = async (url, init = {}) => {
+  const r = await fetch(url, { ...init, headers: { 'User-Agent': UA, 'Accept-Language': 'tr-TR,tr;q=0.9', ...(init.headers ?? {}) }, signal: AbortSignal.timeout(20_000) })
   if (!r.ok) throw new Error(`${r.status}`)
   return r.text()
 }
@@ -45,9 +45,51 @@ export function parseEnpara(html) {
 }
 const enpara = async () => parseEnpara(await get('https://www.enpara.com/hesaplar/doviz-ve-altin-kurlari'))
 
+/** Akbank: kur bileşeninin JSON kaynağı, "kurTuru 8" (XAU, XAG gram/TL) */
+export function parseAkbank(json) {
+  const rows = JSON.parse(json).d.Data.DovizKurlari
+  const of = (code) => { const x = rows.find((r) => r.AlfaKod === code); return x ? pair(Number(x.DovizAlis), Number(x.DovizSatis)) : undefined }
+  return { gold: of('XAU'), silver: of('XAG') }
+}
+const akbank = async () => parseAkbank(await get('https://www.akbank.com/_layouts/15/Akbank/CalcTools/Ajax.aspx/GetDovizKurlari', {
+  method: 'POST', body: JSON.stringify({ kurTuru: '8' }),
+  headers: { 'Content-Type': 'application/json; charset=utf-8', Referer: 'https://www.akbank.com/mevduat-yatirim/yatirim/doviz/canli-doviz-kurlari' },
+}))
+
+/** Yapı Kredi: hesaplama aracının XML kaynağı, <Exchange Buy="6433,3" Sale="6633,743" …> */
+export function parseYapiKredi(xml) {
+  const m = xml.match(/<Exchange[^>]*\bBuy="([\d.,]+)"[^>]*\bSale="([\d.,]+)"/)
+  return m ? pair(Number(m[1].replace(',', '.')), Number(m[2].replace(',', '.'))) : undefined
+}
+async function yapiKredi() {
+  const one = (c) => get(`https://www.yapikredi.com.tr/service-data/calculate-tools/exchange?currency=${c}&tocurrency=YTL&amount=1`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest', Referer: 'https://www.yapikredi.com.tr/yatirimci-kosesi/altin-bilgileri' },
+  }).then(parseYapiKredi).catch(() => undefined)
+  const [gold, silver] = await Promise.all([one('XAU'), one('XAG')])
+  return { gold, silver }
+}
+
+/**
+ * Ziraat: "Fiyatlar ve oranlar" sayfasındaki kıymetli maden tabloları (önce gişe, sonra internet kuru).
+ * Mevduat hesabı satırları kullanılır: A02 ALTIN (1000/1000), G02 GUMUS (1000/1000); internet kuru tercih edilir.
+ */
+export function parseZiraat(html) {
+  const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+  const last = (label) => {
+    const all = [...text.matchAll(new RegExp(label + '\\s*\\(1000/1000\\)\\s*([\\d.,]+)\\s+([\\d.,]+)', 'g'))]
+    const m = all[all.length - 1]
+    return m ? pair(Number(m[1].replace(',', '.')), Number(m[2].replace(',', '.'))) : undefined
+  }
+  return { gold: last('ALTIN'), silver: last('GUMUS') }
+}
+const ziraat = async () => parseZiraat(await get('https://www.ziraatbank.com.tr/tr/fiyatlar-ve-oranlar'))
+
 const SOURCES = [
   { id: 'kuveytturk', name: 'Kuveyt Türk', run: kuveytTurk },
   { id: 'enpara', name: 'Enpara', run: enpara },
+  { id: 'akbank', name: 'Akbank', run: akbank },
+  { id: 'yapikredi', name: 'Yapı Kredi', run: yapiKredi },
+  { id: 'ziraat', name: 'Ziraat Bankası', run: ziraat },
 ]
 
 export async function fetchBanks() {
