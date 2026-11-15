@@ -40,6 +40,7 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
       - *Altın boz, ev al / Altın biriktir:* konut fiyat endeksi (TRHPI) ÷ gram altın, 2010'dan bu yana.
       - *Dolar boz, ev al / Dolar biriktir:* konut fiyat endeksi ÷ Dolar/TL.
       - *Altın sat, gümüş al / Gümüş sat, altın al:* altın/gümüş rasyosu, son 20 yıl.
+      - **Para arzına göre:** Dolar/TL ÷ (Türkiye M2 ÷ ABD M2), ons altın ÷ ABD M2, gram altın, BIST 100 ve konut endeksi ÷ Türkiye M2; her biri kendi geçmiş ortancasına göre ucuz ya da pahalı.
       - En düşük ya da en yüksek %25'lik dilimde sinyal "güçlü" yazar. Uzun dönem seriler günlük kopyayla gelir (`data/ratios.json`, sunucuda `/api/ratios`).
   - Düzenleyicide yazarken canlı önizleme gösterilir.
   - Liste tek tıkla panoya eklenir.
@@ -60,7 +61,7 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
     - *Sabit:* PEG ve beklenen F/K gibi geçmişi bilinmeyenler bugünkü değerle alınır (ileriye bakma yanlılığı); bu listelerin skoru dörtte bir düşürülür.
 
   ![geçmişte test](../docs/web-gecmiste-test.png)
-- **Sözlük** (`#/sozluk`). RSI, F/K, EPS büyümesi, piyasa değeri, FD/FAVÖK, güvenilirlik skoru gibi 61 terim. Her terimde ne olduğu, hesap formülü, sayılı bir örnek ve Piyasa'nın değeri nereden aldığı var. Aranabilir; listelerdeki koşul çiplerine dokununca ilgili terim açılır.
+- **Sözlük** (`#/sozluk`). RSI, F/K, EPS büyümesi, piyasa değeri, FD/FAVÖK, güvenilirlik skoru gibi 62 terim. Her terimde ne olduğu, hesap formülü, sayılı bir örnek ve Piyasa'nın değeri nereden aldığı var. Aranabilir; listelerdeki koşul çiplerine dokununca ilgili terim açılır.
 - **Ayarlar.** Tema (sistem/açık/koyu), yenileme aralığı, dışa/içe aktarma (Android'in durum dosyası dahil), sıfırlama.
 - **Kurulabilir (PWA).** Tarayıcıdan "Ana ekrana ekle" ile uygulama gibi açılır; uygulama kabuğu çevrimdışı da açılır.
 

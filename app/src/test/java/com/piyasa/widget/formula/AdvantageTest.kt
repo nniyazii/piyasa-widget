@@ -72,6 +72,26 @@ class AdvantageTest {
         assertEquals("Gümüş sat, altın al", Advices.all(d, silver = gold[99].second / 62, now = now)[2].action)
     }
 
+    @Test fun moneySupplyValuation() {
+        fun months(n: Int = 100, f: (Int) -> Double) = List(n) { (24000 + it) to f(it) }
+        fun g(r: Double) = { i: Int -> 100 * (1 + r).pow(i) }
+        // TR M2 ayda %2, ABD M2 sabit; Dolar/TL ayda %3 (arzdan hızlı), BIST sabit (arzdan yavaş); para arzı 2 ay gecikmeli
+        val d = RatioData(0, months(f = g(0.02)), months { 2000.0 }, months { 25.0 }, months(f = g(0.03)),
+            usM2 = months(98) { 1000.0 }, trM2 = months(98, g(0.02)), xu100 = months { 5000.0 })
+        val now = Instant.parse("2008-04-15T00:00:00Z")
+        val a = Advices.money(d, now = now).associateBy { it.id }
+        assertEquals("Dolar/TL pahalı", a.getValue(Advices.Id.M2_USDTRY).action); assertTrue(a.getValue(Advices.Id.M2_USDTRY).strong)
+        assertEquals(100 * 1.03.pow(99) / (100 * 1.02.pow(97) / 1000), a.getValue(Advices.Id.M2_USDTRY).value, 1e-6)
+        assertEquals(24097, a.getValue(Advices.Id.M2_USDTRY).m2Month)
+        assertEquals("BIST 100 ucuz", a.getValue(Advices.Id.M2_BIST).action)
+        assertEquals("Gram altın pahalı", a.getValue(Advices.Id.M2_GOLD_TRY).action)
+        assertEquals(0.0, a.getValue(Advices.Id.M2_GOLD_USD).vsMedian, 1e-9)
+        assertTrue(kotlin.math.abs(a.getValue(Advices.Id.M2_HOME).vsMedian) < 0.1)
+        assertEquals("BIST 100 pahalı", Advices.money(d, xu100 = 500_000.0, now = now).first { it.id == Advices.Id.M2_BIST }.action)
+        assertTrue(Advices.money(RatioData(0, d.hpi, d.gold, d.silver, d.usdTry), now = now).isEmpty()) // eski veri dosyası
+        assertEquals(listOf(5.0, 6.0, 6.0, null, null), listOf(10, 11, 14, 15, 9).map(Advices.carried(listOf(10 to 5.0, 11 to 6.0))))
+    }
+
     private val s = Costs.Scenario(100_000.0, 1.0, 0.3, 0.001)
 
     @Test fun bankSpreadAndBsmv() {

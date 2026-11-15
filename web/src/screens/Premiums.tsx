@@ -68,6 +68,14 @@ export function Premiums() {
         </section>
       )}
 
+      {s.money.length > 0 && (
+        <section className="bt-sect">
+          <h2>Para arzına göre</h2>
+          <p className="note" style={{ marginTop: -4 }}>Para basıldıkça fiyatların da artması beklenir. Burada her fiyat, ilgili para arzına (M2) bölünür ve kendi geçmiş ortancasıyla karşılaştırılır: ortancanın üstündeyse fiyat para arzından hızlı artmıştır.</p>
+          <div className="adv-list">{s.money.map((a) => <AdviceCard key={a.id} a={a} />)}</div>
+        </section>
+      )}
+
       <details className="bt-how" style={{ marginTop: 18 }}>
         <summary>Nasıl hesaplanıyor, nelere dikkat etmeli</summary>
         <ul>
@@ -79,6 +87,7 @@ export function Premiums() {
           <li><b>Ev mi, altın mı (dolar mı)?</b> Konut fiyat endeksi (TCMB, TRHPI) gram altına ya da Dolar/TL’ye bölünür: evin altın ya da dolar cinsinden fiyatı. Bugünkü değer, endeksin başladığı 2010’dan bu yanaki aylık ortancayla karşılaştırılır. Ortancanın altındaysa ev ucuzdur (“boz, ev al”), üstündeyse pahalıdır (“biriktir”). En düşük ya da en yüksek %25’lik dilimdeyse sinyal güçlüdür.</li>
           <li>Konut endeksi yaklaşık iki ay gecikmeyle açıklanır ve Türkiye ortalamasıdır; şehir, semt ve tek tek evler çok farklı olabilir. Son değer, son 3 ayın artış hızıyla bugüne taşınır. Öneri, alım masraflarını, kirayı ve kredi faizini hesaba katmaz.</li>
           <li><b>Altın mı, gümüş mü?</b> Rasyo = ons altın ÷ ons gümüş. Son 20 yılın aylık ortancasının üstündeyse gümüş altına göre ucuzdur (“altın sat, gümüş al”), altındaysa altın ucuzdur. Rasyo yıllarca ortancadan uzak kalabilir; öneri bir zamanlama garantisi değildir.</li>
+          <li><b>Para arzına göre:</b> M2, dolaşımdaki para ile vadesiz ve vadeli mevduatın toplamıdır. Dolar/TL için Türkiye M2’si ABD M2’sine bölünür (TL arzı dolar arzından ne kadar hızlı büyüdü); ons altın ABD M2’sine; gram altın, BIST 100 ve konut endeksi Türkiye M2’sine bölünür. Geçmiş, Türkiye verisinin başladığı Aralık 2005’ten (ons altında 1993’ten) bu yanadır. Türkiye M2’si döviz mevduatını da TL karşılığıyla içerir; kur yükselince M2 de büyür, bu yüzden dolar ve altın bu ölçüyle olduğundan biraz ucuz görünür. Para arzı gecikmeli açıklanır; son değer bugüne taşınır. Bu bir değerleme göstergesidir, zamanlama sinyali değildir: oranlar yıllarca ortancadan uzak kalabilir.</li>
           <li>BIST kapalıyken sinyal verilmez. Resmî tatiller bilinmediği için tatil günlerinde fark yanıltıcı olabilir. Alım satımda aracı kurum komisyonu ve alış-satış farkı da hesaba katılmalıdır.</li>
         </ul>
       </details>
@@ -89,7 +98,8 @@ export function Premiums() {
 const pct0 = (v: number) => '%' + Fmt.number(Math.abs(v * 100), 0)
 
 function AdviceCard({ a }: { a: Advice }) {
-  const home = a.id !== 'gold-silver'
+  const money = a.subject != null
+  const home = !money && a.id !== 'gold-silver'
   const what = a.id === 'home-gold' ? 'altın' : 'dolar'
   // Çubuk: geçmişin en düşüğü–en yükseği; koyu bant orta %50, çizgi ortanca, nokta bugün
   const pos = (v: number) => Math.max(0, Math.min(100, ((v - a.min) / (a.max - a.min || 1)) * 100))
@@ -98,7 +108,9 @@ function AdviceCard({ a }: { a: Advice }) {
       <h3>{a.title}</h3>
       <p className="adv-act">{a.action}<span className="adv-str">{a.strength === 'strong' ? 'Güçlü sinyal' : 'Zayıf sinyal'}</span></p>
       <p className="adv-why">
-        {home
+        {money
+          ? <>{a.subject}, {a.basis} uzun dönem ortancasının <b className="num">{pct0(a.vsMedian)}</b> {a.vsMedian < 0 ? 'altında' : 'üstünde'}. Geçmişte bugünkünden {a.cheap ? 'pahalı' : 'ucuz'} olduğu ayların oranı <b className="num">{pct0(a.cheap ? 1 - a.percentile : a.percentile)}</b>.</>
+          : home
           ? <>Ev, {what} cinsinden uzun dönem ortancasının <b className="num">{pct0(a.vsMedian)}</b> {a.vsMedian < 0 ? 'altında' : 'üstünde'}. Geçmişte bugünkünden {a.cheap ? 'pahalı' : 'ucuz'} olduğu ayların oranı <b className="num">{pct0(a.cheap ? 1 - a.percentile : a.percentile)}</b>.</>
           : <>1 ons altın <b className="num">{Fmt.number(a.value, 1)}</b> ons gümüş ediyor; son 20 yılın ortancası <b className="num">{Fmt.number(a.median, 1)}</b>. Rasyo {a.cheap ? 'düşükken altın gümüşe' : 'yüksekken gümüş altına'} göre ucuzdur.</>}
       </p>
@@ -108,11 +120,12 @@ function AdviceCard({ a }: { a: Advice }) {
         <span className="now" style={{ left: `${pos(a.value)}%` }} />
       </div>
       <div className="adv-ends">
-        <span>{home ? 'ev ucuz' : `altın ucuz (${Fmt.number(a.min, 0)})`}</span>
-        <span>{home ? 'ev pahalı' : `gümüş ucuz (${Fmt.number(a.max, 0)})`}</span>
+        <span>{money ? 'ucuz' : home ? 'ev ucuz' : `altın ucuz (${Fmt.number(a.min, 0)})`}</span>
+        <span>{money ? 'pahalı' : home ? 'ev pahalı' : `gümüş ucuz (${Fmt.number(a.max, 0)})`}</span>
       </div>
       <p className="adv-note">
         {monthLabel(a.since)} sonrası {a.months} ay.
+        {a.m2Month != null && <> Para arzı en son {monthLabel(a.m2Month)} için açıklandı.</>}
         {a.hpiMonth != null && <> Konut endeksi en son {monthLabel(a.hpiMonth)} için açıklandı{a.hpiGap ? `; ${a.hpiGap} aylık artış tahminle eklendi` : ''}.</>}
       </p>
     </article>

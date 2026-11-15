@@ -442,6 +442,18 @@ export const GLOSSARY: TermGroup[] = [
         inApp: 'Endeksin başladığı Ocak 2010’dan bu yanaki aylık ortancayla karşılaştırılır. Endeks yaklaşık iki ay gecikmeyle açıklandığı için son değer, son 3 ayın artış hızıyla bugüne taşınır.',
         related: ['gram-altin', 'tufe'],
       },
+      {
+        id: 'para-arzi', term: 'Para arzı (M2)', aka: ['M2', 'para arzı', 'parasal genişleme', 'para basmak', 'likidite'],
+        short: 'Ekonomideki para miktarı: dolaşımdaki nakit ile bankalardaki vadesiz ve vadeli mevduatın toplamı.',
+        body: [
+          'Para arzı arttıkça aynı mal ve varlıklar için daha çok para vardır; uzun vadede fiyatların da artması beklenir. Bir fiyatı para arzına bölmek, “bu fiyat basılan paradan hızlı mı arttı” sorusunu yanıtlar.',
+          'Türkiye M2’si döviz mevduatını da TL karşılığıyla içerir; kur yükselince M2 de büyür.',
+        ],
+        formula: ['Para arzına göre değer = Fiyat ÷ M2', 'Dolar/TL için: Dolar/TL ÷ (Türkiye M2 ÷ ABD M2)'],
+        example: 'TL arzı 10 yılda 20 katına, BIST 100 ise 12 katına çıktıysa, BIST para arzına göre %40 ucuzlamıştır.',
+        inApp: '“Avantajlı fiyatlar” listesindeki “Para arzına göre” bölümü Dolar/TL, ons altın, gram altın, BIST 100 ve konut endeksini ilgili M2’ye böler ve kendi geçmiş ortancasıyla karşılaştırır. Bu bir değerleme göstergesidir; zamanlama sinyali değildir.',
+        related: ['tufe', 'reel-faiz', 'ev-altin'],
+      },
       { id: 'dxy', term: 'Dolar endeksi', aka: ['DXY'], short: 'Doların euro, yen, sterlin gibi altı büyük para birimine karşı ortalama değeri.' },
       { id: 'vix', term: 'VIX korku endeksi', aka: ['VIX'], short: 'S&P 500 opsiyonlarından hesaplanan, önümüzdeki 30 gün için beklenen oynaklık. Yükseldikçe piyasada tedirginlik artmıştır.' },
       { id: 'reel-faiz', term: 'Reel faiz', short: 'Faizin enflasyondan arındırılmış hali.', formula: ['Reel faiz ≈ Politika faizi − Yıllık enflasyon', 'Kesin: (1 + faiz) ÷ (1 + enflasyon) − 1'], example: 'Faiz %40, enflasyon %33 ise yaklaşık %7; kesin hesapla 1,40 ÷ 1,33 − 1 = %5,3.', inApp: 'Hazır formül yaklaşık hesabı kullanır: TR_FAIZ − TR_ENF.' },

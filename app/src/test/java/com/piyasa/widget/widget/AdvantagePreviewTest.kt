@@ -35,7 +35,7 @@ import java.time.Instant
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h2600dp-xxhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h4300dp-xxhdpi")
 class AdvantagePreviewTest {
     private fun render(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
@@ -43,7 +43,7 @@ class AdvantagePreviewTest {
         repeat(4) { Thread.sleep(100); ShadowLooper.idleMainLooper(100, java.util.concurrent.TimeUnit.MILLISECONDS) }
         val root = activity.window.decorView
         val w = root.width.takeIf { it > 0 } ?: 1200
-        val h = root.height.takeIf { it > 0 } ?: 7800
+        val h = root.height.takeIf { it > 0 } ?: 12900
         root.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
         root.layout(0, 0, w, h)
         ShadowLooper.idleMainLooper()
@@ -65,7 +65,9 @@ class AdvantagePreviewTest {
             Premiums.row(p, price[p.symbol], price[p.metal.symbol], fx, if (p.grams == null) Premiums.typicalGrams(d[p.symbol], d[p.metal.symbol], d[Premiums.USDTRY]) else null)
         }
         val adv = Advices.all(Remote.parseRatios(published("ratios.json")), price[Metal.GOLD.symbol], price[Metal.SILVER.symbol], fx, Instant.parse("2026-11-11T09:00:00Z"))
-        return AdvantageData(rows, adv, Remote.parseBanks(published("banks.json")), open = true, time = 1794380000000)
+        val ratios = File("../web/research/out/ratios.json").takeIf { it.exists() }?.readText() ?: published("ratios.json")
+        val money = Advices.money(Remote.parseRatios(ratios), price[Metal.GOLD.symbol], fx, 11842.82, Instant.parse("2026-11-11T09:00:00Z"))
+        return AdvantageData(rows, adv, money, Remote.parseBanks(published("banks.json")), open = true, time = 1794380000000)
     }
 
     @Test fun advantageScreen() {

@@ -119,6 +119,10 @@ internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossa
                     item { SectionTitle("Birikim önerileri", "Bugünkü oran, kendi geçmişinin ortancasıyla karşılaştırılır. Ortancadan uzaklaştıkça sinyal güçlenir.") }
                     items(data.advices, key = { it.id.name }) { a -> AdviceCard(a, onGlossary) }
                 }
+                if (data.money.isNotEmpty()) {
+                    item { SectionTitle("Para arzına göre", "Her fiyat ilgili para arzına (M2) bölünür ve kendi geçmiş ortancasıyla karşılaştırılır: ortancanın üstündeyse fiyat para arzından hızlı artmıştır.") }
+                    items(data.money, key = { it.id.name }) { a -> AdviceCard(a, onGlossary) }
+                }
                 item { HowItWorks(onGlossary) }
             }
         }
@@ -337,7 +341,8 @@ private fun CostRow(o: Costs.Outcome, best: Boolean) {
 
 @Composable
 private fun AdviceCard(a: Advices.Advice, onGlossary: (String) -> Unit) {
-    val home = a.id != Advices.Id.GOLD_SILVER
+    val money = a.subject != null
+    val home = !money && a.id != Advices.Id.GOLD_SILVER
     val what = if (a.id == Advices.Id.HOME_GOLD) "altın" else "dolar"
     val accent = if (a.strong) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurfaceVariant
     OutlinedCard(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 5.dp)) {
@@ -352,22 +357,23 @@ private fun AdviceCard(a: Advices.Advice, onGlossary: (String) -> Unit) {
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                if (home) "Ev, $what cinsinden uzun dönem ortancasının ${pctAbs(a.vsMedian)} ${if (a.vsMedian < 0) "altında" else "üstünde"}. Geçmişte bugünkünden ${if (a.cheap) "pahalı" else "ucuz"} olduğu ayların oranı ${pctAbs(if (a.cheap) 1 - a.percentile else a.percentile)}."
+                if (money) "${a.subject}, ${a.basis} uzun dönem ortancasının ${pctAbs(a.vsMedian)} ${if (a.vsMedian < 0) "altında" else "üstünde"}. Geçmişte bugünkünden ${if (a.cheap) "pahalı" else "ucuz"} olduğu ayların oranı ${pctAbs(if (a.cheap) 1 - a.percentile else a.percentile)}."
+                else if (home) "Ev, $what cinsinden uzun dönem ortancasının ${pctAbs(a.vsMedian)} ${if (a.vsMedian < 0) "altında" else "üstünde"}. Geçmişte bugünkünden ${if (a.cheap) "pahalı" else "ucuz"} olduğu ayların oranı ${pctAbs(if (a.cheap) 1 - a.percentile else a.percentile)}."
                 else "1 ons altın ${Fmt.number(a.value, 1)} ons gümüş ediyor; son 20 yılın ortancası ${Fmt.number(a.median, 1)}. Rasyo ${if (a.cheap) "düşükken altın gümüşe" else "yüksekken gümüş altına"} göre ucuzdur.",
                 style = MaterialTheme.typography.bodySmall,
             )
             Spacer(Modifier.height(12.dp))
             RangeBar(a, if (a.strong) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface)
             Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-                Text(if (home) "ev ucuz" else "altın ucuz (${Fmt.number(a.min, 0)})", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(if (home) "ev pahalı" else "gümüş ucuz (${Fmt.number(a.max, 0)})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End)
+                Text(if (money) "ucuz" else if (home) "ev ucuz" else "altın ucuz (${Fmt.number(a.min, 0)})", Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (money) "pahalı" else if (home) "ev pahalı" else "gümüş ucuz (${Fmt.number(a.max, 0)})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End)
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                "${Advices.monthLabel(a.since)} sonrası ${a.months} ay." + (a.hpiMonth?.let { m -> " Konut endeksi en son ${Advices.monthLabel(m)} için açıklandı" + (a.hpiGap?.takeIf { it > 0 }?.let { "; $it aylık artış tahminle eklendi" } ?: "") + "." } ?: ""),
+                "${Advices.monthLabel(a.since)} sonrası ${a.months} ay." + (a.m2Month?.let { " Para arzı en son ${Advices.monthLabel(it)} için açıklandı." } ?: "") + (a.hpiMonth?.let { m -> " Konut endeksi en son ${Advices.monthLabel(m)} için açıklandı" + (a.hpiGap?.takeIf { it > 0 }?.let { "; $it aylık artış tahminle eklendi" } ?: "") + "." } ?: ""),
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Text("Nasıl hesaplanıyor?", Modifier.clickable { onGlossary(if (home) "ev-altin" else "altin-gumus") }.padding(top = 6.dp),
+            Text("Nasıl hesaplanıyor?", Modifier.clickable { onGlossary(if (money) "para-arzi" else if (home) "ev-altin" else "altin-gumus") }.padding(top = 6.dp),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
         }
     }
@@ -409,6 +415,7 @@ private fun HowItWorks(onGlossary: (String) -> Unit) {
                 "Sinyal, ürünün madene göre ucuzladığını söyler; madenin kendisinin yükseleceğini söylemez.",
                 "BIST kapalıyken sinyal verilmez. Resmî tatiller bilinmediği için tatil günlerinde fark yanıltıcı olabilir.",
                 "Konut endeksi Türkiye ortalamasıdır ve yaklaşık iki ay gecikmeyle açıklanır; şehir, semt ve tek tek evler çok farklı olabilir. Öneriler alım masraflarını, kirayı ve kredi faizini hesaba katmaz.",
+                "Para arzına göre: M2, dolaşımdaki para ile mevduatın toplamıdır. Türkiye M2’si döviz mevduatını da TL karşılığıyla içerir; kur yükselince M2 de büyür, bu yüzden dolar ve altın bu ölçüyle olduğundan biraz ucuz görünür. Bu bir değerleme göstergesidir, zamanlama sinyali değildir.",
                 "Piyasa yatırım tavsiyesi vermez.",
             ).forEach { Text("• $it", Modifier.padding(vertical = 3.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             Text("Prim ve iskonto nedir?", Modifier.clickable { onGlossary("prim-iskonto") }.padding(vertical = 6.dp), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)

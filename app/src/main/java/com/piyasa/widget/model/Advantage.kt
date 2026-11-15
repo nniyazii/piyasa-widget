@@ -110,10 +110,14 @@ object Premiums {
 /** Aylık seri: (yıl × 12 + ay, kapanış) */
 typealias Monthly = List<Pair<Int, Double>>
 
-class RatioData(val generated: Long, val hpi: Monthly, val gold: Monthly, val silver: Monthly, val usdTry: Monthly)
+/** [usM2], [trM2]: ABD ve Türkiye M2 para arzı; [xu100]: BIST 100 (eski veri dosyasında yoksa boş). */
+class RatioData(
+    val generated: Long, val hpi: Monthly, val gold: Monthly, val silver: Monthly, val usdTry: Monthly,
+    val usM2: Monthly = emptyList(), val trM2: Monthly = emptyList(), val xu100: Monthly = emptyList(),
+)
 
 object Advices {
-    enum class Id { HOME_GOLD, HOME_USD, GOLD_SILVER }
+    enum class Id { HOME_GOLD, HOME_USD, GOLD_SILVER, M2_USDTRY, M2_GOLD_USD, M2_GOLD_TRY, M2_BIST, M2_HOME }
 
     data class Advice(
         val id: Id,
@@ -135,6 +139,10 @@ object Advices {
         val months: Int,
         val hpiMonth: Int? = null,
         val hpiGap: Int? = null,
+        /** Para arzı analizi: neyin, hangi arza göre değerlendirildiği ve arzın son açıklandığı ay */
+        val subject: String? = null,
+        val basis: String? = null,
+        val m2Month: Int? = null,
     )
 
     private val MONTHS = listOf("Oca", "Şub", "Mar", "Nis", "May", "Haz", "Tem", "Ağu", "Eyl", "Eki", "Kas", "Ara")
@@ -176,6 +184,42 @@ object Advices {
     }
 
     private fun gramTl(ozUsd: Double, usdTry: Double) = ozUsd * usdTry / OZ
+
+    /** Gecikmeli açıklanan seriyi aylara yayar: o ay yoksa en çok [carry] ay öncesi. */
+    fun carried(s: Monthly, carry: Int = 3): (Int) -> Double? {
+        val m = s.toMap()
+        return { k -> (0..carry).firstNotNullOfOrNull { m[k - it] } }
+    }
+
+    /**
+     * Para arzına göre değerleme (web: moneyAdvices): fiyat ÷ M2 oranı kendi geçmiş ortancasına göre. Oran ortancanın
+     * üstündeyse fiyat para arzından hızlı artmıştır (pahalı), altındaysa ucuz.
+     */
+    fun money(d: RatioData, gold: Double? = null, usdTry: Double? = null, xu100: Double? = null, now: Instant = Instant.now()): List<Advice> {
+        if (d.usM2.isEmpty() || d.trM2.isEmpty()) return emptyList()
+        val us = carried(d.usM2); val tr = carried(d.trM2); val fxAt = carried(d.usdTry, 0)
+        val g = gold ?: d.gold.lastOrNull()?.second
+        val fx = usdTry ?: d.usdTry.lastOrNull()?.second
+        val xu = xu100 ?: d.xu100.lastOrNull()?.second
+        val nowM = monthOf(now)
+        val usNow = us(nowM) ?: d.usM2.last().second; val trNow = tr(nowM) ?: d.trM2.last().second
+        val usMonth = d.usM2.last().first; val trMonth = d.trM2.last().first
+        fun hist(price: Monthly, f: (Double, Int) -> Double?): Monthly =
+            price.mapNotNull { (k, p) -> (if (p > 0) f(p, k) else null)?.takeIf { it.isFinite() && it > 0 }?.let { k to it } }
+        val h = hpiNow(d.hpi, nowM)
+        fun mk(id: Id, subject: String, basis: String, m2Month: Int, series: Monthly, value: Double?, hpi: HpiNow? = null): Advice? =
+            if (value == null) null
+            else build(id, "$subject, $basis", series, value, "$subject ucuz", "$subject pahalı", hpi)?.copy(subject = subject, basis = basis, m2Month = m2Month)
+        return listOfNotNull(
+            mk(Id.M2_USDTRY, "Dolar/TL", "iki ülkenin para arzına göre", min(usMonth, trMonth),
+                hist(d.usdTry) { p, k -> val a = tr(k); val b = us(k); if (a != null && b != null) p / (a / b) else null }, fx?.let { it / (trNow / usNow) }),
+            mk(Id.M2_GOLD_USD, "Ons altın", "dolar arzına göre", usMonth, hist(d.gold) { p, k -> us(k)?.let { p / it } }, g?.let { it / usNow }),
+            mk(Id.M2_GOLD_TRY, "Gram altın", "TL arzına göre", trMonth,
+                hist(d.gold) { p, k -> val a = tr(k); val x = fxAt(k); if (a != null && x != null) gramTl(p, x) / a else null }, if (g != null && fx != null) gramTl(g, fx) / trNow else null),
+            if (d.xu100.isNotEmpty()) mk(Id.M2_BIST, "BIST 100", "TL arzına göre", trMonth, hist(d.xu100) { p, k -> tr(k)?.let { p / it } }, xu?.let { it / trNow }) else null,
+            if (h != null) mk(Id.M2_HOME, "Ev", "TL arzına göre", trMonth, hist(d.hpi) { p, k -> tr(k)?.let { p / it } }, h.value / trNow, h) else null,
+        )
+    }
 
     /** Üç öneri; canlı fiyat yoksa serilerin son ayı kullanılır. Altın/gümüş için son [gsYears] yıl. */
     fun all(d: RatioData, gold: Double? = null, silver: Double? = null, usdTry: Double? = null, now: Instant = Instant.now(), gsYears: Int = 20): List<Advice> {

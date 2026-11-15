@@ -39,6 +39,8 @@ data class ReliabilityScore(val score: Int?, val label: String, val years: Int, 
 data class AdvantageData(
     val rows: List<Premiums.Row> = emptyList(),
     val advices: List<Advices.Advice> = emptyList(),
+    /** Para arzına göre değerlemeler */
+    val money: List<Advices.Advice> = emptyList(),
     val banks: BanksData? = null,
     val open: Boolean = Premiums.bistOpen(),
     val time: Long = 0L,
@@ -54,6 +56,7 @@ data class AdvantageData(
  * kopya kullanılır.
  */
 object Remote {
+    private const val XU100 = "BIST:XU100"
     const val BASE = "https://nniyazii.github.io/piyasa-widget/data"
 
     private val _advantage = MutableStateFlow(AdvantageData())
@@ -83,7 +86,7 @@ object Remote {
         _advantage.value = _advantage.value.copy(loading = true)
         try {
             coroutineScope {
-                val quotes = async { TradingViewSource.quotes(Premiums.symbols) }
+                val quotes = async { TradingViewSource.quotes(Premiums.symbols + XU100) }
                 val daily = async { file(context, "daily/misc.json", 6 * 3600_000L)?.let { runCatching { parseDaily(it, Premiums.symbols) }.getOrNull() }.orEmpty() }
                 val ratios = async { file(context, "ratios.json", 6 * 3600_000L)?.let { runCatching { parseRatios(it) }.getOrNull() } }
                 val banks = async { file(context, "banks.json", 10 * 60_000L)?.let { runCatching { parseBanks(it) }.getOrNull() } }
@@ -96,7 +99,8 @@ object Remote {
                     Premiums.row(p, price(p.symbol), price(p.metal.symbol), fx, typical)
                 }
                 val adv = ratios.await()?.let { Advices.all(it, price(Metal.GOLD.symbol), price(Metal.SILVER.symbol), fx) }.orEmpty()
-                _advantage.value = AdvantageData(rows, adv, banks.await() ?: _advantage.value.banks, Premiums.bistOpen(), System.currentTimeMillis(),
+                val money = ratios.await()?.let { Advices.money(it, price(Metal.GOLD.symbol), fx, price(XU100)) }.orEmpty()
+                _advantage.value = AdvantageData(rows, adv, money, banks.await() ?: _advantage.value.banks, Premiums.bistOpen(), System.currentTimeMillis(),
                     error = if (fx == null) "Fiyatlar alınamadı" else null)
             }
         } catch (e: Exception) {
@@ -152,11 +156,11 @@ object Remote {
     fun parseRatios(json: String): RatioData {
         val o = AppJson.parseToJsonElement(json).jsonObject
         val s = o["series"]!!.jsonObject
-        fun m(k: String): Monthly = s[k]!!.jsonArray.mapNotNull { p ->
+        fun m(k: String): Monthly = (s[k] as? JsonArray).orEmpty().mapNotNull { p ->
             val a = p.jsonArray; val ym = a[0].jsonPrimitive.intOrNull; val c = a[1].num()
             if (ym != null && c != null) ym to c else null
         }
-        return RatioData(o["generated"]?.jsonPrimitive?.longOrNull ?: 0L, m("HPI"), m("GOLD"), m("SILVER"), m("USDTRY"))
+        return RatioData(o["generated"]?.jsonPrimitive?.longOrNull ?: 0L, m("HPI"), m("GOLD"), m("SILVER"), m("USDTRY"), m("USM2"), m("TRM2"), m("XU100"))
     }
 
     /** Paketli günlük kapanışlar: [ilk gün, gün farkları[], kapanışlar[]] (boş kapanış = önceki). */

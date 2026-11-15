@@ -48,6 +48,9 @@ class RemoteDataTest {
         val r = Remote.parseRatios("""{"generated":5,"series":{"HPI":[[24319,230.1],[24320,239.38]],"GOLD":[[24322,4061.92]],"SILVER":[[24322,52.9]],"USDTRY":[[24322,50.2]]}}""")
         assertEquals(24320 to 239.38, r.hpi.last())
         assertEquals(4061.92, r.gold.single().second, 0.0)
+        assertTrue(r.usM2.isEmpty() && r.xu100.isEmpty()) // eski dosyada para arzı yok
+        val r2 = Remote.parseRatios("""{"generated":5,"series":{"HPI":[],"GOLD":[],"SILVER":[],"USDTRY":[],"USM2":[[24320,2.34e13]],"TRM2":[[24322,2.97e13]],"XU100":[[24322,11842.8]]}}""")
+        assertEquals(2.34e13, r2.usM2.single().second, 0.0); assertEquals(24322, r2.trM2.single().first); assertEquals(11842.8, r2.xu100.single().second, 0.0)
         // [ilk gün, farklar, kapanışlar]; boş kapanış bir öncekini taşır
         val d = Remote.parseDaily("""{"bars":{"BIST:GMSTR":[20000,[1,3,1],[500.5,null,510,515.75]],"X":null}}""", listOf("BIST:GMSTR", "X", "YOK"))
         val s = d.getValue("BIST:GMSTR")
