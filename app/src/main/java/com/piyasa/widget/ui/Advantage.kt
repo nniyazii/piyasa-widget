@@ -357,7 +357,7 @@ private fun AdviceCard(a: Advices.Advice, onGlossary: (String) -> Unit) {
             }
             Spacer(Modifier.height(6.dp))
             Text(
-                if (money) "${a.subject}, ${a.basis} uzun dönem ortancasının ${pctAbs(a.vsMedian)} ${if (a.vsMedian < 0) "altında" else "üstünde"}. Geçmişte bugünkünden ${if (a.cheap) "pahalı" else "ucuz"} olduğu ayların oranı ${pctAbs(if (a.cheap) 1 - a.percentile else a.percentile)}."
+                if (money) "${a.subject}, ${a.basis} uzun dönem ortancasının ${pctAbs(a.vsMedian)} ${if (a.vsMedian < 0) "altında" else "üstünde"}. Geçmişte bugünkünden ${if (a.cheap) "pahalı" else "ucuz"} olduğu ayların oranı ${pctAbs(if (a.cheap) 1 - a.percentile else a.percentile)}. Yani ${if (a.subject!!.startsWith("BIST")) a.subject else a.subject.lowercase(tr)} ${if (a.cheap) "ucuz" else "pahalı"}${if (a.id == Advices.Id.M2_USDTRY) (if (a.cheap) ", TL pahalı" else ", TL ucuz") else ""}."
                 else if (home) "Ev, $what cinsinden uzun dönem ortancasının ${pctAbs(a.vsMedian)} ${if (a.vsMedian < 0) "altında" else "üstünde"}. Geçmişte bugünkünden ${if (a.cheap) "pahalı" else "ucuz"} olduğu ayların oranı ${pctAbs(if (a.cheap) 1 - a.percentile else a.percentile)}."
                 else "1 ons altın ${Fmt.number(a.value, 1)} ons gümüş ediyor; son 20 yılın ortancası ${Fmt.number(a.median, 1)}. Rasyo ${if (a.cheap) "düşükken altın gümüşe" else "yüksekken gümüş altına"} göre ucuzdur.",
                 style = MaterialTheme.typography.bodySmall,

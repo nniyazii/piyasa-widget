@@ -26,16 +26,16 @@ describe('öneriler', () => {
     } }
     const now = new Date(Date.UTC(Math.floor(24099 / 12), 24099 % 12, 15))
     const a = Object.fromEntries(moneyAdvices(d, {}, now).map((x) => [x.id, x]))
-    expect(a['m2-usdtry'].action).toBe('Dolar/TL pahalı')
+    expect(a['m2-usdtry'].action).toBe('Dolar sat')
     expect(a['m2-usdtry'].strength).toBe('strong')
     expect(a['m2-usdtry'].value).toBeCloseTo(100 * 1.03 ** 99 / (100 * 1.02 ** 97 / 1000), 6) // son arz ileri taşınır
     expect(a['m2-usdtry'].m2Month).toBe(24097)
-    expect(a['m2-bist'].action).toBe('BIST 100 ucuz')
-    expect(a['m2-gold-try'].action).toBe('Gram altın pahalı') // gram altın TL = sabit ons × hızla artan kur
+    expect(a['m2-bist'].action).toBe('BIST al')
+    expect(a['m2-gold-try'].action).toBe('Gram altın sat') // gram altın TL = sabit ons × hızla artan kur
     expect(a['m2-gold-usd'].vsMedian).toBeCloseTo(0, 9) // altın ve dolar arzı sabit: tam ortancada
     expect(Math.abs(a['m2-home'].vsMedian)).toBeLessThan(0.1) // ev arzla aynı hızda: ortanca civarı
     // Canlı fiyat verilirse o kullanılır
-    expect(moneyAdvices(d, { xu100: 5000 * 100 }, now).find((x) => x.id === 'm2-bist')!.action).toBe('BIST 100 pahalı')
+    expect(moneyAdvices(d, { xu100: 5000 * 100 }, now).find((x) => x.id === 'm2-bist')!.action).toBe('BIST sat')
     // Para arzı serisi yoksa (eski veri dosyası) boş döner
     expect(moneyAdvices({ generated: 0, series: { ...d.series, USM2: undefined } }, {}, now)).toEqual([])
   })

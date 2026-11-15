@@ -207,17 +207,18 @@ object Advices {
         fun hist(price: Monthly, f: (Double, Int) -> Double?): Monthly =
             price.mapNotNull { (k, p) -> (if (p > 0) f(p, k) else null)?.takeIf { it.isFinite() && it > 0 }?.let { k to it } }
         val h = hpiNow(d.hpi, nowM)
-        fun mk(id: Id, subject: String, basis: String, m2Month: Int, series: Monthly, value: Double?, hpi: HpiNow? = null): Advice? =
+        // Öneri diğer kartlarla aynı dilde: ucuzsa "al", pahalıysa "sat" (evde "bekle")
+        fun mk(id: Id, subject: String, basis: String, buy: String, sell: String, m2Month: Int, series: Monthly, value: Double?, hpi: HpiNow? = null): Advice? =
             if (value == null) null
-            else build(id, "$subject, $basis", series, value, "$subject ucuz", "$subject pahalı", hpi)?.copy(subject = subject, basis = basis, m2Month = m2Month)
+            else build(id, "$subject, $basis", series, value, buy, sell, hpi)?.copy(subject = subject, basis = basis, m2Month = m2Month)
         return listOfNotNull(
-            mk(Id.M2_USDTRY, "Dolar/TL", "iki ülkenin para arzına göre", min(usMonth, trMonth),
+            mk(Id.M2_USDTRY, "Dolar", "TL karşısında, iki ülkenin para arzına göre", "Dolar al", "Dolar sat", min(usMonth, trMonth),
                 hist(d.usdTry) { p, k -> val a = tr(k); val b = us(k); if (a != null && b != null) p / (a / b) else null }, fx?.let { it / (trNow / usNow) }),
-            mk(Id.M2_GOLD_USD, "Ons altın", "dolar arzına göre", usMonth, hist(d.gold) { p, k -> us(k)?.let { p / it } }, g?.let { it / usNow }),
-            mk(Id.M2_GOLD_TRY, "Gram altın", "TL arzına göre", trMonth,
+            mk(Id.M2_GOLD_USD, "Ons altın", "dolar arzına göre", "Altın al", "Altın sat", usMonth, hist(d.gold) { p, k -> us(k)?.let { p / it } }, g?.let { it / usNow }),
+            mk(Id.M2_GOLD_TRY, "Gram altın", "TL arzına göre", "Gram altın al", "Gram altın sat", trMonth,
                 hist(d.gold) { p, k -> val a = tr(k); val x = fxAt(k); if (a != null && x != null) gramTl(p, x) / a else null }, if (g != null && fx != null) gramTl(g, fx) / trNow else null),
-            if (d.xu100.isNotEmpty()) mk(Id.M2_BIST, "BIST 100", "TL arzına göre", trMonth, hist(d.xu100) { p, k -> tr(k)?.let { p / it } }, xu?.let { it / trNow }) else null,
-            if (h != null) mk(Id.M2_HOME, "Ev", "TL arzına göre", trMonth, hist(d.hpi) { p, k -> tr(k)?.let { p / it } }, h.value / trNow, h) else null,
+            if (d.xu100.isNotEmpty()) mk(Id.M2_BIST, "BIST 100", "TL arzına göre", "BIST al", "BIST sat", trMonth, hist(d.xu100) { p, k -> tr(k)?.let { p / it } }, xu?.let { it / trNow }) else null,
+            if (h != null) mk(Id.M2_HOME, "Ev", "TL arzına göre", "Ev al", "Ev için bekle", trMonth, hist(d.hpi) { p, k -> tr(k)?.let { p / it } }, h.value / trNow, h) else null,
         )
     }
 

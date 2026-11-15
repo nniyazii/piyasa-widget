@@ -109,7 +109,7 @@ function AdviceCard({ a }: { a: Advice }) {
       <p className="adv-act">{a.action}<span className="adv-str">{a.strength === 'strong' ? 'Güçlü sinyal' : 'Zayıf sinyal'}</span></p>
       <p className="adv-why">
         {money
-          ? <>{a.subject}, {a.basis} uzun dönem ortancasının <b className="num">{pct0(a.vsMedian)}</b> {a.vsMedian < 0 ? 'altında' : 'üstünde'}. Geçmişte bugünkünden {a.cheap ? 'pahalı' : 'ucuz'} olduğu ayların oranı <b className="num">{pct0(a.cheap ? 1 - a.percentile : a.percentile)}</b>.</>
+          ? <>{a.subject}, {a.basis} uzun dönem ortancasının <b className="num">{pct0(a.vsMedian)}</b> {a.vsMedian < 0 ? 'altında' : 'üstünde'}. Geçmişte bugünkünden {a.cheap ? 'pahalı' : 'ucuz'} olduğu ayların oranı <b className="num">{pct0(a.cheap ? 1 - a.percentile : a.percentile)}</b>. Yani {a.subject!.startsWith('BIST') ? a.subject : a.subject!.toLocaleLowerCase('tr-TR')} {a.cheap ? 'ucuz' : 'pahalı'}{a.id === 'm2-usdtry' ? (a.cheap ? ', TL pahalı' : ', TL ucuz') : ''}.</>
           : home
           ? <>Ev, {what} cinsinden uzun dönem ortancasının <b className="num">{pct0(a.vsMedian)}</b> {a.vsMedian < 0 ? 'altında' : 'üstünde'}. Geçmişte bugünkünden {a.cheap ? 'pahalı' : 'ucuz'} olduğu ayların oranı <b className="num">{pct0(a.cheap ? 1 - a.percentile : a.percentile)}</b>.</>
           : <>1 ons altın <b className="num">{Fmt.number(a.value, 1)}</b> ons gümüş ediyor; son 20 yılın ortancası <b className="num">{Fmt.number(a.median, 1)}</b>. Rasyo {a.cheap ? 'düşükken altın gümüşe' : 'yüksekken gümüş altına'} göre ucuzdur.</>}

@@ -197,7 +197,7 @@ await step('avantajlı fiyatlar: sertifika primi ve fon farkı hesaplanır', asy
   ok.forEach((re, i) => { if (!re.test(acts[i] ?? '')) throw new Error('öneri ' + (i + 1) + ': ' + acts[i]) })
   // Para arzına göre: beş değerleme
   const money = acts.slice(3)
-  for (const s of ['Dolar/TL', 'Ons altın', 'Gram altın', 'BIST 100', 'Ev']) if (!money.some((t) => new RegExp('^' + s + ' (ucuz|pahalı)').test(t))) throw new Error('para arzı kartı yok: ' + s + ' | ' + money.join(' ¦ '))
+  for (const s of ['Dolar (al|sat)', 'Altın (al|sat)', 'Gram altın (al|sat)', 'BIST (al|sat)', 'Ev (al|için bekle)']) if (!money.some((t) => new RegExp('^' + s).test(t))) throw new Error('para arzı kartı yok: ' + s + ' | ' + money.join(' ¦ '))
 })
 
 await step('sözlük: koşul çipinden terime, arama', async () => {

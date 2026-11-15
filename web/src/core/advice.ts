@@ -119,16 +119,17 @@ export function moneyAdvices(d: RatioData, live: Live = {}, now = new Date()): A
   }
   const fxAt = carried(USDTRY, 0)
   const h = hpiNow(HPI, nowM)
-  const mk = (id: AdviceId, subject: string, basis: string, m2Month: number, series: Monthly, value: number | undefined, extra: Partial<Advice> = {}) =>
-    value == null ? undefined : build(id, `${subject}, ${basis}`, series, value, `${subject} ucuz`, `${subject} pahalı`, { subject, basis, m2Month, ...extra })
+  // Öneri diğer kartlarla aynı dilde: ucuzsa "al", pahalıysa "sat" (evde "bekle")
+  const mk = (id: AdviceId, subject: string, basis: string, buy: string, sell: string, m2Month: number, series: Monthly, value: number | undefined, extra: Partial<Advice> = {}) =>
+    value == null ? undefined : build(id, `${subject}, ${basis}`, series, value, buy, sell, { subject, basis, m2Month, ...extra })
   const out = [
-    mk('m2-usdtry', 'Dolar/TL', 'iki ülkenin para arzına göre', Math.min(usMonth, trMonth),
+    mk('m2-usdtry', 'Dolar', 'TL karşısında, iki ülkenin para arzına göre', 'Dolar al', 'Dolar sat', Math.min(usMonth, trMonth),
       hist(USDTRY, (p, k) => { const a = tr(k), b = us(k); return a && b ? p / (a / b) : undefined }), fx && usNow && trNow ? fx / (trNow / usNow) : undefined),
-    mk('m2-gold-usd', 'Ons altın', 'dolar arzına göre', usMonth, hist(GOLD, (p, k) => { const b = us(k); return b ? p / b : undefined }), gold && usNow ? gold / usNow : undefined),
-    mk('m2-gold-try', 'Gram altın', 'TL arzına göre', trMonth,
+    mk('m2-gold-usd', 'Ons altın', 'dolar arzına göre', 'Altın al', 'Altın sat', usMonth, hist(GOLD, (p, k) => { const b = us(k); return b ? p / b : undefined }), gold && usNow ? gold / usNow : undefined),
+    mk('m2-gold-try', 'Gram altın', 'TL arzına göre', 'Gram altın al', 'Gram altın sat', trMonth,
       hist(GOLD, (p, k) => { const a = tr(k), x = fxAt(k); return a && x ? gramTl(p, x) / a : undefined }), gold && fx && trNow ? gramTl(gold, fx) / trNow : undefined),
-    XU100 ? mk('m2-bist', 'BIST 100', 'TL arzına göre', trMonth, hist(XU100, (p, k) => { const a = tr(k); return a ? p / a : undefined }), xu && trNow ? xu / trNow : undefined) : undefined,
-    h ? mk('m2-home', 'Ev', 'TL arzına göre', trMonth, hist(HPI, (p, k) => { const a = tr(k); return a ? p / a : undefined }), trNow ? h.value / trNow : undefined, { hpiMonth: h.month, hpiGap: h.gap }) : undefined,
+    XU100 ? mk('m2-bist', 'BIST 100', 'TL arzına göre', 'BIST al', 'BIST sat', trMonth, hist(XU100, (p, k) => { const a = tr(k); return a ? p / a : undefined }), xu && trNow ? xu / trNow : undefined) : undefined,
+    h ? mk('m2-home', 'Ev', 'TL arzına göre', 'Ev al', 'Ev için bekle', trMonth, hist(HPI, (p, k) => { const a = tr(k); return a ? p / a : undefined }), trNow ? h.value / trNow : undefined, { hpiMonth: h.month, hpiGap: h.gap }) : undefined,
   ]
   return out.filter((x): x is Advice => !!x)
 }
