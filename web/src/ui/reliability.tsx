@@ -32,14 +32,11 @@ function Meter({ value }: { value?: number }) {
 /** Test sonucunda: skor, düz bir cümleyle anlamı ve bileşenleri. */
 export function ReliabilityPanel({ rel, years, bench }: { rel: Reliability; years: number; bench?: string }) {
   const idx = bench ?? 'endeks'
-  const edge = rel.edge3m ?? rel.edge1m
-  const horizon = rel.edge3m != null ? '3 ay' : '1 ay'
   const t = [rel.t1m, rel.t3m].filter((x): x is number => x != null)
   const tAvg = t.length ? t.reduce((a, b) => a + b, 0) / t.length : undefined
   const strength = tAvg == null ? 'ölçülemedi' : tAvg >= 2 ? 'güçlü' : tAvg >= 1 ? 'orta' : tAvg > -1 ? 'zayıf; şans eseri olabilir' : 'ters yönde'
   return (
     <section className={'bt-sect rel-panel ' + tier(rel)}>
-      <h2>Güvenilirlik</h2>
       <div className="rel-head">
         <div className="rel-score">
           <b className="num">{rel.score ?? '—'}</b>
@@ -48,8 +45,7 @@ export function ReliabilityPanel({ rel, years, bench }: { rel: Reliability; year
         <p>
           {rel.score == null
             ? `Skor için en az 6 ayda giriş ve toplam 15 giriş gerekiyor; ${span(years)} içinde ${rel.months} ayda ${rel.episodes} giriş var. Dönemi uzatmayı dene.`
-            : <>Listeye giren hisseler, girdikten {horizon} sonra {idx} karşısında ortalama <b className="num">{edge == null ? '—' : Fmt.number(Math.abs(edge * 100), 1) + ' puan'}</b> {edge != null && edge < 0 ? 'geride kaldı' : 'öne geçti'}.
-              {rel.consistency != null && <> Farkın pozitif olduğu ayların oranı <b className="num">%{Fmt.number(rel.consistency * 100, 0)}</b>.</>} Sonucun istatistiksel gücü {strength}.</>}
+            : <>{rel.consistency != null && <> Farkın pozitif olduğu ayların oranı <b className="num">%{Fmt.number(rel.consistency * 100, 0)}</b>.</>} Sonucun istatistiksel gücü {strength}.</>}
         </p>
       </div>
       <dl className="bt-kv rel-kv">

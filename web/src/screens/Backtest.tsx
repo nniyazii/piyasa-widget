@@ -124,6 +124,7 @@ function Progress({ step }: { step: BtStep }) {
 }
 
 type Mode = 'list' | 'hold1m' | 'hold3m'
+type Tab = 'ozet' | 'sonra' | 'portfoy' | 'kosul' | 'giris'
 const MODES: { value: Mode; label: string; note: string }[] = [
   { value: 'list', label: 'Listede kaldıkça', note: 'Her gün listedekilere eşit ağırlıkla yatırım, ertesi günün kapanışına kadar. Listeden çıkan satılır; liste boşken nakitte.' },
   { value: 'hold1m', label: '1 ay tut', note: 'Listeye giren her hisse girdiği günün kapanışında alınır ve 1 ay (21 işlem günü) tutulur; eldekilere eşit ağırlık.' },
@@ -145,6 +146,7 @@ function TryWider({ count, onTry }: { count: number; onTry: (u: Universe) => voi
 function Results({ run, screen, onTry }: { run: BtRun; screen: Screen; onTry?: (u: Universe) => void }) {
   const r = run.result
   const [mode, setMode] = useState<Mode>('list')
+  const [tab, setTab] = useState<Tab>('ozet')
   const rel = useMemo(() => reliability(r, screen), [r, screen])
   const port = r.portfolios?.[mode] ?? r.portfolio
   const span = run.years === 0.5 ? 'Son 6 ayda' : `Son ${run.years} yılda`
@@ -166,51 +168,84 @@ function Results({ run, screen, onTry }: { run: BtRun; screen: Screen; onTry?: (
       </>
     )
   }
+  // Önce cevap: liste geçmişte işe yaradı mı? Ayrıntılar sekmelerde.
+  const edge = rel.edge3m ?? rel.edge1m
+  const horizon = rel.edge3m != null ? '3 ay' : '1 ay'
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'ozet', label: 'Güvenilirlik' }, { id: 'sonra', label: 'Sonrası' }, { id: 'portfoy', label: 'Portföy' },
+    { id: 'kosul', label: 'Koşullar' }, { id: 'giris', label: `Girişler (${r.episodes.length})` },
+  ]
   return (
     <>
-      <p className="bt-lead">
+      <header className="an-head bt-head">
+        <h2>Bu liste geçmişte işe yaradı mı?</h2>
+        <p className="an-answer" aria-live="polite">
+          {rel.score == null ? 'Karar vermek için giriş sayısı yetersiz.'
+            : <>{rel.label}: <span className="num">{rel.score}</span>/100. {edge != null && <>Girenler {horizon} sonra {bench ?? 'endeks'} karşısında ortalama <span className="num">{Fmt.number(Math.abs(edge * 100), 1)}</span> puan {edge < 0 ? 'geride kaldı' : 'öne geçti'}.</>}</>}
+        </p>
+      </header>
+      <p className="bt-lead an-sub">
         {span} <b className="num">{r.distinct}</b> hisse toplam <b className="num">{r.episodes.length}</b> kez listeye girdi.
         Listede ortada <b className="num">{Fmt.number(r.stay.median ?? 0, 0)}</b> işlem günü kaldı
         (ortalama {Fmt.number(r.stay.mean ?? 0, 1)}, en uzun {r.stay.max}).
         {r.currentMembers.length ? <> Şu an <b className="num">{r.currentMembers.length}</b> hisse listede.</> : ' Şu an listede hisse yok.'}
       </p>
       <p className="note">{r.tested} hisse test edildi{run.missing ? `, ${run.missing} hissenin günlük geçmişi yok` : ''}. {fmtDay(r.startDay)} – {fmtDay(r.endDay)}.</p>
-
       {tryWider}
-      <ReliabilityPanel rel={rel} years={run.years} bench={bench} />
 
-      <section className="bt-sect">
-        <h2>Girdikten sonra</h2>
-        <HorizonTable stats={r.afterEntry} bench={bench} />
-      </section>
-      <section className="bt-sect">
-        <h2>Çıktıktan sonra</h2>
-        <p className="note" style={{ marginTop: -4 }}>Listeden çıktığı günün kapanışından itibaren. Hâlâ listede olanlar dahil değil.</p>
-        <HorizonTable stats={r.afterExit} bench={bench} />
-      </section>
-      <section className="bt-sect">
-        <h2>Listeyi takip etseydin</h2>
-        <Segmented value={mode} onChange={setMode} label="Portföy" options={MODES.map(({ value, label }) => ({ value, label }))} />
-        <p className="note" style={{ marginTop: 8 }}>{MODES.find((m) => m.value === mode)!.note}</p>
-        <Curve result={r} benchName={bench} mode={mode} />
-        <dl className="bt-kv">
-          <div><dt>Portföy</dt><dd className={'num ' + tone(port.total)}>{pct1(port.total)}</dd></div>
-          {bench && <div><dt>{bench}</dt><dd className={'num ' + tone(r.portfolio.bench)}>{pct1(r.portfolio.bench)}</dd></div>}
-          <div><dt>En büyük düşüş</dt><dd className="num">{pct1(port.maxDrawdown)}</dd></div>
-          <div><dt>Ortalama hisse sayısı</dt><dd className="num">{Fmt.number(port.avgMembers ?? 0, 1)}</dd></div>
-          <div><dt>Yatırımda geçen gün</dt><dd className="num">{port.daysInvested} / {Math.max(0, r.curve.length - 1)}</dd></div>
-          {port.costPaid != null && port.costPaid > 0 && <div><dt>İşlem ücreti</dt><dd className="num">{pct1(-port.costPaid)}</dd></div>}
-        </dl>
-      </section>
-      <details className="bt-how" style={{ marginTop: 22 }}>
-        <summary>Koşullar ne sıklıkla sağlandı</summary>
-        <ConditionTable screen={screen} result={r} />
-      </details>
-      <section className="bt-sect">
-        <h2>Girişler</h2>
-        <EpisodeTable episodes={r.episodes} />
-      </section>
-      {r.notes.map((n, i) => <p key={i} className="note">{n}</p>)}
+      <nav className="an-tabs bt-tabs" aria-label="Test sonuçları">
+        {tabs.map((t) => <button key={t.id} type="button" aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)}>{t.label}</button>)}
+      </nav>
+
+      {tab === 'ozet' && <ReliabilityPanel rel={rel} years={run.years} bench={bench} />}
+
+      {tab === 'sonra' && (
+        <>
+          <section className="bt-sect">
+            <h2>Girdikten sonra</h2>
+            <p className="note" style={{ marginTop: -4 }}>Listeye girdiği günün kapanışından itibaren getiriler.</p>
+            <HorizonTable stats={r.afterEntry} bench={bench} />
+          </section>
+          <section className="bt-sect">
+            <h2>Çıktıktan sonra</h2>
+            <p className="note" style={{ marginTop: -4 }}>Listeden çıktığı günün kapanışından itibaren. Hâlâ listede olanlar dahil değil.</p>
+            <HorizonTable stats={r.afterExit} bench={bench} />
+          </section>
+        </>
+      )}
+
+      {tab === 'portfoy' && (
+        <section className="bt-sect">
+          <h2>Listeyi takip etseydin</h2>
+          <Segmented value={mode} onChange={setMode} label="Portföy" options={MODES.map(({ value, label }) => ({ value, label }))} />
+          <p className="note" style={{ marginTop: 8 }}>{MODES.find((m) => m.value === mode)!.note}</p>
+          <Curve result={r} benchName={bench} mode={mode} />
+          <dl className="bt-kv">
+            <div><dt>Portföy</dt><dd className={'num ' + tone(port.total)}>{pct1(port.total)}</dd></div>
+            {bench && <div><dt>{bench}</dt><dd className={'num ' + tone(r.portfolio.bench)}>{pct1(r.portfolio.bench)}</dd></div>}
+            <div><dt>En büyük düşüş</dt><dd className="num">{pct1(port.maxDrawdown)}</dd></div>
+            <div><dt>Ortalama hisse sayısı</dt><dd className="num">{Fmt.number(port.avgMembers ?? 0, 1)}</dd></div>
+            <div><dt>Yatırımda geçen gün</dt><dd className="num">{port.daysInvested} / {Math.max(0, r.curve.length - 1)}</dd></div>
+            {port.costPaid != null && port.costPaid > 0 && <div><dt>İşlem ücreti</dt><dd className="num">{pct1(-port.costPaid)}</dd></div>}
+          </dl>
+        </section>
+      )}
+
+      {tab === 'kosul' && (
+        <section className="bt-sect">
+          <h2>Koşullar ne sıklıkla sağlandı</h2>
+          <p className="note" style={{ marginTop: -4 }}>Her koşulun kaç hisse-günde hesaplanabildiği ve sağlandığı; en seyrek sağlanan, listeyi en çok daraltandır.</p>
+          <ConditionTable screen={screen} result={r} />
+          {r.notes.map((n, i) => <p key={i} className="note">{n}</p>)}
+        </section>
+      )}
+
+      {tab === 'giris' && (
+        <section className="bt-sect">
+          <h2>Girişler</h2>
+          <EpisodeTable episodes={r.episodes} />
+        </section>
+      )}
     </>
   )
 }

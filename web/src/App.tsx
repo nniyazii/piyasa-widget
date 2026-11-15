@@ -8,7 +8,7 @@ import { BacktestView } from './screens/Backtest'
 import { Detail } from './screens/Detail'
 import { ScreenEditor, ScreensIndex, ScreenView } from './screens/ScreensPage'
 import { Glossary } from './screens/Glossary'
-import { Premiums } from './screens/Premiums'
+import { Analysis } from './screens/Analysis'
 import { Settings } from './screens/Settings'
 import { Watchlist } from './screens/Watchlist'
 import { useNewVersion } from './data/version'
@@ -27,16 +27,18 @@ export function App() {
   )
 }
 
-/** #/listeler/avantajli: koşullu tarama değil, hazır bir karşılaştırma listesi */
-const PREMIUMS_ROUTE = 'avantajli'
-
+/** Ana bölümler (telefonda alt sekmeler); yardımcılar kenar çubuğunun altında, telefonda üst çubukta. */
 const NAV = [
   { path: '', label: 'Piyasalar', icon: 'list' },
-  { path: 'panolar', label: 'Panolar', icon: 'boards' },
   { path: 'listeler', label: 'Dinamik listeler', short: 'Listeler', icon: 'filter' },
+  { path: 'analiz', label: 'Analiz', icon: 'compass' },
+  { path: 'panolar', label: 'Panolar', icon: 'boards' },
+]
+const NAV_AUX = [
   { path: 'sozluk', label: 'Sözlük', icon: 'book' },
   { path: 'ayarlar', label: 'Ayarlar', icon: 'settings' },
 ]
+const ALL_NAV = [...NAV, ...NAV_AUX]
 
 function Shell() {
   const state = useApp()
@@ -62,19 +64,21 @@ function Shell() {
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === '/') { e.preventDefault(); setCompose({}) }
       else if (e.key === 'r' || e.key === 'R') void refreshQuotes()
-      else if (['1', '2', '3', '4', '5'].includes(e.key)) navigate(NAV[Number(e.key) - 1].path)
+      else if (['1', '2', '3', '4', '5', '6'].includes(e.key)) navigate(ALL_NAV[Number(e.key) - 1].path)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Eski adres (Avantajlı fiyatlar, Dinamik listelerin içindeydi) yeni bölüme yönlenir
+  useEffect(() => { if (section === 'listeler' && route.path[1] === 'avantajli') navigate('analiz', undefined, true) }, [section, route.path[1]])
+
   if (section === 'pano' && route.path[1]) return <Kiosk id={route.path[1]} />
 
-  const current = NAV.find((n) => n.path === section) ?? NAV[0]
+  const current = ALL_NAV.find((n) => n.path === section) ?? NAV[0]
   const screenId = section === 'listeler' ? route.path[1] : undefined
   const testing = section === 'listeler' && route.path[2] === 'test'
-  const premiums = screenId === PREMIUMS_ROUTE
-  const screen = screenId && !premiums ? state.screens.find((s) => s.id === screenId) : undefined
+  const screen = screenId ? state.screens.find((s) => s.id === screenId) : undefined
   const status = statusOf(live)
 
   return (
@@ -93,6 +97,11 @@ function Shell() {
             </a>
           ))}
         </nav>
+        <nav className="nav nav-aux" aria-label="Yardımcı">
+          {NAV_AUX.map((n) => (
+            <a key={n.path} href={href(n.path)} aria-current={current.path === n.path ? 'page' : undefined}><Icon name={n.icon} />{n.label}</a>
+          ))}
+        </nav>
         <div className="sidebar-foot">
           <button className="status btn ghost small" style={{ justifyContent: 'flex-start', padding: 0, height: 'auto' }} onClick={() => void refreshQuotes()} title="Şimdi yenile (R)">
             <span className={'status-dot ' + status.dot} />{status.text}
@@ -105,6 +114,7 @@ function Shell() {
         <a className="brand" href="#/"><span className="brand-mark" aria-hidden="true" />Piyasa</a>
         <button className="icon-btn" onClick={() => void refreshQuotes()} aria-label="Yenile"><Icon name="refresh" className={live.refreshing ? 'spin' : undefined} /></button>
         <button className="icon-btn" onClick={() => setCompose({})} aria-label="Ara ya da formül yaz"><Icon name="search" /></button>
+        {NAV_AUX.map((n) => <a key={n.path} className="icon-btn" href={href(n.path)} aria-label={n.label} aria-current={current.path === n.path ? 'page' : undefined}><Icon name={n.icon} /></a>)}
       </div>
 
       {newVersion && (
@@ -117,10 +127,8 @@ function Shell() {
         <div className={'page' + (section === 'panolar' ? ' wide' : '')}>
           <header className="page-head">
             {screen && <a className="icon-btn" href={testing ? `#/listeler/${screen.id}` : '#/listeler'} aria-label={testing ? 'Listeye dön' : 'Dinamik listelere dön'}><Icon name="back" /></a>}
-            {premiums && <a className="icon-btn" href="#/listeler" aria-label="Dinamik listelere dön"><Icon name="back" /></a>}
             <div style={{ minWidth: 0 }}>
-              <h1>{screen ? screen.name : premiums ? 'Avantajlı fiyatlar' : current.label}</h1>
-              {premiums && <div className="sub">Prim ve iskonto, birikim önerileri</div>}
+              <h1>{screen ? screen.name : current.label}</h1>
               {testing && <div className="sub">Geçmişte test</div>}
               {section === '' && <div className="sub" aria-live="polite">{status.text}</div>}
             </div>
@@ -150,9 +158,9 @@ function Shell() {
           {section === '' && <Watchlist onCompose={(query) => setCompose({ query })} onEditFormula={(editKey) => setCompose({ editKey })} />}
           {section === 'panolar' && <Boards />}
           {section === 'listeler' && !screenId && <ScreensIndex onNew={() => setScreenEdit({})} />}
-          {premiums && <Premiums />}
-          {section === 'listeler' && screenId && !premiums && !testing && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
-          {testing && screenId && !premiums && <BacktestView id={screenId} />}
+          {section === 'listeler' && screenId && !testing && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
+          {testing && screenId && <BacktestView id={screenId} />}
+          {section === 'analiz' && <Analysis tab={route.path[1]} />}
           {section === 'sozluk' && <Glossary target={route.path[1]} />}
           {section === 'ayarlar' && <Settings />}
         </div>

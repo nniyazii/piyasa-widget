@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
@@ -35,7 +36,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -95,15 +98,16 @@ fun AdvantageScreen(onClose: () -> Unit, onGlossary: (String) -> Unit) {
 }
 
 @Composable
-internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossary: (String) -> Unit, onRefresh: () -> Unit) {
+internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossary: (String) -> Unit, onRefresh: () -> Unit, initialTab: Int = 0) {
+    var tab by rememberSaveable { mutableStateOf(initialTab) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose) { Icon(Icons.Default.Close, "Kapat") }
                 Column(Modifier.weight(1f)) {
-                    Text("Avantajlı fiyatlar", style = MaterialTheme.typography.titleMedium)
+                    Text("Analiz", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        if (data.time == 0L) "Prim ve iskonto, birikim önerileri"
+                        if (data.time == 0L) "Altın, gümüş, ev, dolar, borsa"
                         else SimpleDateFormat("d MMM HH:mm", tr).format(Date(data.time)) + " itibarıyla",
                         style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -111,44 +115,127 @@ internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossa
                 if (data.loading) { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp); Spacer(Modifier.size(14.dp)) }
                 else IconButton(onClick = onRefresh) { Icon(Icons.Default.Refresh, "Yenile") }
             }
+            // Bir sayfa, bir soru: özet ve dört soru sayfası
+            ScrollableTabRow(selectedTabIndex = tab, edgePadding = 12.dp, containerColor = MaterialTheme.colorScheme.surface, divider = { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }) {
+                TABS.forEachIndexed { i, t ->
+                    Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t, maxLines = 1, fontWeight = if (tab == i) FontWeight.SemiBold else FontWeight.Normal) })
+                }
+            }
             LazyColumn(Modifier.weight(1f).testTag("advantage")) {
-                item { Lead(data) }
-                items(data.rows, key = { it.pair.symbol }) { r -> PremiumItem(r, data.open) }
-                if (data.rows.isNotEmpty()) item { CostCompare(data, onGlossary) }
-                if (data.advices.isNotEmpty()) {
-                    item { SectionTitle("Birikim önerileri", "Bugünkü oran, kendi geçmişinin ortancasıyla karşılaştırılır. Ortancadan uzaklaştıkça sinyal güçlenir.") }
-                    items(data.advices, key = { it.id.name }) { a -> AdviceCard(a, onGlossary) }
+                when (tab) {
+                    0 -> item { Overview(data) { tab = it } }
+                    1 -> {
+                        item { Lead(data) }
+                        items(data.rows, key = { it.pair.symbol }) { r -> PremiumItem(r, data.open) }
+                        item { HowItWorks(onGlossary) }
+                    }
+                    2 -> if (data.rows.isNotEmpty()) item { CostCompare(data, onGlossary) } else item { Hint(data.error ?: "Fiyatlar alınıyor…") }
+                    3 -> {
+                        item {
+                            val strong = data.advices.filter { it.strong }
+                            Answer("Birikimimi neye çevirmeliyim?", if (strong.isEmpty()) "Şu an güçlü bir sinyal yok; oranlar olağan aralıkta." else strong.joinToString(". ") { it.action } + ".",
+                                "Her oran kendi geçmiş ortancasıyla karşılaştırılır. Ortancadan uzaklaştıkça sinyal güçlenir.")
+                        }
+                        items(data.advices, key = { it.id.name }) { a -> AdviceCard(a, onGlossary) }
+                    }
+                    else -> {
+                        item {
+                            val cheap = data.money.filter { it.cheap }.mapNotNull { it.subject }; val dear = data.money.filterNot { it.cheap }.mapNotNull { it.subject }
+                            Answer("Para arzına göre ne ucuz, ne pahalı?",
+                                if (data.money.isEmpty()) "Para arzı verisi alınamadı." else listOfNotNull(cheap.takeIf { it.isNotEmpty() }?.let { "Ucuz: " + it.joinToString(", ") + "." }, dear.takeIf { it.isNotEmpty() }?.let { "Pahalı: " + it.joinToString(", ") + "." }).joinToString(" "),
+                                "Para basıldıkça fiyatların da artması beklenir. Her fiyat ilgili para arzına (M2) bölünür ve kendi geçmiş ortancasıyla karşılaştırılır: ortancanın üstündeyse fiyat, basılan paradan hızlı artmıştır.")
+                        }
+                        items(data.money, key = { it.id.name }) { a -> AdviceCard(a, onGlossary) }
+                    }
                 }
-                if (data.money.isNotEmpty()) {
-                    item { SectionTitle("Para arzına göre", "Her fiyat ilgili para arzına (M2) bölünür ve kendi geçmiş ortancasıyla karşılaştırılır: ortancanın üstündeyse fiyat para arzından hızlı artmıştır.") }
-                    items(data.money, key = { it.id.name }) { a -> AdviceCard(a, onGlossary) }
-                }
-                item { HowItWorks(onGlossary) }
+                item { Text("Piyasa yatırım tavsiyesi vermez; bunlar geçmiş verilere dayalı göstergelerdir.", Modifier.padding(16.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
         }
     }
 }
 
+private val TABS = listOf("Özet", "Ürünler", "Nereden almalı", "Birikim", "Para arzı")
+
+/** Sayfa başı: soru küçük, cevap büyük, altında bir cümle bağlam. */
+@Composable
+private fun Answer(question: String, answer: String, sub: String? = null) {
+    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
+        Text(question, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(answer, Modifier.padding(top = 4.dp).testTag("answer"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        if (sub != null) Text(sub, Modifier.padding(top = 10.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Özet: her sorunun cevabı tek satırda; satır ilgili sayfayı açar. */
+@Composable
+private fun Overview(d: AdvantageData, open: (Int) -> Unit) {
+    if (d.rows.isEmpty() && d.advices.isEmpty()) { Answer("Bugün ne yapmalı?", d.error ?: "Fiyatlar alınıyor…"); return }
+    val all = d.advices + d.money
+    val strong = all.count { it.strong } + d.buys.size
+    Answer("Bugün ne yapmalı?", if (strong > 0) "Bugün $strong güçlü sinyal var." else "Bugün güçlü bir sinyal yok.",
+        "Her sorunun cevabı aşağıda tek satırda; güçlü sinyaller işaretli. Gerekçesi için satıra dokun.")
+    val cert = d.rows.firstOrNull { it.pair.symbol == "BIST:ALTIN" }?.premium
+    fun best(metal: Metal): Costs.Outcome? {
+        val rows = Costs.routes(metal, d.banks).map { Costs.evaluate(it, Costs.Scenario(100_000.0, 1.0, 0.3, 0.001)) }.sortedByDescending { it.net }
+        return rows.firstOrNull { !(it.route.kind == Costs.Kind.CERT && (cert ?: 0.0) > 0.02) } ?: rows.firstOrNull()
+    }
+    val nearest = d.rows.filter { it.premium != null }.minByOrNull { it.premium!! }
+    OverviewGroup("Altın ve gümüş ürünleri")
+    OverviewRow("Değerinin altında işlem gören var mı?",
+        when { !d.open -> "Sinyal seans içinde verilir"; d.buys.isNotEmpty() -> d.buys.joinToString(", ") { it.pair.code }; else -> "Şu an yok" },
+        when { !d.open -> "BIST kapalı"; d.buys.isNotEmpty() -> "al sinyali"; nearest != null -> "en yakını ${nearest.pair.code} (${pct(nearest.premium)})"; else -> null },
+        d.buys.isNotEmpty()) { open(1) }
+    best(Metal.GOLD)?.let { OverviewRow("Altını nereden almalı?", it.route.name, "masraf ${pctAbs(it.cost / 100_000)}", false) { open(2) } }
+    best(Metal.SILVER)?.let { OverviewRow("Gümüşü nereden almalı?", it.route.name, "masraf ${pctAbs(it.cost / 100_000)}", false) { open(2) } }
+    if (d.advices.isNotEmpty()) {
+        OverviewGroup("Birikim")
+        listOf(Advices.Id.HOME_GOLD to "Altınım var; ev alayım mı?", Advices.Id.HOME_USD to "Dolarım var; ev alayım mı?", Advices.Id.GOLD_SILVER to "Altın mı, gümüş mü?").forEach { (id, q) ->
+            all.firstOrNull { it.id == id }?.let { a -> OverviewRow(q, a.action, if (a.strong) "güçlü sinyal" else "zayıf sinyal", a.strong) { open(3) } }
+        }
+    }
+    if (d.money.isNotEmpty()) {
+        OverviewGroup("Para arzına göre")
+        d.money.forEach { a -> OverviewRow(a.subject ?: "", a.action, if (a.strong) "güçlü sinyal" else "zayıf sinyal", a.strong) { open(4) } }
+    }
+}
+
+@Composable
+private fun OverviewGroup(title: String) {
+    Text(title, Modifier.padding(start = 16.dp, end = 16.dp, top = 22.dp, bottom = 2.dp), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun OverviewRow(question: String, answer: String, note: String?, strong: Boolean, onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.tertiary
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(question, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (strong) { Box(Modifier.size(7.dp).background(accent, androidx.compose.foundation.shape.CircleShape)); Spacer(Modifier.width(8.dp)) }
+                Text(answer, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            }
+            if (note != null) Text(note, style = MaterialTheme.typography.labelSmall, fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal, color = if (strong) accent else MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.outline)
+    }
+    HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+}
+
 @Composable
 private fun Lead(d: AdvantageData) {
     val buys = d.buys
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(
-            "Altın ve gümüşe dayalı borsa ürünleri, içlerindeki madenin değerinden pahalıya (primli) ya da ucuza (iskontolu) işlem görebilir.",
-            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            when {
-                d.rows.isEmpty() -> d.error ?: "Fiyatlar alınıyor…"
-                !d.open -> "BIST şu an kapalı. Farklar son kapanış fiyatına göredir; maden fiyatı o zamandan beri değiştiği için sinyal verilmez."
-                buys.isNotEmpty() -> buys.joinToString(", ") { it.pair.code } + (if (buys.size == 1) " içindeki değerin altında: al sinyali." else " içlerindeki değerin altında: al sinyali.")
-                else -> "Şu an değerinin altında işlem gören yok."
-            },
-            style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium,
-        )
-        if (d.error != null && d.rows.isNotEmpty()) Text("${d.error}; son bilinen değerler gösteriliyor.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
-    }
+    Answer(
+        "Altın ve gümüş ürünleri değerinin altında mı?",
+        when {
+            d.rows.isEmpty() -> d.error ?: "Fiyatlar alınıyor…"
+            !d.open -> "BIST şu an kapalı; sinyal seans içinde verilir."
+            buys.isNotEmpty() -> buys.joinToString(", ") { it.pair.code } + (if (buys.size == 1) " içindeki madenin değerinin altında." else " içlerindeki madenin değerinin altında.")
+            else -> "Şu an değerinin altında işlem gören yok."
+        },
+        "Borsadaki altın ve gümüş ürünleri, içlerindeki madenin değerinden pahalıya (primli) ya da ucuza (iskontolu) işlem görebilir." +
+            (if (!d.open) " Farklar son kapanışa göredir; maden fiyatı o zamandan beri değişti." else ""),
+    )
+    if (d.error != null && d.rows.isNotEmpty()) Text("${d.error}; son bilinen değerler gösteriliyor.", Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
 }
 
 @Composable
@@ -257,7 +344,8 @@ private fun CostCompare(d: AdvantageData, onGlossary: (String) -> Unit) {
     val even = remember(fund.route, bank.route, s) { Costs.breakEven(fund.route, bank.route, s) }
     val span = if (YEARS[yearIx] == 0.5) "6 ay" else "${YEARS[yearIx].toInt()} yıl"
 
-    SectionTitle("Banka mı, fon mu?", "Aynı parayla $name alıp bir süre sonra satarsan, her yolun toplam masrafı ve elinde kalan tutar.")
+    Answer(if (metal == Metal.GOLD) "Altını nereden almalı?" else "Gümüşü nereden almalı?", "${best.route.name}. Elinde ${tl(best.net, 0)} kalır; toplam masraf ${tl(best.cost, 0)}.",
+        "Aynı parayla $name alıp bir süre sonra satarsan, her yolun toplam masrafı ve elinde kalan tutar.")
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Choice(listOf("Altın", "Gümüş"), metalIx) { metalIx = it }
         Choice(listOf("6 ay", "1 yıl", "3 yıl", "5 yıl"), yearIx) { yearIx = it }
@@ -267,17 +355,12 @@ private fun CostCompare(d: AdvantageData, onGlossary: (String) -> Unit) {
             NumberInput("Komisyon ‰", commission, Modifier.weight(1f)) { commission = it }
         }
         Text(
-            buildString {
-                append(name.replaceFirstChar { it.titlecase(tr) })
-                append(if (s.annualGrowth >= 0) " yılda ${pctAbs(s.annualGrowth)} artarsa" else " yılda ${pctAbs(s.annualGrowth)} düşerse")
-                append(" en avantajlı yol: ${best.route.name}. ${tl(s.amount, 0)} yatırıp $span sonra satınca elinde ${tl(best.net, 0)} kalır; toplam masraf ${tl(best.cost, 0)}. ")
-                if (even == null) append(if (fund.net >= bank.net) "Bu sürede fon, ${bank.route.name} karşısında her artış oranında önde." else "Bu sürede ${bank.route.name}, fon karşısında her artış oranında önde.")
-                else {
-                    val fundBelow = Costs.evaluate(fund.route, s.copy(annualGrowth = even - 0.01)).net > Costs.evaluate(bank.route, s.copy(annualGrowth = even - 0.01)).net
-                    append("Başa baş noktası yıllık ${pctAbs(even)} artış: ${if (fundBelow) "altında fon, üstünde banka" else "altında banka, üstünde fon"} daha avantajlı.")
-                }
+            if (even == null) (if (fund.net >= bank.net) "Bu sürede fon, ${bank.route.name} karşısında her artış oranında önde." else "Bu sürede ${bank.route.name}, fon karşısında her artış oranında önde.")
+            else {
+                val fundBelow = Costs.evaluate(fund.route, s.copy(annualGrowth = even - 0.01)).net > Costs.evaluate(bank.route, s.copy(annualGrowth = even - 0.01)).net
+                "Banka ile fon arasında başa baş noktası yıllık ${pctAbs(even)} artış: ${if (fundBelow) "altında fon, üstünde banka" else "altında banka, üstünde fon"} daha avantajlı. Fonun vergisi kazançla büyür, bankanın makası sabittir."
             },
-            Modifier.padding(top = 6.dp).testTag("cost-lead"), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium,
+            Modifier.padding(top = 6.dp).testTag("cost-lead"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
     Column(Modifier.padding(top = 6.dp)) { rows.forEach { CostRow(it, it === best) } }
@@ -430,7 +513,7 @@ fun AdvantageCard(d: AdvantageData, modifier: Modifier = Modifier) {
         Box(Modifier.width(3.dp).height(44.dp).background(MaterialTheme.colorScheme.tertiary, RoundedCornerShape(2.dp)))
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text("Avantajlı fiyatlar", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+            Text("Analiz", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 when {
                     d.rows.isEmpty() -> d.error ?: "Altın ve gümüşte prim, iskonto ve birikim önerileri"

@@ -26,27 +26,30 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
   - Her listenin yanında **güvenilirlik skoru** (0–100): liste geçmişte endeksi tutarlı biçimde geçti mi? Hazır listelerin skoru her gün son 3 yılla yeniden hesaplanır; kendi listelerin, geçmişte test ettiğinde skor alır.
   - **Sıralama:** listeler kendi sırana (sürükle-bırak), güvenilirlik skoruna, eşleşme sayısına ya da ada göre dizilir. Liste sonuçlarında *Ad*, *Fiyat* ve *Bugün* başlıklarına basınca o sütuna göre sıralanır; *Koşula göre* listenin kendi sırasına döner.
   - **Hepsini tara:** ilerlemeyi düğmede gösterir ("Taranıyor 7/18"), bitince kaç listenin tarandığını bildirir; son tarama saati listenin üstünde yazar.
-  - **Avantajlı fiyatlar** (listenin en üstünde): altın ve gümüş ürünleri içlerindeki madenin değerine göre primli mi iskontolu mu?
+  - Düzenleyicide yazarken canlı önizleme gösterilir.
+  - Liste tek tıkla panoya eklenir.
+- **Analiz** (`#/analiz`). Bir sayfa, bir soru: her sayfada önce cevap, sonra veri, en altta hesabın açıklaması.
+  - **Özet:** tüm soruların cevabı tek ekranda, soru → cevap satırları; güçlü sinyaller işaretli.
+  - **Ürünler:** altın ve gümüş ürünleri içlerindeki madenin değerine göre primli mi iskontolu mu?
     - *ALTIN.S1* her zaman 0,01 gram altındır; gram altının altına inerse al sinyali.
     - *GLDTR, ZGOLD, ISGLK, GMSTR* fonlarında pay başına maden miktarı sabit değildir (GMSTR ≈ 6 gram gümüş, yılda yaklaşık %2 azalır). Olağan miktar son 20 işlem gününün ortancasıdır; fon bunun en az %2 altına inerse al sinyali.
     - BIST kapalıyken sinyal verilmez (maden fiyatı değişirken borsa fiyatı durur).
-    - **Banka mı, fon mu?** Aynı parayla altın ya da gümüş alıp bir süre sonra satmanın tüm masrafları: makas, BSMV, komisyon, yönetim gideri, stopaj.
-      - Banka: bankaların sitelerinde yayımladığı alış/satış fiyatları (Kuveyt Türk, Enpara, Akbank, Yapı Kredi, Ziraat; listede olmayan banka elle girilir; yarım saatte bir `data/banks.json`, sunucuda `/api/banks`), alımda binde 2 BSMV.
-      - Mesai dışında (hafta içi 09:30–17:30 dışı ve hafta sonu) bankalar makası belirgin biçimde açar. Bu saatlerde karşılaştırma mesai içindeki son fiyatlarla yapılır ve bu ekranda yazılır.
-      - Fiziki: Altınkaynak'ın gram altın, külçe altın ve gümüş alış/satış fiyatları; yalnızca makas (BSMV ve gelir vergisi yok).
-      - Fon: komisyon (+%5 BSMV), borsa makası, yıllık gider ve kazançtan %17,5 stopaj. Sertifika: stopaj %0, ama primli.
-      - Tutar, süre, beklenen yıllık artış ve komisyon değiştirilebilir; başa baş artış oranı gösterilir.
-    - **Birikim önerileri** (aynı listede), her biri oranın kendi geçmiş ortancasına göre:
-      - *Altın boz, ev al / Altın biriktir:* konut fiyat endeksi (TRHPI) ÷ gram altın, 2010'dan bu yana.
-      - *Dolar boz, ev al / Dolar biriktir:* konut fiyat endeksi ÷ Dolar/TL.
-      - *Altın sat, gümüş al / Gümüş sat, altın al:* altın/gümüş rasyosu, son 20 yıl.
-      - **Para arzına göre:** Dolar/TL ÷ (Türkiye M2 ÷ ABD M2), ons altın ÷ ABD M2, gram altın, BIST 100 ve konut endeksi ÷ Türkiye M2; her biri kendi geçmiş ortancasına göre ucuz ya da pahalı.
-      - En düşük ya da en yüksek %25'lik dilimde sinyal "güçlü" yazar. Uzun dönem seriler günlük kopyayla gelir (`data/ratios.json`, sunucuda `/api/ratios`).
-  - Düzenleyicide yazarken canlı önizleme gösterilir.
-  - Liste tek tıkla panoya eklenir.
+  - **Nereden almalı:** aynı parayla altın ya da gümüş alıp bir süre sonra satmanın tüm masrafları (makas, BSMV, komisyon, yönetim gideri, stopaj). Senaryo bir cümle olarak yazılır; yollar masraf çubuklarıyla karşılaştırılır, satıra dokununca kalem kalem döküm açılır.
+    - Banka: bankaların sitelerinde yayımladığı alış/satış fiyatları (Kuveyt Türk, Enpara, Akbank, Yapı Kredi, Ziraat; listede olmayan banka elle girilir; yarım saatte bir `data/banks.json`, sunucuda `/api/banks`), alımda binde 2 BSMV.
+    - Mesai dışında (hafta içi 09:30–17:30 dışı ve hafta sonu) bankalar makası belirgin biçimde açar. Bu saatlerde karşılaştırma mesai içindeki son fiyatlarla yapılır ve bu ekranda yazılır.
+    - Fiziki: Altınkaynak'ın gram altın, külçe altın ve gümüş alış/satış fiyatları; yalnızca makas (BSMV ve gelir vergisi yok).
+    - Fon: komisyon (+%5 BSMV), borsa makası, yıllık gider ve kazançtan %17,5 stopaj. Sertifika: stopaj %0, ama primli.
+    - Tutar, süre, beklenen yıllık artış ve komisyon değiştirilebilir; başa baş artış oranı gösterilir.
+  - **Birikim** ve **Para arzı:** her biri oranın kendi geçmiş ortancasına göre:
+    - *Altın boz, ev al / Altın biriktir:* konut fiyat endeksi (TRHPI) ÷ gram altın, 2010'dan bu yana.
+    - *Dolar boz, ev al / Dolar biriktir:* konut fiyat endeksi ÷ Dolar/TL.
+    - *Altın sat, gümüş al / Gümüş sat, altın al:* altın/gümüş rasyosu, son 20 yıl.
+    - **Para arzına göre:** Dolar/TL ÷ (Türkiye M2 ÷ ABD M2), ons altın ÷ ABD M2, gram altın, BIST 100 ve konut endeksi ÷ Türkiye M2; her biri kendi geçmiş ortancasına göre ucuz ya da pahalı.
+    - En düşük ya da en yüksek %25'lik dilimde sinyal "güçlü" yazar. Uzun dönem seriler günlük kopyayla gelir (`data/ratios.json`, sunucuda `/api/ratios`).
 - **Geçmişte test (backtest).** Her dinamik listede *Geçmişte test et*: son 6 ay / 1 / 2 / 3 yılın her işlem günü liste o günün kapanışıyla yeniden hesaplanır.
   - **Kim, ne zaman:** hangi hisse ne zaman girdi, kaç işlem günü kaldı, ne zaman çıktı. Şu an listede olanlar da görünür.
   - **Sonra ne oldu:** girdikten ve çıktıktan 1 hafta, 1 ay, 3 ay ve 6 ay sonra ortalama ve medyan getiri, yükselenlerin oranı, BIST 100 ya da S&P 500'e göre fark.
+  - Sonuç sayfası önce cevabı verir ("Bu liste geçmişte işe yaradı mı?"); ayrıntılar sekmelerdedir: Güvenilirlik, Sonrası, Portföy, Koşullar, Girişler.
   - **Güvenilirlik:** skor, düz bir cümleyle anlamı ve bileşenleri (aşağıda).
   - **Listeyi takip etseydin:** üç portföy, endekse karşı değer eğrisi, en büyük düşüş, ortalama hisse sayısı ve ödenen işlem ücreti (alım ve satışta %0,15).
     - *Listede kaldıkça:* her gün listedekilere eşit ağırlık; listeden çıkan satılır.

@@ -35,7 +35,7 @@ import java.time.Instant
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [35], qualifiers = "w400dp-h4300dp-xxhdpi")
+@Config(sdk = [35], qualifiers = "w400dp-h1900dp-xxhdpi")
 class AdvantagePreviewTest {
     private fun render(name: String, content: @androidx.compose.runtime.Composable () -> Unit) {
         val activity = Robolectric.buildActivity(ComponentActivity::class.java).setup().get()
@@ -43,7 +43,7 @@ class AdvantagePreviewTest {
         repeat(4) { Thread.sleep(100); ShadowLooper.idleMainLooper(100, java.util.concurrent.TimeUnit.MILLISECONDS) }
         val root = activity.window.decorView
         val w = root.width.takeIf { it > 0 } ?: 1200
-        val h = root.height.takeIf { it > 0 } ?: 12900
+        val h = root.height.takeIf { it > 0 } ?: 5700
         root.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY))
         root.layout(0, 0, w, h)
         ShadowLooper.idleMainLooper()
@@ -73,7 +73,7 @@ class AdvantagePreviewTest {
     @Test fun advantageScreen() {
         assumeTrue(System.getProperty("previews") == "true")
         val d = data()
-        render("advantage") { AdvantageContent(d, {}, {}, {}) }
+        listOf("ozet", "urunler", "maliyet", "birikim", "para-arzi").forEachIndexed { i, n -> render("analiz-$n") { AdvantageContent(d, {}, {}, {}, initialTab = i) } }
     }
 
     @Test fun glossaryScreen() {
