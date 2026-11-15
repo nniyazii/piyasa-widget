@@ -124,7 +124,8 @@ try {
 // Banka alış/satış fiyatları (ayrıca yarım saatte bir banks.yml ile yenilenir)
 try {
   const { fetchBanks } = await import('../server/banks.mjs')
-  const banks = await fetchBanks()
+  const prevBanks = BASE ? await fetch(`${BASE}/banks.json`).then((x) => (x.ok ? x.json() : undefined)).catch(() => undefined) : undefined
+  const banks = await fetchBanks(prevBanks)
   if (banks.banks.length) writeFileSync(join(OUT, 'banks.json'), JSON.stringify(banks))
   else if (BASE) { const r = await fetch(`${BASE}/banks.json`); if (r.ok) writeFileSync(join(OUT, 'banks.json'), await r.text()) }
   console.log(`banks: ${banks.banks.map((b) => b.name).join(', ') || 'okunamadı'}`)

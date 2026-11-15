@@ -439,6 +439,9 @@ internal fun ScreenRow.toInstrument(state: AppState): Instrument =
         state.allKeys,
     ).let { if (currency == "USD" && it.category == Category.TR) it.copy(prefix = "", suffix = "₺") else it }
 
+/** Sonuç tablosunun sıralaması. */
+private enum class RowSort(val label: String) { OWN("Koşula göre"), NAME("Ad"), PRICE("Fiyat"), CHANGE("Bugün") }
+
 /** Dinamik liste sonuçları (tam ekran katman). */
 @Composable
 fun ScreenResultsView(
@@ -449,8 +452,23 @@ fun ScreenResultsView(
     onRefresh: () -> Unit,
     onAdd: (ScreenRow) -> Unit,
     onPinWidget: (() -> Unit)? = null,
+    score: com.piyasa.widget.data.ReliabilityScore? = null,
+    onGlossary: ((String) -> Unit)? = null,
 ) {
     val result = state.screenResults[screen.id]
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val terms = remember { com.piyasa.widget.ui.Glossary.load(context) }
+    // Sonuç sıralaması: listenin kendi sırası ya da ad / fiyat / bugünkü değişim
+    var sort by remember(screen.id) { mutableStateOf(RowSort.OWN) }
+    val rows = remember(result, sort) {
+        val r = result?.rows.orEmpty()
+        when (sort) {
+            RowSort.OWN -> r
+            RowSort.NAME -> r.sortedWith(compareBy(java.text.Collator.getInstance(trLoc)) { it.name })
+            RowSort.PRICE -> r.sortedByDescending { it.price ?: Double.NEGATIVE_INFINITY }
+            RowSort.CHANGE -> r.sortedByDescending { it.change ?: Double.NEGATIVE_INFINITY }
+        }
+    }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -469,7 +487,16 @@ fun ScreenResultsView(
                 item {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                         screen.conditions.forEach { c ->
-                            Text("• " + ScreenEngine.describe(c), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                            // Koşula dokununca alanın sözlükteki açıklaması açılır
+                            val term = if (onGlossary != null) com.piyasa.widget.ui.Glossary.termFor(terms, c.left) else null
+                            Text("• " + ScreenEngine.describe(c), if (term != null) Modifier.clickable { onGlossary?.invoke(term.id) } else Modifier,
+                                style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                        }
+                        if (score != null) {
+                            Row(Modifier.padding(top = 4.dp).then(if (onGlossary != null) Modifier.clickable { onGlossary("guvenilirlik") } else Modifier), verticalAlignment = Alignment.CenterVertically) {
+                                ReliabilityBadge(score)
+                                Text("  son ${score.years} yılın testine göre", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                         val status = when {
                             result == null -> "Henüz taranmadı · yenileyin"
@@ -484,7 +511,14 @@ fun ScreenResultsView(
                 if (result != null && result.rows.isEmpty() && result.error == null) {
                     item { Hint("Şu an koşulları sağlayan sembol yok.") }
                 }
-                items(result?.rows.orEmpty(), key = { "r_" + it.symbol }) { row -> ScreenRowItem(row, screen, state, onAdd) }
+                if (rows.size > 1) {
+                    item {
+                        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(RowSort.entries) { o -> FilterChip(selected = sort == o, onClick = { sort = o }, label = { Text(o.label) }) }
+                        }
+                    }
+                }
+                items(rows, key = { "r_" + it.symbol }) { row -> ScreenRowItem(row, screen, state, onAdd) }
                 item {
                     Text(
                         "Dokun: TradingView'da aç · + ile listene ekle. Liste her yenilemede kendiliğinden güncellenir.",

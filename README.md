@@ -142,6 +142,22 @@ Uygulamaya **18 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; sile
 
 **Nasıl çalışır:** Tarama TradingView'un tarayıcı servisiyle yapılır: evren ve sayısal koşullar mümkün olduğunda sunucuda ön elenir, kalanlar uygulamada değerlendirilir. TradingView 5 yıllık dip/zirve ve geçmiş F/K vermediği için bu alanlar Yahoo Finance aylık geçmişinden, yalnızca ön elemeden geçen ilk 60 aday için hesaplanır ve gün boyunca önbellekte tutulur. EPS ve gelir büyümesi, beklenen F/K TradingView'un yıllık bilanço dizilerinden uygulamada hesaplanır. Listemdeki BIST hisseleri TradingView'un Türkiye ucundan sorgulanır (genel uç piyasa değerini ve tahminleri USD'ye çeviriyor); böylece "Piyasa değeri > 50 mlr" her yerde ₺ demektir.
 
+## Avantajlı fiyatlar, sözlük ve güvenilirlik (0.10.0)
+
+Web sürümündeki hesaplar uygulamada da var; aynı formüller Kotlin'e taşındı ve aynı örneklerle test ediliyor. Veriler web sürümünün yayımladığı dosyalardan okunur (banka fiyatları yarım saatte bir, diğerleri günlük); ağ yokken son kopya kullanılır.
+
+- **Avantajlı fiyatlar** (ana listenin en üstündeki kart):
+  - *Prim ve iskonto:* ALTIN.S1, GLDTR, ZGOLD, ISGLK ve GMSTR içlerindeki madenin değerine göre nerede; değerinin altına inince al sinyali. BIST kapalıyken sinyal verilmez.
+  - *Banka mı, fon mu?* Altın ya da gümüş alıp bir süre sonra satmanın tüm masrafları (makas, BSMV, komisyon, yönetim gideri, stopaj): bankalar, fiziki alım, fon ve sertifika yan yana. Tutar, süre, beklenen artış ve komisyon değiştirilebilir; listede olmayan banka elle girilir.
+  - *Birikim önerileri:* Altın boz, ev al / Altın biriktir; Dolar boz, ev al / Dolar biriktir; Altın sat, gümüş al / Gümüş sat, altın al.
+- **Sözlük** (üst çubuktaki ⓘ): 61 terim, aranabilir. Liste sonuçlarında bir koşula dokununca ilgili terim açılır.
+- **Güvenilirlik skoru:** hazır dinamik listelerin yanında rozet (son 3 yılın testi, her gün yeniden hesaplanır). Koşulları değiştirilen listede skor gösterilmez.
+- **Sıralama:** dinamik listeler kendi sırana (sürükleyerek), güvenilirliğe, eşleşme sayısına ya da ada göre dizilir; liste sonuçları koşula, ada, fiyata ya da bugünkü değişime göre.
+
+Geçmişte test (backtest) yalnızca web sürümündedir.
+
+Ayrıntılar ve hesapların dayanakları: [web/README](web/README.md).
+
 ## Varsayılan liste
 
 İlk kurulumda derli toplu bir liste gelir. *Ayarlar → Varsayılan listeye dön* ile istediğiniz zaman bu listeye dönebilirsiniz (widget ayarları korunur).

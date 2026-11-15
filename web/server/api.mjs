@@ -43,7 +43,7 @@ export async function handleApi(req, res) {
       const hit = cache.get('banks')
       if (hit && Date.now() - hit.time < 2 * 60_000) return send(res, 200, hit.body)
       const { fetchBanks } = await import('./banks.mjs')
-      const body = await fetchBanks()
+      const body = await fetchBanks(hit?.body)
       if (body.banks.length) cache.set('banks', { time: Date.now(), body })
       return send(res, 200, body)
     }

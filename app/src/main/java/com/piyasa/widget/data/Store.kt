@@ -166,6 +166,8 @@ object Actions {
         context.appStore.updateData { s -> s.copy(widgets = s.widgets - ids.toSet()) }
     }
 
+    suspend fun setScreenSort(context: Context, sort: com.piyasa.widget.model.ScreenListSort) = edit(context) { it.copy(screenSort = sort) }
+
     suspend fun setRefreshMinutes(context: Context, minutes: Int) {
         context.appStore.updateData { it.copy(refreshMinutes = minutes) }
         RefreshWorker.schedule(context, minutes, replace = true)

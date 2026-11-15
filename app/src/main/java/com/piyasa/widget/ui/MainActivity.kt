@@ -1,5 +1,8 @@
 package com.piyasa.widget.ui
 
+import com.piyasa.widget.data.Remote
+import com.piyasa.widget.model.ScreenListSort
+import androidx.compose.material.icons.filled.Info
 import android.content.Context
 import android.os.Bundle
 import android.widget.Toast
@@ -108,14 +111,22 @@ private fun MainScreen() {
     // Dinamik listeler: düzenlenen (yeni ise state'te yok) ve görüntülenen
     var editingScreen by remember { mutableStateOf<ScreenEditTarget?>(null) }
     var viewingScreen by remember { mutableStateOf<String?>(null) }
+    // Avantajlı fiyatlar ve sözlük (sözlük: null kapalı, "" açık, aksi halde gidilecek terim)
+    var showAdvantage by remember { mutableStateOf(false) }
+    var glossary by remember { mutableStateOf<String?>(null) }
+    val scores by Remote.scores.collectAsStateWithLifecycle()
+    val advantage by Remote.advantage.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { RefreshWorker.runNow(context) }
+    LaunchedEffect(Unit) { Remote.refreshScores(context); Remote.refreshAdvantage(context) }
 
     val s = state
     // Katmanlar açıkken geri tuşu en üsttekini kapatır
-    BackHandler(enabled = composing != null || editingScreen != null || viewingScreen != null) {
+    BackHandler(enabled = composing != null || editingScreen != null || viewingScreen != null || showAdvantage || glossary != null) {
         when {
+            glossary != null -> glossary = null
             editingScreen != null -> editingScreen = null
+            showAdvantage -> showAdvantage = false
             composing != null -> composing = null
             else -> viewingScreen = null
         }
@@ -140,6 +151,7 @@ private fun MainScreen() {
                     } else {
                         IconButton(onClick = { RefreshWorker.runNow(context) }) { Icon(Icons.Default.Refresh, "Yenile") }
                     }
+                    IconButton(onClick = { glossary = "" }) { Icon(Icons.Default.Info, "Sözlük") }
                     IconButton(onClick = { showSettings = true }) { Icon(Icons.Default.Settings, "Ayarlar") }
                 },
             )
@@ -157,6 +169,10 @@ private fun MainScreen() {
         Box(Modifier.fillMaxSize().padding(padding)) {
             WatchList(
                 state = s,
+                scores = scores,
+                advantage = advantage,
+                onOpenAdvantage = { showAdvantage = true },
+                onSortScreens = { sort -> scope.launch { Actions.setScreenSort(context, sort) } },
                 onOpenScreen = { viewingScreen = it },
                 onEditScreen = { editingScreen = ScreenEditTarget(it) },
                 onDeleteScreen = { id -> scope.launch { Actions.deleteScreen(context, id) } },
@@ -221,8 +237,11 @@ private fun MainScreen() {
             onRefresh = { scope.launch { Actions.runScreen(context, viewing.id) } },
             onAdd = { row -> scope.launch { Actions.addInstrument(context, row.toInstrument(s)) } },
             onPinWidget = { scope.launch { pinWidget(context, WidgetConfig.forScreen(viewing)) } },
+            score = Remote.scoreFor(viewing, scores),
+            onGlossary = { glossary = it },
         )
     }
+    if (showAdvantage) AdvantageScreen(onClose = { showAdvantage = false }, onGlossary = { glossary = it })
     // Dinamik liste düzenleyici
     val screenTarget = editingScreen
     if (screenTarget != null && s != null) {
@@ -239,6 +258,8 @@ private fun MainScreen() {
             runner = { scr -> com.piyasa.widget.data.Repository.runScreen(scr, s) },
         )
     }
+    // Sözlük en üstte: diğer katmanlardan açılabilir
+    glossary?.let { GlossaryScreen(target = it, onClose = { glossary = null }) }
     }
 }
 
@@ -267,10 +288,18 @@ internal data class ListGroup(val id: String, val label: String, val keys: List<
         const val FORMULAS = "f"
         const val SCREENS = "s"
 
-        fun of(state: AppState): List<ListGroup> =
+        /** Dinamik listeler seçilen sıralamayla; "Sıram" dışındakilerde sürükleyerek sıralama kapalıdır. */
+        fun screenOrder(state: AppState, scores: Map<String, com.piyasa.widget.data.ReliabilityScore>): List<String> = when (state.screenSort) {
+            ScreenListSort.MANUAL -> state.screens
+            ScreenListSort.NAME -> state.screens.sortedWith(compareBy(java.text.Collator.getInstance(Locale.forLanguageTag("tr-TR"))) { it.name })
+            ScreenListSort.MATCHES -> state.screens.sortedByDescending { state.screenResults[it.id]?.rows?.size ?: -1 }
+            ScreenListSort.SCORE -> state.screens.sortedByDescending { Remote.scoreFor(it, scores)?.score ?: -1 }
+        }.map { it.id }
+
+        fun of(state: AppState, scores: Map<String, com.piyasa.widget.data.ReliabilityScore> = emptyMap()): List<ListGroup> =
             listOf(ListGroup(FORMULAS, "Hesaplamalar", state.formulas.map { it.key })) +
                 Category.entries.map { c -> ListGroup("c_" + c.name, c.label, state.instruments.filter { it.category == c }.map { it.key }) } +
-                ListGroup(SCREENS, "Dinamik listeler", state.screens.map { it.id })
+                ListGroup(SCREENS, "Dinamik listeler", screenOrder(state, scores))
     }
 }
 
@@ -289,6 +318,10 @@ internal fun WatchList(
     onDeleteScreen: (String) -> Unit = {},
     onPinScreen: (com.piyasa.widget.model.Screen) -> Unit = {},
     onPinGroup: (title: String, keys: List<String>) -> Unit = { _, _ -> },
+    scores: Map<String, com.piyasa.widget.data.ReliabilityScore> = emptyMap(),
+    advantage: com.piyasa.widget.data.AdvantageData? = null,
+    onOpenAdvantage: () -> Unit = {},
+    onSortScreens: (ScreenListSort) -> Unit = {},
 ) {
     val context = LocalContext.current
     val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
@@ -302,13 +335,15 @@ internal fun WatchList(
         return
     }
     // Sürüklerken sıra yerelde tutulur (anında tepki); bırakınca kaydedilir.
-    val base = remember(state.formulas, state.instruments, state.screens) { ListGroup.of(state) }
+    val sorted = state.screenSort != ScreenListSort.MANUAL
+    val base = remember(state.formulas, state.instruments, state.screens, state.screenSort, scores, if (sorted) state.screenResults else null) { ListGroup.of(state, scores) }
     var groups by remember(base) { mutableStateOf(base) }
     var movedGroup by remember { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     val reorder = rememberReorderableLazyListState(listState) { from, to ->
         val g = groups.indexOfFirst { it.keyOf(from.key) != null }
         if (g < 0 || groups[g].keyOf(to.key) == null) return@rememberReorderableLazyListState // yalnızca kendi grubunda
+        if (sorted && groups[g].id == ListGroup.SCREENS) return@rememberReorderableLazyListState // sıralıyken sürükleme kapalı
         val grp = groups[g]
         val a = grp.keys.indexOf(grp.keyOf(from.key))
         val b = grp.keys.indexOf(grp.keyOf(to.key))
@@ -324,10 +359,12 @@ internal fun WatchList(
     }
 
     LazyColumn(state = listState, contentPadding = PaddingValues(bottom = 96.dp)) {
+        if (advantage != null) item(key = "advantage") { AdvantageCard(advantage, Modifier.clickable { onOpenAdvantage() }) }
         groups.forEach { grp ->
             if (grp.keys.isEmpty()) return@forEach
             item(key = "h_${grp.id}") {
-                GroupHeader(grp, pinnable = grp.id != ListGroup.SCREENS) { onPinGroup(grp.label, grp.keys) }
+                if (grp.id == ListGroup.SCREENS) ScreensHeader(grp.label, state.screenSort, onSortScreens)
+                else GroupHeader(grp, pinnable = true) { onPinGroup(grp.label, grp.keys) }
             }
             if (grp.id == ListGroup.SCREENS) {
                 items(grp.keys, key = { grp.itemKey(it) }) { id ->
@@ -337,7 +374,7 @@ internal fun WatchList(
                         DragSurface(dragging) {
                             Box {
                                 ScreenListRow(
-                                    state, scr,
+                                    state, scr, Remote.scoreFor(scr, scores),
                                     Modifier.clickable { onOpenScreen(scr.id) }
                                         .longPressDraggableHandle(
                                             onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
@@ -425,14 +462,41 @@ private fun GroupHeader(grp: ListGroup, pinnable: Boolean, onPin: () -> Unit) {
     }
 }
 
-/** Dinamik liste satırı: ad · ilk eşleşenler · eşleşme sayısı. */
+/** Dinamik listeler başlığı: sağda sıralama seçimi. */
 @Composable
-private fun ScreenListRow(state: AppState, scr: com.piyasa.widget.model.Screen, modifier: Modifier) {
+private fun ScreensHeader(label: String, sort: ScreenListSort, onSort: (ScreenListSort) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.weight(1f)) { SectionHeader(label) }
+        Box {
+            Text(
+                "Sırala: ${sort.label}",
+                Modifier.clickable { menu = true }.padding(start = 12.dp, end = 16.dp, top = 12.dp, bottom = 2.dp),
+                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                ScreenListSort.entries.forEach { o ->
+                    DropdownMenuItem(
+                        text = { Text(o.label + if (o == ScreenListSort.MANUAL) " (sürükleyerek)" else "", fontWeight = if (o == sort) FontWeight.Bold else FontWeight.Normal) },
+                        onClick = { menu = false; onSort(o) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Dinamik liste satırı: ad · güvenilirlik · ilk eşleşenler · eşleşme sayısı. */
+@Composable
+private fun ScreenListRow(state: AppState, scr: com.piyasa.widget.model.Screen, score: com.piyasa.widget.data.ReliabilityScore?, modifier: Modifier) {
     val r = state.screenResults[scr.id]
     Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(scr.name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(scr.name, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                if (score != null) ReliabilityBadge(score, Modifier.padding(start = 8.dp), showLabel = false)
+            }
             val rows = r?.rows.orEmpty()
             // Eşleşenlerin adları (listeyi açmadan bir bakışta); yoksa koşulun kendisi
             Text(

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -113,5 +114,28 @@ fun openUrl(context: android.content.Context, url: String?) {
             android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
         )
+    }
+}
+
+/** Güvenilirlik rozeti: dört kademeli çubuk, skor ve etiket (web sürümüyle aynı eşikler: 70 / 50 / 30). */
+@Composable
+fun ReliabilityBadge(score: com.piyasa.widget.data.ReliabilityScore, modifier: Modifier = Modifier, showLabel: Boolean = true) {
+    val v = score.score
+    val filled = when { v == null -> 0; v >= 70 -> 4; v >= 50 -> 3; v >= 30 -> 2; else -> 1 }
+    val color = when (filled) {
+        4 -> directionColor(1)
+        3 -> MaterialTheme.colorScheme.tertiary
+        1 -> directionColor(-1)
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    val off = MaterialTheme.colorScheme.outlineVariant
+    androidx.compose.foundation.layout.Row(modifier, verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            listOf(5, 7, 9, 11).forEachIndexed { i, h ->
+                Box(Modifier.size(width = 4.dp, height = h.dp).background(if (i < filled) color else off, RoundedCornerShape(1.5.dp)))
+            }
+        }
+        if (v != null) Text(" $v", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        if (showLabel) Text(" " + (if (v == null) "Yetersiz veri" else score.label), fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color, maxLines = 1)
     }
 }

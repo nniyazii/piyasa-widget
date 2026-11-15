@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseAltinkaynak, parseAkbank, parseEnpara, parseKuveytTurk, parseYapiKredi, parseZiraat, trNum } from './banks.mjs'
+import { inSession, withDaytime, parseAltinkaynak, parseAkbank, parseEnpara, parseKuveytTurk, parseYapiKredi, parseZiraat, trNum } from './banks.mjs'
 
 describe('banka fiyatları', () => {
   it('Türkçe sayı', () => { expect(trNum('6.442,771307')).toBeCloseTo(6442.771307, 6) })
@@ -31,6 +31,21 @@ describe('banka fiyatları', () => {
   it('Altınkaynak: gram, külçe, gümüş', () => {
     const r = parseAltinkaynak('[{"Alis":"6.494","Satis":"6.550","Kod":"CH_T"},{"Alis":"6.500","Satis":"6.619","Kod":"GA"},{"Alis":"79,78","Satis":"92,87","Kod":"AG_T"},{"Alis":"324.689","Satis":"334.008","Kod":"GA50"}]')
     expect(r).toEqual({ gram: { bid: 6500, ask: 6619 }, bar: { bid: 6494, ask: 6550 }, silver: { bid: 79.78, ask: 92.87 } })
+  })
+  it('mesai: hafta içi 09:30–17:30 İstanbul', () => {
+    expect(inSession(Date.parse('2026-11-11T08:00:00Z'))).toBe(true) // Çarşamba 11:00
+    expect(inSession(Date.parse('2026-11-11T06:00:00Z'))).toBe(false) // 09:00
+    expect(inSession(Date.parse('2026-11-13T18:38:00Z'))).toBe(false) // Cuma 21:38
+    expect(inSession(Date.parse('2026-11-14T09:00:00Z'))).toBe(false) // Cumartesi
+  })
+  it('mesai dışında, mesai içindeki son fiyatlar taşınır', () => {
+    const day = { generated: 1, session: true, banks: [{ id: 'z' }], physical: [] }
+    const night = { generated: 2, session: false, banks: [{ id: 'z2' }], physical: [] }
+    expect(withDaytime(day, night)).toBe(day) // mesaide: olduğu gibi
+    const n1 = withDaytime(night, day)
+    expect(n1.daytime).toEqual({ generated: 1, banks: [{ id: 'z' }], physical: [] })
+    expect(withDaytime({ ...night, generated: 3 }, n1).daytime.generated).toBe(1) // gece boyunca korunur
+    expect(withDaytime(night, undefined).daytime).toBeUndefined()
   })
   it('anlamsız fiyat çifti atılır', () => {
     expect(parseKuveytTurk('[{"Title":"ALT (gr)","BuyRate":6600,"SellRate":6500}]').gold).toBeUndefined()

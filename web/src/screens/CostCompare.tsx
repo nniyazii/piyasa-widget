@@ -77,6 +77,12 @@ export function CostCompare({ banks, certPremium }: { banks?: BanksData; certPre
           <tbody>{rows.map((r) => <Row key={r.route.id} r={r} best={r === best} amount={s.amount} />)}</tbody>
         </table>
       </div>
+      {banks?.session === false && (
+        <p className="note" style={{ color: 'var(--down)' }}>Banka fiyatları mesai dışında okundu ({Fmt.dateTime(banks.generated)}). Bankalar mesai dışında ve hafta sonu makası belirgin biçimde açar; hafta içi 09:30–17:30 arasında makaslar çok daha dardır.</p>
+      )}
+      {banks?.offHoursAt != null && (
+        <p className="note">Şu an banka mesaisi dışında; karşılaştırma mesai içindeki son fiyatlarla ({Fmt.dateTime(banks.generated)}) yapıldı. Şu an alırsan makas daha geniş olur.</p>
+      )}
       <div className="cost-form cost-own">
         <span className="cost-own-label">Bankan ya da kuyumcun listede yoksa (ör. İş Bankası) gram {metal} alış ve satış fiyatını gir:</span>
         <label>Bankanın alışı (₺)<input type="number" inputMode="decimal" min={0} step="any" value={inp.own[inp.metal]?.bid ?? ''} onChange={(e) => setOwn({ bid: Number(e.target.value) || undefined })} /></label>

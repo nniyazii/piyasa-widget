@@ -14,6 +14,15 @@
  */
 export const RATES = { bankBsmv: 0.002, fundTax: 0.175, certTax: 0, commissionBsmv: 0.05 }
 
+/** Banka mesaisi (hafta içi 09:30–17:30, İstanbul): makaslar bu saatlerde dardır, dışında belirgin biçimde açılır. */
+export function bankSession(ms: number): boolean {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Istanbul', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(ms))
+  const get = (t: string) => p.find((x) => x.type === t)?.value ?? ''
+  if (['Sat', 'Sun'].includes(get('weekday'))) return false
+  const min = Number(get('hour')) * 60 + Number(get('minute'))
+  return min >= 9 * 60 + 30 && min <= 17 * 60 + 30
+}
+
 export interface Route {
   id: string
   name: string

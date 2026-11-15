@@ -127,6 +127,10 @@ data class WidgetConfig(
     val itemKeys: List<String> get() = keys.filterNot { isSection(it) || isScreen(it) }
 }
 
+/** Dinamik listelerin ana listedeki sıralaması (yalnızca görünüm; kullanıcının sırası saklı kalır). */
+@Serializable
+enum class ScreenListSort(val label: String) { MANUAL("Sıram"), SCORE("Güvenilirlik"), MATCHES("Eşleşme"), NAME("Ad") }
+
 @Serializable
 data class AppState(
     val instruments: List<Instrument> = Catalog.defaultInstruments,
@@ -148,6 +152,8 @@ data class AppState(
      */
     val pendingWidget: WidgetConfig? = null,
     val pendingWidgetAt: Long = 0L,
+    /** Dinamik listelerin ana listedeki sırası: kullanıcının sırası ya da güvenilirlik / eşleşme / ad. */
+    val screenSort: ScreenListSort = ScreenListSort.MANUAL,
 ) {
     /** Yakın zamanda (2 dk) istenen sabitleme içeriği; vazgeçilmiş eski istekler sonraki widget'lara sızmasın. */
     fun pendingWidget(now: Long = System.currentTimeMillis()): WidgetConfig? =

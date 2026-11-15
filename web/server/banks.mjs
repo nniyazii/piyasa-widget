@@ -1,6 +1,7 @@
 /**
  * Bankaların kendi sitelerinde yayımladığı gram altın ve gram gümüş alış/satış fiyatları.
- *   Çıktı: { generated, banks: [{ id, name, gold?, silver? }], physical: [{ id, name, gold?, silver? }] }   (fiyat: { bid, ask })
+ *   Çıktı: { generated, session, banks: [{ id, name, gold?, silver? }], physical: [...], daytime?: { generated, banks, physical } }
+ *   (fiyat: { bid, ask }; session: banka mesaisinde mi okundu; daytime: mesai içindeki son fiyatlar)
  * banks: kaydi hesap (alımda BSMV); physical: kuyumcudan fiziki alım.
  * bid = bankanın alış fiyatı (sen satarken), ask = bankanın satış fiyatı (sen alırken). TL / gram.
  * Bir banka okunamazsa atlanır; hiçbir banka gelmezse boş liste döner.
@@ -110,7 +111,26 @@ const SOURCES = [
   { id: 'ziraat', name: 'Ziraat Bankası', run: ziraat },
 ]
 
-export async function fetchBanks() {
+/** Banka mesaisi (hafta içi 09:30–17:30, İstanbul): makaslar bu saatlerde dardır, dışında belirgin biçimde açılır. */
+export function inSession(ms = Date.now()) {
+  const p = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Istanbul', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date(ms))
+  const get = (t) => p.find((x) => x.type === t)?.value ?? ''
+  if (['Sat', 'Sun'].includes(get('weekday'))) return false
+  const min = Number(get('hour')) * 60 + Number(get('minute'))
+  return min >= 9 * 60 + 30 && min <= 17 * 60 + 30
+}
+
+/**
+ * Mesai dışında okunan fiyatların yanında, mesai içindeki son fiyatlar da taşınır (daytime): karşılaştırma
+ * gece ya da hafta sonu açılmış makaslarla yapılmasın. [prev]: bir önceki çıktı.
+ */
+export function withDaytime(now, prev) {
+  if (now.session) return now
+  const day = prev?.session ? { generated: prev.generated, banks: prev.banks, physical: prev.physical ?? [] } : prev?.daytime
+  return day?.banks?.length ? { ...now, daytime: day } : now
+}
+
+export async function fetchBanks(prev) {
   const banks = []
   await Promise.all(SOURCES.map(async (s) => {
     try {
@@ -122,5 +142,6 @@ export async function fetchBanks() {
   // Fiziki fiyatlar ayrı alanda: banka satırı gibi (BSMV'li) okunmasınlar
   let physical = []
   try { physical = await altinkaynak() } catch (e) { console.log(`fiziki fiyat alınamadı: Altınkaynak (${e.message})`) }
-  return { generated: Date.now(), banks, physical }
+  const generated = Date.now()
+  return withDaytime({ generated, session: inSession(generated), banks, physical }, prev)
 }

@@ -26,7 +26,7 @@ jobs:
         with:
           node-version: 22
       - name: Banka fiyatlarını oku
-        run: node scripts/banks.mjs out/data/banks.json
+        run: node scripts/banks.mjs out/data/banks.json "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/banks.json"
       - name: Yayına ekle (diğer dosyalar korunur)
         uses: peaceiris/actions-gh-pages@v4
         with:

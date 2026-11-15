@@ -4,12 +4,29 @@
  */
 import { useEffect, useSyncExternalStore } from 'react'
 import { advices, type Advice, type RatioData } from '../core/advice'
+import { bankSession } from '../core/costs'
 import { bistOpen, METALS, PREMIUM_PAIRS, premiumRow, typicalGrams, USDTRY, type PremiumRow } from '../core/premium'
 import { dailyCloses } from './daily'
 import { scan } from './tv'
 
 export interface BankQuote { bid: number; ask: number }
-export interface BanksData { generated: number; banks: BankEntry[]; physical?: BankEntry[] }
+export interface BanksData { generated: number; banks: BankEntry[]; physical?: BankEntry[]
+  /** Fiyatlar banka mesaisinde mi okundu (yoksa makaslar olağandan geniştir) */
+  session?: boolean
+  /** Mesai dışındayken: mesai içindeki son fiyatlar */
+  daytime?: { generated: number; banks: BankEntry[]; physical?: BankEntry[] }
+  /** Karşılaştırmada mesai içi son fiyatlar kullanılıyor; canlı (mesai dışı) okuma zamanı */
+  offHoursAt?: number
+}
+
+/** Mesai dışında okunmuşsa karşılaştırma mesai içindeki son fiyatlarla yapılır. */
+export function effectiveBanks(d: BanksData): BanksData {
+  // Alan yoksa (eski kopya) okuma zamanından bulunur
+  const session = d.session ?? bankSession(d.generated)
+  if (session) return { ...d, session: true }
+  if (!d.daytime?.banks.length) return { ...d, session: false }
+  return { ...d.daytime, session: true, offHoursAt: d.generated }
+}
 export interface BankEntry { id: string; name: string; gold?: BankQuote; silver?: BankQuote }
 
 export interface PremiumState { rows: PremiumRow[]; advices: Advice[]; banks?: BanksData; time: number; open: boolean; loading: boolean; error?: string }
@@ -39,7 +56,7 @@ async function loadBanks(): Promise<BanksData | undefined> {
   for (const url of ['data/banks.json', 'api/banks']) {
     try {
       const r = await fetch(url, { cache: 'no-cache' })
-      if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) return (await r.json()) as BanksData
+      if (r.ok && (r.headers.get('content-type') ?? '').includes('json')) return effectiveBanks((await r.json()) as BanksData)
     } catch { /* sıradaki kaynak */ }
   }
   return undefined
