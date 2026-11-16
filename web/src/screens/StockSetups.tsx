@@ -2,13 +2,14 @@
  * Güçlü kurulumlar: pazardaki tüm hisselerde, üç ayrı dönemde sınanmış az sayıda dip/tepe kurulumu ve
  * seçilen hissenin şu an bunlara göre durumu.
  */
+import { useMemo, useState } from 'react'
 import * as Fmt from '../core/format'
 import { HORIZON, INDEX_NAME, PATH_DAYS, PERIOD_LABELS, REGIME_LABEL, SETUPS, STRONG, type Basis, type SetupEvidence, type SetupNow } from '../core/setups'
 import type { SetupData } from '../data/bars'
 import { Icon } from '../ui/Icon'
 import { Segmented } from '../ui/overlay'
 import { href } from '../ui/router'
-import { EventChart, PathChart, StateChart } from '../ui/SignalChart'
+import { EventChart, PathChart, StateChart, type ChartMark } from '../ui/SignalChart'
 
 const pct = (v?: number, d = 1) => (v == null ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), d))
 const p0 = (v: number) => '%' + Fmt.number(v * 100, 0)
@@ -53,6 +54,26 @@ export function SetupsView({ d, symbol, onBasis }: { d: SetupData; symbol: strin
   const weakest = (s: SetupNow) => Math.min(...s.evidence!.periods.map((p) => (p[0] >= STRONG.n ? p[1] - p[2] : -1)))
   const rest = d.list.filter((s) => !s.strength?.strong && s.evidence).sort((a, b) => Number(b.regimeOk) - Number(a.regimeOk) || weakest(b) - weakest(a))
   const anyActive = strong.some((s) => s.active)
+  // Grafikte işaretlenecek geçmiş sinyaller: seçilen kurulum(lar)ın bu hissede oluştuğu günler
+  const [pick, setPick] = useState('all')
+  const marks = useMemo(() => {
+    const out: ChartMark[] = []
+    for (const side of ['dip', 'top'] as const) {
+      const days = new Map<number, { ret?: number; labels: string[] }>()
+      for (const s of d.list) {
+        if (s.regime !== 'any' || s.setup.side !== side) continue
+        if (pick === 'strong' ? !d.list.some((x) => x.setup.id === s.setup.id && x.strength?.strong) : pick !== 'all' && pick !== side && pick !== s.setup.id) continue
+        for (const e of s.events) { const m = days.get(e.i) ?? { ret: e.ret, labels: [] }; m.labels.push(s.setup.label); days.set(e.i, m) }
+      }
+      // Birkaç gün içinde art arda gelenler tek işaret
+      let last: ChartMark | undefined
+      for (const i of [...days.keys()].sort((a, b) => a - b)) {
+        const m = days.get(i)!
+        if (last && i - last.i <= 5) { for (const l of m.labels) if (!last.labels.includes(l)) last.labels.push(l) } else { last = { i, side, ret: m.ret, labels: [...m.labels] }; out.push(last) }
+      }
+    }
+    return out
+  }, [d, pick])
   return (
     <>
       <p className="st-alarm">
@@ -66,7 +87,19 @@ export function SetupsView({ d, symbol, onBasis }: { d: SetupData; symbol: strin
         </div>
       )}
       {d.regimeNow != null && <p className="st-regime">Piyasa durumu: {INDEX_NAME[d.market]}{d.basis === 'usd' ? ' (dolar bazında)' : ''} 200 günlük ortalamasının <b>{d.regimeNow ? 'üstünde' : 'altında'}</b>.</p>}
-      <StateChart c={d.ctx.c} t={d.ctx.t} sma200={d.ctx.s.sma200} rsi={d.ctx.s.rsi} vol={d.ctx.vol} unit={d.basis === 'usd' ? 'dolar bazında' : undefined} />
+      <StateChart c={d.ctx.c} t={d.ctx.t} sma200={d.ctx.s.sma200} rsi={d.ctx.s.rsi} vol={d.ctx.vol} unit={d.basis === 'usd' ? 'dolar bazında' : undefined} marks={marks}
+        controls={(
+          <label className="sc-pick">İşaretlenen sinyaller
+            <select className="select" value={pick} onChange={(e) => setPick(e.target.value)}>
+              <option value="all">Tüm kurulumlar</option>
+              {strong.length > 0 && <option value="strong">Yalnızca güçlü kurulumlar</option>}
+              <option value="dip">Yalnızca dip kurulumları</option>
+              <option value="top">Yalnızca tepe kurulumları</option>
+              <optgroup label="Tek kurulum">{SETUPS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}</optgroup>
+            </select>
+          </label>
+        )} />
+      {!strong.length && <p className="sc-note">İşaretler, sınanan kurulumların bu hissede oluştuğu günlerdir; bu pazarda hiçbiri güvenilir sayılacak kadar tutmadı. Grafik bunu hisse özelinde görmeni sağlar.</p>}
 
       {shown.length > 0 && (
         <section className="an-group">

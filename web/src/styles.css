@@ -1092,3 +1092,7 @@ a.screen-item { text-decoration: none; color: inherit; }
 
 .st-basis { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 16px 0 0; }
 .st-basis .note { margin: 0; max-width: 62ch; }
+
+.sc-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; }
+.sc-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-3); }
+.sc-pick .select { height: 34px; max-width: 260px; font-size: 13.5px; }

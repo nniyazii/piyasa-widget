@@ -239,6 +239,15 @@ await step('analiz: hisse seç, güçlü kurulumlar ve hisseye özgü kurallar',
   if (await page.locator('.st-frame[open] > table tbody tr').first().locator('.hitbar').count() !== 3) throw new Error('dönem göstergeleri eksik')
   if (await page.locator('.st-frame[open] > table tbody tr').count() !== 10) throw new Error('ilk 10 kurulum bekleniyordu')
   if (!(await page.locator('.sc-vol').count())) throw new Error('hacim paneli yok')
+  // Geçmiş sinyaller grafikte işaretli; tek kurulum seçilince işaret sayısı azalır; tüm geçmişe genişletilebilir
+  const marksAll = await page.locator('.sc').first().locator('path.sc-mark').count()
+  if (marksAll < 5) throw new Error('grafikte sinyal işareti yok: ' + marksAll)
+  await page.locator('.sc-pick select').selectOption('rsi30')
+  const marksOne = await page.locator('.sc').first().locator('svg[role=img] path.sc-mark').count()
+  if (!(marksOne > 0 && marksOne < marksAll)) throw new Error('kurulum seçimi işaretleri değiştirmedi: ' + marksOne + '/' + marksAll)
+  await page.locator('.sc-controls button', { hasText: 'Tümü' }).click()
+  if (await page.locator('.sc').first().locator('svg[role=img] path.sc-mark').count() <= marksOne) throw new Error('tüm geçmişte işaret artmadı')
+  await page.locator('.sc-pick select').selectOption('all')
   // Hisseye özgü kurallar: grafikler, dört kanıt şartı, tüm kurallar
   await page.locator('.st-own > summary').click()
   await page.locator('.st-own .st-table tbody tr').nth(3).waitFor({ timeout: 10000 })

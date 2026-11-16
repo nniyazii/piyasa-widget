@@ -323,9 +323,19 @@ export function EventChart({ bars, events, side }: { bars: Bars; events: { i: nu
  * Hissenin durumu: son ~3 yılın günlük fiyatı ve 200 günlük ortalaması; altında göreli hacim ve RSI.
  * Üç panel aynı zaman eksenini paylaşır, her birinin kendi dikey ekseni vardır.
  */
-export function StateChart({ c, t, sma200, rsi, vol, unit }: { c: number[]; t: number[]; sma200: number[]; rsi: number[]; vol: number[]; unit?: string }) {
+/** Grafikte işaretlenen geçmiş sinyal: dip (▲, fiyatın altında) ya da tepe (▼, fiyatın üstünde); dolgu sonucu gösterir */
+export interface ChartMark { i: number; side: 'dip' | 'top'; ret?: number; labels: string[] }
+const markOutcome = (m: ChartMark): Outcome => (m.ret == null ? 'open' : (m.ret > 0) === (m.side === 'dip') ? 'hit' : 'miss')
+function Tri({ x, y, side, o }: { x: number; y: number; side: 'dip' | 'top'; o: Outcome }) {
+  const s = 5.5
+  const d = side === 'dip' ? `M${x} ${y - s}L${x + s} ${y + s * 0.8}L${x - s} ${y + s * 0.8}Z` : `M${x} ${y + s}L${x + s} ${y - s * 0.8}L${x - s} ${y - s * 0.8}Z`
+  return <path d={d} className={'sc-mark ' + o} />
+}
+
+export function StateChart({ c, t, sma200, rsi, vol, unit, marks = [], controls }: { c: number[]; t: number[]; sma200: number[]; rsi: number[]; vol: number[]; unit?: string; marks?: ChartMark[]; controls?: ReactNode }) {
   const n = c.length
-  const start = Math.max(0, n - 750)
+  const [all, setAll] = useState(false)
+  const start = all ? Math.min(n - 1, 200) : Math.max(0, n - 750)
   const hasVol = vol.slice(start).some((x) => !Number.isNaN(x))
   const [box, W] = useWidth(720)
   const P = { l: 8, r: 64, t: 10, b: 22 }
@@ -345,19 +355,34 @@ export function StateChart({ c, t, sma200, rsi, vol, unit }: { c: number[]; t: n
     const rTop = vTop + (hasVol ? VH + GAP : 0)
     const ry = (q: number) => rTop + RH - 3 - (q / 100) * (RH - 6)
     const line = (get: (i: number) => number, map: (q: number) => number) => { let d = '', pen = false; for (let i = start; i < n; i++) { const q = get(i); if (Number.isNaN(q)) { pen = false; continue }; d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)} ${map(q).toFixed(1)}`; pen = true }; return d }
-    const ticks = [0, 1, 2, 3].map((k) => { const i = Math.round(start + ((n - 1 - start) * k) / 3); return { x: x(i), label: monthFmt.format(t[i] * 1000) } })
+    const ticks = [0, 1, 2, 3].map((k) => { const i = Math.round(start + ((n - 1 - start) * k) / 3); return { x: x(i), label: (n - start > 1300 ? yearFmt : monthFmt).format(t[i] * 1000) } })
     return { x, y, vy, ry, vTop, rTop, log, price: line((i) => c[i], y), ma: line((i) => sma200[i], y), rsi: line((i) => rsi[i], ry), ticks }
-  }, [c, t, sma200, rsi, vol, W])
+  }, [c, t, sma200, rsi, vol, W, start])
+  const shown = marks.filter((m) => m.i >= start && m.i < n)
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect()
     const px = ((e.clientX - r.left) / r.width) * W
-    setHover(Math.max(start, Math.min(n - 1, Math.round(start + ((px - P.l) / (W - P.l - P.r)) * (n - 1 - start)))))
+    // Sinyal işaretine yakınsa ona yapış
+    let best = Math.max(start, Math.min(n - 1, Math.round(start + ((px - P.l) / (W - P.l - P.r)) * (n - 1 - start)))), near = 9
+    for (const m of shown) { const dd = Math.abs(g.x(m.i) - px); if (dd < near) { near = dd; best = m.i } }
+    setHover(best)
   }
+  const hm = hover != null ? shown.filter((m) => m.i === hover) : []
+  const tally = (side: 'dip' | 'top') => { const s = shown.filter((m) => m.side === side && m.ret != null); return { n: s.length, hit: s.filter((m) => markOutcome(m) === 'hit').length } }
+  const dipT = tally('dip'), topT = tally('top')
   const bw = Math.max(0.6, ((W - P.l - P.r) / Math.max(1, n - start)) * 0.7)
   const lastR = rsi[n - 1], lastV = vol[n - 1]
   return (
     <figure className="sc">
-      <figcaption>Hissenin durumu{unit ? ` (${unit})` : ''}<span>Son 3 yıl: günlük fiyat{unit ? ` (${unit})` : ''} ve 200 günlük ortalama{hasVol ? '; hacim (50 günlük ortalamaya göre)' : ''}; RSI.</span></figcaption>
+      <figcaption>Fiyat ve geçmiş sinyaller{unit ? ` (${unit})` : ''}<span>{all ? 'Tüm geçmiş' : 'Son 3 yıl'}: günlük fiyat{unit ? ` (${unit})` : ''} ve 200 günlük ortalama{hasVol ? '; hacim (50 günlük ortalamaya göre)' : ''}; RSI.
+        {marks.length > 0 && <> Bu aralıkta sonucu belli {dipT.n} dip sinyalinin {dipT.hit} tanesinde 3 ay sonra fiyat yukarıdaydı{topT.n ? `; ${topT.n} tepe sinyalinin ${topT.hit} tanesinde aşağıdaydı` : ''}.</>}</span></figcaption>
+      <div className="sc-controls">
+        <div className="segmented" role="group" aria-label="Aralık">
+          <button type="button" aria-pressed={!all} onClick={() => setAll(false)}>3 yıl</button>
+          <button type="button" aria-pressed={all} onClick={() => setAll(true)}>Tümü</button>
+        </div>
+        {controls}
+      </div>
       <div className="sc-plot" ref={box}>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Fiyat ${price(c[n - 1])}; 200 günlük ortalama ${Number.isNaN(sma200[n - 1]) ? 'yok' : price(sma200[n - 1])}; RSI ${Number.isNaN(lastR) ? 'yok' : Fmt.number(lastR, 1)}`}
           onPointerMove={onMove} onPointerLeave={() => setHover(undefined)}>
@@ -365,6 +390,7 @@ export function StateChart({ c, t, sma200, rsi, vol, unit }: { c: number[]; t: n
           {g.ticks.map((k, i) => <text key={i} className="sc-tick" x={k.x} y={H - 6} textAnchor={i === 0 ? 'start' : i === 3 ? 'end' : 'middle'}>{k.label}</text>)}
           <path d={g.ma} className="sc-ma" />
           <path d={g.price} className="sc-price" />
+          {shown.map((m) => <Tri key={m.side + m.i} x={g.x(m.i)} y={g.y(c[m.i]) + (m.side === 'dip' ? 13 : -13)} side={m.side} o={markOutcome(m)} />)}
           <circle className="sc-now" cx={g.x(n - 1)} cy={g.y(c[n - 1])} r={3.5} />
           <text className="sc-tag strong" x={W - P.r + 6} y={g.y(c[n - 1]) + 4}>{price(c[n - 1])}</text>
           {!Number.isNaN(sma200[n - 1]) && Math.abs(g.y(sma200[n - 1]) - g.y(c[n - 1])) > 13 && <text className="sc-tag" x={W - P.r + 6} y={g.y(sma200[n - 1]) + 4}>200 ort.</text>}
@@ -398,10 +424,12 @@ export function StateChart({ c, t, sma200, rsi, vol, unit }: { c: number[]; t: n
             {!Number.isNaN(sma200[hover]) && <span>200 ort. <b className="num">{pct(c[hover] / sma200[hover] - 1, 0)}</b></span>}
             {!Number.isNaN(rsi[hover]) && <span>RSI <b className="num">{Fmt.number(rsi[hover], 1)}</b></span>}
             {!Number.isNaN(vol[hover]) && <span>Hacim <b className="num">{Fmt.number(vol[hover], 1)} katı</b></span>}
+            {hm.map((m) => <span key={m.side} className="ev">{m.side === 'dip' ? 'Dip' : 'Tepe'} sinyali: {m.labels.slice(0, 3).join('; ')}{m.labels.length > 3 ? ` (+${m.labels.length - 3})` : ''}<br />3 ay sonra <b className="num">{m.ret == null ? 'bekleniyor' : pct(m.ret)}</b> ({OUTCOME_LABEL[markOutcome(m)]})</span>)}
           </div>
         )}
       </div>
       <p className="sc-legend">
+        {marks.length > 0 && <><span><svg viewBox="0 0 12 12" aria-hidden><Tri x={6} y={6} side="dip" o="hit" /></svg>dip sinyali</span><span><svg viewBox="0 0 12 12" aria-hidden><Tri x={6} y={6} side="top" o="hit" /></svg>tepe sinyali</span><span>dolu: tuttu, içi boş: tutmadı, kesikli: bekleniyor</span></>}
         <span><i className="k solid" />fiyat</span>
         <span><i className="k ma" />200 günlük ortalama</span>
         {hasVol && <span><i className="k box" />hacim; koyu: olağanın 2 katından fazla{Number.isNaN(lastV) ? '' : ` (bugün ${Fmt.number(lastV, 1)} katı)`}</span>}
