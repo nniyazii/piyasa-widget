@@ -1,0 +1,19 @@
+{
+ "checked": 1794853136450,
+ "states": {
+  "deneme43927498693": {
+   "on": true,
+   "now": "50,38",
+   "firedAt": 1794853136450,
+   "text": "USDTRY 1,0000 üstüne çıktı: şu an 50,38.",
+   "done": true
+  }
+ },
+ "log": [
+  {
+   "t": 1794853136450,
+   "title": "USDTRY 1,0000 üstüne çıktı",
+   "text": "USDTRY 1,0000 üstüne çıktı: şu an 50,38."
+  }
+ ]
+}
