@@ -121,6 +121,16 @@ try {
     if (r?.ok) writeFileSync(join(OUT, 'ratios.json'), await r.text())
   } catch { /* önceki kopya da yok */ }
 }
+// Makro analiz için uzun dönem aylık seriler (para arzı, faiz, dolar endeksi, enflasyon, VIX, emtia); olmazsa önceki kopya
+try {
+  const { macroSeries } = await import('../server/macro.mjs')
+  const macro = await macroSeries()
+  writeFileSync(join(OUT, 'macro.json'), JSON.stringify(macro))
+  console.log(`macro: ${Object.keys(macro.series).length} seri`)
+} catch (e) {
+  console.log(`macro alınamadı (${e.message}); önceki kopya denenecek`)
+  try { const r = BASE ? await fetch(`${BASE}/macro.json`) : null; if (r?.ok) writeFileSync(join(OUT, 'macro.json'), await r.text()) } catch { /* önceki kopya da yok */ }
+}
 // Hisse analizi için derin geçmiş (haftalık, günlük, 4 saatlik, saatlik), parçalara bölünmüş.
 // Yayındaki kopya 20 saatten yeniyse yeniden çekilmez, olduğu gibi taşınır (her yayında TradingView'a yüklenmemek için).
 try {

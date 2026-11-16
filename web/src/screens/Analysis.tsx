@@ -6,6 +6,7 @@
  *   #/analiz/birikim     Birikimimi neye çevirmeliyim? (ev, altın, dolar, gümüş)
  *   #/analiz/para-arzi   Para arzına göre ne ucuz, ne pahalı?
  *   #/analiz/hisse/:sembol  Hissede geçmişte tutmuş dip ya da tepe sinyali var mı?
+ *   #/analiz/makro       Makro tablo geçmişte hangi dönemlere benziyor, sonrasında ne oldu?
  */
 import { useEffect, type ReactNode } from 'react'
 import { monthLabel, type Advice } from '../core/advice'
@@ -16,6 +17,7 @@ import { refreshPremiums, usePremiums, type PremiumState } from '../data/premium
 import { Icon } from '../ui/Icon'
 import { href } from '../ui/router'
 import { bestRoute, CostCompare } from './CostCompare'
+import { Macro } from './Macro'
 import { StockAnalysis } from './StockAnalysis'
 
 const TABS = [
@@ -25,6 +27,7 @@ const TABS = [
   { path: 'birikim', label: 'Birikim' },
   { path: 'para-arzi', label: 'Para arzı' },
   { path: 'hisse', label: 'Hisse' },
+  { path: 'makro', label: 'Makro' },
 ]
 
 const pct = (v?: number) => (v == null ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), 1))
@@ -42,6 +45,7 @@ export function Analysis({ tab, arg }: { tab?: string; arg?: string }) {
         {TABS.map((t) => <a key={t.path} href={href('analiz' + (t.path ? '/' + t.path : ''))} aria-current={t === current ? 'page' : undefined}>{t.label}</a>)}
       </nav>
       {current.path === 'hisse' ? <StockAnalysis symbol={arg} />
+        : current.path === 'makro' ? <Macro />
         : !s.rows.length && !s.advices.length
         ? <p className="an-answer" aria-live="polite">{s.error ?? 'Fiyatlar alınıyor…'}</p>
         : current.path === 'urunler' ? <Products s={s} />
@@ -103,6 +107,11 @@ function Overview({ s }: { s: PremiumState }) {
         </Row>
         {gold && <Row q="Altını nereden almalı?" to="maliyet" note={`masraf ${pct0(gold.costRate)}`}>{gold.route.name}</Row>}
         {silver && <Row q="Gümüşü nereden almalı?" to="maliyet" note={`masraf ${pct0(silver.costRate)}`}>{silver.route.name}</Row>}
+      </section>
+
+      <section className="an-group">
+        <h3>Büyük resim</h3>
+        <Row q="Makro tablo geçmişte hangi dönemlere benziyor, sonrasında ne oldu?" to="makro">Para arzı, faiz, dolar, enflasyon, VIX, petrol</Row>
       </section>
 
       <section className="an-group">
