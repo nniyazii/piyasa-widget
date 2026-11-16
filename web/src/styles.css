@@ -615,7 +615,7 @@ svg.i { width: 18px; height: 18px; flex: none; stroke: currentColor; fill: none;
   .mobile-top .brand { padding: 0; font-size: 21px; flex: 1; }
   .tabbar {
     position: fixed; z-index: 30; left: 0; right: 0; bottom: 0;
-    display: grid; grid-template-columns: repeat(4, 1fr);
+    display: grid; grid-template-columns: repeat(5, 1fr);
     padding: 6px 6px calc(env(safe-area-inset-bottom) + 6px);
     background: color-mix(in srgb, var(--surface) 94%, transparent);
     backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
@@ -998,3 +998,41 @@ a.screen-item { text-decoration: none; color: inherit; }
 .st-events th { text-align: left; font-size: 12px; font-weight: 560; color: var(--ink-3); padding: 5px 0; border-bottom: 1px solid var(--rule); }
 .st-events th.r { text-align: right; }
 .st-sig .an-how { max-width: 520px; }
+
+/* Alarmlar */
+.al-new { margin-top: 24px; display: grid; gap: 14px; justify-items: start; }
+.al-new .st-pick { margin: 0; width: 100%; }
+.al-say { margin: 0; }
+.al-say b { color: var(--ink); }
+.al-say select { max-width: 100%; }
+.al-go { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.al-go .note { margin: 0; }
+.st-quick button { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: var(--ink-3); cursor: pointer; }
+.st-quick button:hover { color: var(--ink); text-decoration: underline; }
+.st-alarm { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 0; }
+.st-alarm .btn { text-decoration: none; }
+.al-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.al-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px 14px; padding: 13px 0; border-bottom: 1px solid var(--rule-2); }
+.al-row .kind { display: block; font-size: 12px; color: var(--ink-3); }
+.al-row b { display: block; font-size: 16.5px; font-weight: 650; letter-spacing: -0.005em; line-height: 1.3; }
+.al-row .s { display: block; margin-top: 2px; font-size: 12.5px; color: var(--ink-3); }
+.al-row.done b { color: var(--ink-3); }
+.al-act { display: inline-flex; align-items: center; gap: 6px; }
+.al-ch { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 8px 16px; padding: 14px 0; border-bottom: 1px solid var(--rule-2); }
+.al-ch b { font-size: 15px; font-weight: 650; }
+.al-ch p { margin: 4px 0 0; font-size: 14px; line-height: 1.55; color: var(--ink-2); max-width: 68ch; }
+.al-steps { margin-top: 8px; font-size: 14px; color: var(--ink-2); max-width: 68ch; }
+.al-steps summary { cursor: pointer; font-weight: 600; padding: 4px 0; }
+.al-steps ol { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 6px; line-height: 1.5; }
+.al-token { display: flex; gap: 8px; max-width: 460px; }
+.al-token .input { flex: 1; min-width: 0; }
+.al-log { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+.al-log li { display: grid; gap: 1px; padding: 10px 0; border-bottom: 1px solid var(--rule-2); }
+.al-log time { font-size: 12px; color: var(--ink-3); }
+.al-log b { font-size: 14.5px; font-weight: 650; }
+.al-log span { font-size: 13.5px; line-height: 1.5; color: var(--ink-2); max-width: 72ch; }
+@media (max-width: 860px) {
+  .al-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .al-row .al-act { grid-column: 1 / -1; justify-content: flex-end; }
+  .al-ch { grid-template-columns: minmax(0, 1fr); }
+}

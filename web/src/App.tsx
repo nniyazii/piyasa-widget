@@ -13,6 +13,8 @@ import { Settings } from './screens/Settings'
 import { Watchlist } from './screens/Watchlist'
 import { useNewVersion } from './data/version'
 import { Icon } from './ui/Icon'
+import { useAlarmRunner, useAlarms } from './data/alarms'
+import { Alarms } from './screens/Alarms'
 import { ToastHost, useToast } from './ui/overlay'
 import { href, navigate, useRoute } from './ui/router'
 import { defaultBoard, newId } from './core/models'
@@ -32,6 +34,7 @@ const NAV = [
   { path: '', label: 'Piyasalar', icon: 'list' },
   { path: 'listeler', label: 'Dinamik listeler', short: 'Listeler', icon: 'filter' },
   { path: 'analiz', label: 'Analiz', icon: 'compass' },
+  { path: 'alarmlar', label: 'Alarmlar', icon: 'bell' },
   { path: 'panolar', label: 'Panolar', icon: 'boards' },
 ]
 const NAV_AUX = [
@@ -54,6 +57,8 @@ function Shell() {
 
   useTheme(state.settings.theme)
   useLiveRefresh(state.settings.refreshSeconds)
+  useAlarmRunner(toast)
+  const alarms = useAlarms()
 
   // Kısayollar
   useEffect(() => {
@@ -64,7 +69,7 @@ function Shell() {
       if (typing || e.metaKey || e.ctrlKey || e.altKey) return
       if (e.key === '/') { e.preventDefault(); setCompose({}) }
       else if (e.key === 'r' || e.key === 'R') void refreshQuotes()
-      else if (['1', '2', '3', '4', '5', '6'].includes(e.key)) navigate(ALL_NAV[Number(e.key) - 1].path)
+      else if (['1', '2', '3', '4', '5', '6', '7'].includes(e.key)) navigate(ALL_NAV[Number(e.key) - 1].path)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -94,6 +99,7 @@ function Shell() {
               <Icon name={n.icon} />{n.label}
               {n.path === 'panolar' && <span className="count">{state.boards.length}</span>}
               {n.path === 'listeler' && <span className="count">{state.screens.length}</span>}
+              {n.path === 'alarmlar' && alarms.alarms.length > 0 && <span className="count">{alarms.alarms.length}</span>}
             </a>
           ))}
         </nav>
@@ -161,6 +167,7 @@ function Shell() {
           {section === 'listeler' && screenId && !testing && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
           {testing && screenId && <BacktestView id={screenId} />}
           {section === 'analiz' && <Analysis tab={route.path[1]} arg={route.path[2]} />}
+          {section === 'alarmlar' && <Alarms query={route.query} />}
           {section === 'sozluk' && <Glossary target={route.path[1]} />}
           {section === 'ayarlar' && <Settings />}
         </div>

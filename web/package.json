@@ -11,7 +11,8 @@
     "start": "node server.mjs",
     "snapshot": "node scripts/snapshot.mjs",
     "scores": "vitest run -c vitest.research.config.ts research/scores.research.ts",
-    "research": "vitest run -c vitest.research.config.ts"
+    "research": "vitest run -c vitest.research.config.ts",
+    "alarms": "vitest run -c vitest.research.config.ts research/alarms.research.ts --disable-console-intercept"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

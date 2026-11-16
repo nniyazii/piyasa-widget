@@ -31,7 +31,7 @@ export default defineConfig({
   // Göreli taban: GitHub Pages alt dizini, kendi sunucunuz ya da herhangi bir statik barındırma
   base: './',
   plugins: [react(), api(), version()],
-  define: { __BUILD__: JSON.stringify(BUILD) },
+  define: { __BUILD__: JSON.stringify(BUILD), __REPO__: JSON.stringify(process.env.GITHUB_REPOSITORY ?? 'nniyazii/piyasa-widget') },
   build: { target: 'es2022', sourcemap: false, chunkSizeWarningLimit: 600 },
   test: { environment: 'node' },
 })

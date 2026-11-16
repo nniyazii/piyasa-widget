@@ -6,6 +6,7 @@ import { useSyncExternalStore } from 'react'
  *   #/panolar          Panolar                  #/pano/:id     tam ekran pano
  *   #/listeler         Dinamik listeler         #/listeler/:id liste sonucu
  *   #/analiz           Analiz özeti             #/analiz/:sayfa urunler | maliyet | birikim | para-arzi | hisse/:sembol
+ *   #/alarmlar         Alarmlar                 ?tur=fiyat|avantaj|sinyal&s=SEMBOL hazır doldurur
  *   #/sozluk           Terimler sözlüğü         #/sozluk/:id   terime git
  *   #/ayarlar          Ayarlar
  */

@@ -3,9 +3,10 @@
  * günlük kapanış geçmişi. Sayfalar arasında paylaşılır; 60 saniyeden eskiyse yenilenir.
  */
 import { useEffect, useSyncExternalStore } from 'react'
-import { advices, moneyAdvices, type Advice, type RatioData } from '../core/advice'
+import type { Advice, RatioData } from '../core/advice'
 import { bankSession } from '../core/costs'
-import { bistOpen, METALS, PREMIUM_PAIRS, premiumRow, typicalGrams, USDTRY, type PremiumRow } from '../core/premium'
+import { bistOpen, type PremiumRow } from '../core/premium'
+import { buildPremiums, PREMIUM_QUOTES, PREMIUM_SYMBOLS } from '../core/premiums'
 import { dailyCloses } from './daily'
 import { scan } from './tv'
 
@@ -62,38 +63,27 @@ async function loadBanks(): Promise<BanksData | undefined> {
   return undefined
 }
 
-const XU100 = 'BIST:XU100'
-
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
 
 export async function refreshPremiums(): Promise<void> {
   if (state.loading) return
   set({ loading: true })
   try {
-    const metals = Object.values(METALS).map((m) => m.symbol)
-    const symbols = [...PREMIUM_PAIRS.map((p) => p.symbol), ...metals, USDTRY]
     const [quotes, daily, long, banks] = await Promise.all([
-      scan('global', { symbols: { tickers: [...symbols, XU100] }, columns: ['close'] }),
+      scan('global', { symbols: { tickers: PREMIUM_QUOTES }, columns: ['close'] }),
       // Geçmiş yoksa (bu yayında günlük veri yok) sertifika yine hesaplanır, fonlar "bilinmiyor" kalır
-      dailyCloses(symbols).catch(() => new Map()),
+      dailyCloses(PREMIUM_SYMBOLS).catch(() => new Map()),
       loadRatios(),
       loadBanks(),
     ])
     const price = new Map(quotes.map((r) => [r.s.toUpperCase(), num(r.d[0])]))
-    const fx = price.get(USDTRY)
-    const rows = PREMIUM_PAIRS.map((p) => {
-      const m = METALS[p.metal].symbol
-      const typical = p.grams == null ? typicalGrams(daily.get(p.symbol), daily.get(m), daily.get(USDTRY)) : undefined
-      return premiumRow(p, price.get(p.symbol), price.get(m), fx, typical)
-    })
-    const adv = long ? advices(long, { gold: price.get(METALS.GOLD.symbol), silver: price.get(METALS.SILVER.symbol), usdTry: fx }) : []
-    const live = { gold: price.get(METALS.GOLD.symbol), silver: price.get(METALS.SILVER.symbol), usdTry: fx, xu100: price.get(XU100) }
-    const money = long ? moneyAdvices(long, live) : []
-    set({ rows, advices: adv, money, banks: banks ?? state.banks, time: Date.now(), open: bistOpen(), loading: false, error: fx == null ? 'Fiyatlar alınamadı' : undefined })
+    const b = buildPremiums(price, daily, long)
+    set({ rows: b.rows, advices: b.advices, money: b.money, banks: banks ?? state.banks, time: Date.now(), open: bistOpen(), loading: false, error: b.fx == null ? 'Fiyatlar alınamadı' : undefined })
   } catch (e) {
     set({ loading: false, error: navigator.onLine === false ? 'Çevrimdışısınız' : (e as Error).message || 'Fiyatlar alınamadı' })
   }
 }
+export const getPremiums = () => state
 
 /** Avantajlı fiyatlar; ekranda olduğu sürece dakikada bir yenilenir. */
 export function usePremiums(): PremiumState {

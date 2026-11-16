@@ -1,0 +1,293 @@
+/**
+ * Alarmlar: tek yerden kurulan uyarılar (fiyat, avantajlı fiyat, hisse sinyali).
+ *   #/alarmlar                      liste ve yeni alarm
+ *   #/alarmlar?tur=sinyal&s=SEMBOL  hazır doldurulmuş (diğer sayfalardaki "haber ver" bağlantıları)
+ */
+import { useEffect, useState } from 'react'
+import { ADVICE_TARGETS, describe, PRODUCT_TARGETS, TYPE_LABEL, type Alarm, type AlarmState } from '../core/alarms'
+import type { SearchHit } from '../core/catalog'
+import * as Fmt from '../core/format'
+import { alarmActions, askNotifyPermission, getToken, loadServerState, notifyPermission, REPO, runAlarmCheck, setToken, syncAlarms, useAlarms, type LogEntry } from '../data/alarms'
+import { useApp } from '../data/store'
+import { scan, search } from '../data/tv'
+import { Icon } from '../ui/Icon'
+import { Segmented, useToast } from '../ui/overlay'
+import { href } from '../ui/router'
+
+type Kind = Alarm['type']
+const KIND_OF: Record<string, Kind> = { fiyat: 'price', avantaj: 'premium', sinyal: 'signal' }
+const price = (v: number) => Fmt.number(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4)
+
+export function Alarms({ query }: { query: URLSearchParams }) {
+  const s = useAlarms()
+  useEffect(() => { void syncAlarms(); void loadServerState(); void runAlarmCheck() }, [])
+  const waiting = s.alarms.filter((a) => !s.states[a.id]?.done).length
+  const log = mergeLog(s.log, s.server?.log ?? [])
+  return (
+    <div className="an al">
+      <header className="an-head">
+        <h2>Ne olunca haber vereyim?</h2>
+        <p className="an-answer" aria-live="polite">{s.alarms.length === 0 ? 'Henüz alarm yok.' : waiting === 0 ? 'Bekleyen alarm yok; hepsi çaldı.' : `${waiting} alarm bekliyor.`}</p>
+      </header>
+
+      <Composer initialKind={KIND_OF[query.get('tur') ?? ''] ?? 'price'} initialSymbol={query.get('s') ?? undefined} />
+
+      {s.alarms.length > 0 && (
+        <section className="an-group">
+          <h3>Alarmlar</h3>
+          <ul className="al-list">
+            {s.alarms.map((a) => <AlarmRow key={a.id} alarm={a} state={s.states[a.id]} server={s.server?.states[a.id]} />)}
+          </ul>
+        </section>
+      )}
+
+      <Delivery />
+
+      {log.length > 0 && (
+        <section className="an-group">
+          <h3>Son bildirimler</h3>
+          <ul className="al-log">
+            {log.slice(0, 12).map((l, i) => <li key={i}><time>{Fmt.dateTime(l.t)}</time><b>{l.title}</b><span>{l.text}</span></li>)}
+          </ul>
+        </section>
+      )}
+
+      <details className="an-how">
+        <summary>Nasıl çalışıyor, nelere dikkat etmeli</summary>
+        <ul>
+          <li>Alarm, koşul sağlanmıyorken sağlanır hâle geldiğinde <b>bir kez</b> çalar. Koşul bozulup yeniden sağlanırsa yeniden çalar. Fiyat alarmları bir kez çalıp kapanır; listeden yeniden kurabilirsin.</li>
+          <li><b>Fiyat</b>: TradingView’in son fiyatı. BIST fiyatları 15 dakika gecikmelidir.</li>
+          <li><b>Avantajlı fiyat</b>: Analiz bölümündeki “al sinyali” ve güçlü önerilerle aynı hesap. Ürün sinyalleri yalnızca BIST seansı içinde sayılır.</li>
+          <li><b>Hisse sinyali</b>: Analiz › Hisse sayfasındaki tarihsel teyitli kurallardan biri açıldığında çalar. Hangi kuralın açıldığı ve geçmişte kaç kez tuttuğu bildirimde yazar.</li>
+          <li>Uygulama açıkken kontrol dakikada bir yapılır. Kapalıyken GitHub 10 dakikada bir kontrol eder; GitHub’ın zamanlayıcısı yoğun saatlerde 5–20 dakika gecikebilir, bu yüzden bildirim anlık değildir.</li>
+          <li>Alarmlar yatırım tavsiyesi değildir; yalnızca belirlediğin koşul gerçekleştiğinde haber verir.</li>
+        </ul>
+      </details>
+    </div>
+  )
+}
+
+/** Yerel ve sunucu kayıtlarını birleştirir (aynı bildirim iki kez görünmesin) */
+function mergeLog(a: LogEntry[], b: LogEntry[]): LogEntry[] {
+  const out: LogEntry[] = []
+  for (const l of [...a, ...b].sort((x, y) => y.t - x.t)) if (!out.some((o) => o.title === l.title && Math.abs(o.t - l.t) < 30 * 60_000)) out.push(l)
+  return out
+}
+
+// ------------------------------------------------------------------ yeni alarm
+
+function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSymbol?: string }) {
+  const toast = useToast()
+  const [kind, setKind] = useState<Kind>(initialKind)
+  const [symbol, setSymbol] = useState<string | undefined>(initialSymbol?.toUpperCase())
+  const [op, setOp] = useState<'below' | 'above'>('below')
+  const [value, setValue] = useState('')
+  const [target, setTarget] = useState('any')
+  const [side, setSide] = useState<'dip' | 'top' | 'both'>('both')
+  const [level, setLevel] = useState<'confirmed' | 'promising'>('confirmed')
+  const [now, setNow] = useState<number | undefined>()
+  useEffect(() => { setKind(initialKind); if (initialSymbol) setSymbol(initialSymbol.toUpperCase()) }, [initialKind, initialSymbol])
+  useEffect(() => {
+    setNow(undefined)
+    if (!symbol) return
+    let alive = true
+    scan('global', { symbols: { tickers: [symbol] }, columns: ['close'] }).then((r) => { if (alive && typeof r[0]?.d[0] === 'number') setNow(r[0].d[0] as number) }).catch(() => { /* fiyat gösterilemez */ })
+    return () => { alive = false }
+  }, [symbol])
+  const v = Fmt.parseInput(value)
+  const ready = kind === 'premium' || (symbol && (kind === 'signal' || (v != null && v > 0)))
+  // Fiyat zaten o taraftaysa alarm kurulur kurulmaz çalar: önceden söyle
+  const already = kind === 'price' && now != null && v != null && (op === 'below' ? now <= v : now >= v)
+  const add = () => {
+    if (!ready) return
+    const a = kind === 'price' ? alarmActions.add({ type: 'price', symbol: symbol!, op, value: v! })
+      : kind === 'premium' ? alarmActions.add({ type: 'premium', target })
+        : alarmActions.add({ type: 'signal', symbol: symbol!, side, level })
+    toast('Alarm kuruldu: ' + describe(a))
+    setValue('')
+    if (notifyPermission() === 'default') void askNotifyPermission()
+  }
+  return (
+    <section className="al-new" aria-label="Yeni alarm">
+      <Segmented value={kind} onChange={setKind} label="Alarm türü" options={[{ value: 'price', label: TYPE_LABEL.price }, { value: 'premium', label: TYPE_LABEL.premium }, { value: 'signal', label: TYPE_LABEL.signal }]} />
+      {kind !== 'premium' && <SymbolField value={symbol} onChange={setSymbol} />}
+      <p className="cost-say al-say">
+        {kind === 'price' && (
+          <>
+            <b>{symbol ? Fmt.ticker(symbol) : 'Seçtiğim sembol'}</b>{' '}
+            <input className="w-amount" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} placeholder={now != null ? price(now) : 'fiyat'} aria-label="Fiyat düzeyi" onKeyDown={(e) => { if (e.key === 'Enter') add() }} />{' '}
+            <select value={op} onChange={(e) => setOp(e.target.value as 'below' | 'above')} aria-label="Yön"><option value="below">altına inerse</option><option value="above">üstüne çıkarsa</option></select> haber ver.
+          </>
+        )}
+        {kind === 'premium' && (
+          <>
+            <select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="Neyi izleyeyim">
+              <optgroup label="Değerinin altına inerse">
+                <option value="any">Altın ya da gümüş ürünlerinden biri</option>
+                {PRODUCT_TARGETS.map((c) => <option key={c} value={c}>{c}</option>)}
+              </optgroup>
+              <optgroup label="Güçlü sinyal verirse">
+                {ADVICE_TARGETS.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+              </optgroup>
+            </select>{' '}
+            {target === 'any' || PRODUCT_TARGETS.includes(target) ? 'değerinin altına inerse' : 'güçlü sinyal verirse'} haber ver.
+          </>
+        )}
+        {kind === 'signal' && (
+          <>
+            <b>{symbol ? Fmt.ticker(symbol) : 'Seçtiğim hisse'}</b> için{' '}
+            <select value={level} onChange={(e) => setLevel(e.target.value as 'confirmed' | 'promising')} aria-label="Sinyal düzeyi"><option value="confirmed">teyitli</option><option value="promising">teyitli ya da umut verici</option></select>{' '}
+            <select value={side} onChange={(e) => setSide(e.target.value as 'dip' | 'top' | 'both')} aria-label="Yön"><option value="both">dip ya da tepe</option><option value="dip">dip</option><option value="top">tepe</option></select> sinyali gelirse haber ver.
+          </>
+        )}
+      </p>
+      <div className="al-go">
+        <button className="btn primary" onClick={add} disabled={!ready}><Icon name="bell" />Alarm kur</button>
+        <span className="note">
+          {kind === 'price' && symbol && now != null && <>Şu an {price(now)}. {already ? 'Fiyat zaten bu düzeyin ötesinde; alarm hemen çalar.' : ''}</>}
+          {kind === 'signal' && symbol && <a href={href('analiz/hisse/' + symbol)}>{Fmt.ticker(symbol)} için sinyalleri gör</a>}
+          {kind === 'premium' && <a href={href('analiz/urunler')}>Şu anki durumu gör</a>}
+        </span>
+      </div>
+    </section>
+  )
+}
+
+function SymbolField({ value, onChange }: { value?: string; onChange: (s: string) => void }) {
+  const app = useApp()
+  const [q, setQ] = useState('')
+  const [hits, setHits] = useState<SearchHit[] | undefined>()
+  useEffect(() => {
+    if (q.trim().length < 2) { setHits(undefined); return }
+    const ac = new AbortController()
+    const id = setTimeout(() => { search(q, ac.signal).then(setHits).catch(() => { /* iptal */ }) }, 250)
+    return () => { clearTimeout(id); ac.abort() }
+  }, [q])
+  const pick = (s: string) => { setQ(''); setHits(undefined); onChange(s.toUpperCase()) }
+  const quick = app.instruments.filter((i) => i.symbol !== value && !i.symbol.startsWith('ECONOMICS:')).slice(0, 6)
+  return (
+    <div className="st-pick">
+      <label className="st-search">
+        <span className="sr-only">Sembol ara</span>
+        <input className="input" type="search" value={q} placeholder={value ? `${Fmt.ticker(value)} seçili; değiştirmek için ara` : 'Sembol ara: SNDK, THYAO, altın, dolar…'}
+          onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && hits?.[0]) pick(hits[0].symbol); if (e.key === 'Escape') setQ('') }} autoComplete="off" spellCheck={false} />
+      </label>
+      {hits && (
+        <ul className="st-hits" role="listbox" aria-label="Arama sonuçları">
+          {hits.length === 0 && <li className="none">Sonuç yok</li>}
+          {hits.slice(0, 8).map((h) => <li key={h.symbol}><button type="button" onClick={() => pick(h.symbol)}><b>{h.ticker}</b><span>{h.name}</span><em>{h.exchange}</em></button></li>)}
+        </ul>
+      )}
+      {!hits && quick.length > 0 && <p className="st-quick">{quick.map((i) => <button key={i.key} type="button" onClick={() => pick(i.symbol)}>{i.name}</button>)}</p>}
+    </div>
+  )
+}
+
+// ------------------------------------------------------------------ liste
+
+function AlarmRow({ alarm, state, server }: { alarm: Alarm; state?: AlarmState; server?: AlarmState }) {
+  // Çalma bilgisi hangisi yeniyse ondan (uygulama ya da sunucu)
+  const fired = Math.max(state?.firedAt ?? 0, server?.firedAt ?? 0) || undefined
+  const done = state?.done || server?.done
+  const on = state?.on ?? server?.on
+  const status = done ? 'Çaldı' : on ? 'Koşul sağlanıyor' : 'Bekliyor'
+  const now = state?.now ?? server?.now
+  return (
+    <li className={'al-row' + (done ? ' done' : on ? ' on' : '')}>
+      <div>
+        <span className="kind">{TYPE_LABEL[alarm.type]}</span>
+        <b>{describe(alarm)}</b>
+        <span className="s">
+          {state?.error ? `Kontrol edilemedi: ${state.error}.` : now ? `Şu an: ${now}.` : 'İlk kontrol bekleniyor.'}
+          {fired ? ` Son çalma: ${Fmt.dateTime(fired)}.` : ''}
+        </span>
+      </div>
+      <span className={'prem-st' + (done ? '' : on ? ' buy' : '')}>{status}</span>
+      <span className="al-act">
+        {done && <button className="btn ghost small" onClick={() => alarmActions.rearm(alarm.id)}>Yeniden kur</button>}
+        <button className="icon-btn" onClick={() => alarmActions.remove(alarm.id)} aria-label={`Sil: ${describe(alarm)}`}><Icon name="trash" /></button>
+      </span>
+    </li>
+  )
+}
+
+// ------------------------------------------------------------------ bildirim kanalları
+
+function Delivery() {
+  const s = useAlarms()
+  const toast = useToast()
+  const [token, setTok] = useState('')
+  const [busy, setBusy] = useState(false)
+  const perm = notifyPermission()
+  const linked = !!getToken()
+  const connect = async () => {
+    setBusy(true)
+    await setToken(token)
+    setBusy(false)
+    setTok('')
+    void loadServerState()
+  }
+  useEffect(() => { if (s.sync === 'ok' && busy) toast('Bağlandı: alarmlar artık uygulama kapalıyken de kontrol edilecek') }, [s.sync])
+  return (
+    <section className="an-group">
+      <h3>Bildirim nereye gelir</h3>
+      <div className="al-ch">
+        <div>
+          <b>Uygulama açıkken</b>
+          <p>Ekranda ve tarayıcı bildirimi olarak. {perm === 'granted' ? 'Tarayıcı bildirimi açık.' : perm === 'denied' ? 'Tarayıcı bildirimi engellenmiş; tarayıcının site ayarlarından izin verebilirsin.' : perm === 'unsupported' ? 'Bu tarayıcı bildirim göstermiyor.' : ''}</p>
+        </div>
+        {perm === 'default' && <button className="btn small" onClick={() => void askNotifyPermission()}>Bildirime izin ver</button>}
+        {perm === 'granted' && <span className="prem-st buy">Açık</span>}
+      </div>
+      <div className="al-ch">
+        <div>
+          <b>Uygulama kapalıyken: e-posta ve telefon bildirimi</b>
+          {linked ? (
+            <p>
+              {s.sync === 'error' ? <span style={{ color: 'var(--down)' }}>{s.syncError}. </span> : 'Alarmların GitHub’da saklanıyor ve 10 dakikada bir kontrol ediliyor. '}
+              Çalan alarm GitHub hesabının e-posta adresine gelir; telefonda GitHub uygulaması kuruluysa bildirim olarak da düşer.
+              {s.server ? ` Sunucunun son kontrolü: ${Fmt.dateTime(s.server.checked)}.` : ' Sunucu henüz kontrol etmedi; ilk kontrol birkaç dakika içinde yapılır.'}
+            </p>
+          ) : (
+            <>
+              <p>Alarmların şu an yalnızca bu cihazda duruyor; uygulama kapalıyken kontrol edilmez. Bir kez GitHub anahtarı bağlarsan alarmlar GitHub’da saklanır, 10 dakikada bir kontrol edilir ve çalan alarm e-posta olarak gelir.</p>
+              <details className="al-steps">
+                <summary>Anahtar nasıl alınır (2 dakika)</summary>
+                <ol>
+                  <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">GitHub’da yeni anahtar sayfasını</a> aç.</li>
+                  <li>Ad olarak “Piyasa alarmları” yaz; süreyi istediğin kadar uzun seç.</li>
+                  <li>“Repository access” altında “Only select repositories” seç ve <b>{REPO.split('/')[1]}</b> deposunu işaretle.</li>
+                  <li>“Permissions › Repository permissions” altında <b>Contents</b> iznini “Read and write” yap. Başka izin gerekmez.</li>
+                  <li>“Generate token” ile oluştur, çıkan anahtarı kopyalayıp aşağıya yapıştır.</li>
+                </ol>
+                <p>Anahtar yalnızca bu tarayıcıda saklanır ve yalnızca GitHub’a gönderilir. Yalnızca bu depoya yazabilir. Depo herkese açık olduğu için alarm listen de (semboller ve düzeyler) herkese açık olur; e-posta adresin hiçbir yere yazılmaz.</p>
+              </details>
+              <p className="al-token">
+                <input className="input" type="password" value={token} onChange={(e) => setTok(e.target.value)} placeholder="github_pat_…" aria-label="GitHub anahtarı" autoComplete="off" />
+                <button className="btn small" onClick={() => void connect()} disabled={busy || token.trim().length < 20}>{busy ? 'Bağlanıyor…' : 'Bağla'}</button>
+              </p>
+              {s.sync === 'error' && <p className="note" style={{ color: 'var(--down)' }}>{s.syncError}</p>}
+            </>
+          )}
+        </div>
+        {linked && (
+          <span className="al-act">
+            <span className={'prem-st' + (s.sync === 'ok' ? ' buy' : '')}>{s.sync === 'ok' ? 'Bağlı' : s.sync === 'syncing' ? 'Eşitleniyor' : 'Hata'}</span>
+            <button className="btn ghost small" onClick={() => void setToken('')}>Bağlantıyı kes</button>
+          </span>
+        )}
+      </div>
+      {linked && (
+        <details className="an-how">
+          <summary>E-posta gelmiyorsa ya da daha hızlı bildirim istersen</summary>
+          <ul>
+            <li>E-postayı GitHub gönderir: çalan her alarm için depoda “Alarm: …” başlıklı bir kayıt açılır. <a href={`https://github.com/${REPO}/subscription`} target="_blank" rel="noreferrer">Depo bildirim ayarında</a> “All Activity” ya da en azından “Issues” seçili olmalı; <a href="https://github.com/settings/notifications" target="_blank" rel="noreferrer">hesap bildirim ayarlarında</a> e-posta açık olmalı.</li>
+            <li>Telefona bildirim için GitHub’ın mobil uygulamasını kurup aynı hesapla giriş yapman yeterli.</li>
+            <li>İstersen ntfy uygulamasıyla da anlık bildirim alabilirsin: ntfy’de tahmin edilmesi zor bir konu adına abone ol, aynı adı deponun “Settings › Secrets and variables › Actions” bölümüne <b>NTFY_TOPIC</b> adıyla ekle.</li>
+            <li>Geçmiş kayıtlar: <a href={`https://github.com/${REPO}/issues?q=is%3Aissue+Alarm`} target="_blank" rel="noreferrer">GitHub’daki alarm kayıtları</a>.</li>
+          </ul>
+        </details>
+      )}
+    </section>
+  )
+}

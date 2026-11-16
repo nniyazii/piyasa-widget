@@ -1,0 +1,84 @@
+name: Alarmlar
+
+# Uygulamada kurulan alarmları (alarms dalındaki alarms.json) 10 dakikada bir kontrol eder.
+# Çalan her alarm için depoda bir kayıt (issue) açıp kapatır: GitHub bunu depo sahibine e-posta ve
+# mobil bildirim olarak iletir. NTFY_TOPIC gizli değeri tanımlıysa ntfy üzerinden de anlık bildirim gönderilir.
+# Son kontrolün sonucu alarms-state dalındaki state.json dosyasına yazılır (uygulama oradan okur).
+on:
+  schedule:
+    - cron: '3-59/10 * * * *'
+  workflow_dispatch:
+    inputs:
+      deneme:
+        description: Deneme bildirimi gönder (e-postanın geldiğini görmek için)
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: alarms
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Alarm var mı
+        id: has
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/alarms/alarms.json?t=$(date +%s)" -o alarms.json || echo '{"alarms":[]}' > alarms.json
+          if [ "${{ inputs.deneme }}" = "true" ]; then
+            node -e "const fs=require('fs');let j={alarms:[]};try{j=JSON.parse(fs.readFileSync('alarms.json','utf8'))}catch{};j.alarms=[...(j.alarms||[]),{id:'deneme${{ github.run_id }}',created:1,type:'price',symbol:'FX:USDTRY',op:'above',value:1}];fs.writeFileSync('alarms.json',JSON.stringify(j))"
+          fi
+          n=$(node -e "try{console.log((JSON.parse(require('fs').readFileSync('alarms.json','utf8')).alarms||[]).length)}catch{console.log(0)}")
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+          echo "Alarm sayısı: $n"
+      - uses: actions/checkout@v5
+        if: steps.has.outputs.count != '0'
+        with:
+          path: repo
+      - uses: actions/setup-node@v5
+        if: steps.has.outputs.count != '0'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: repo/web/package-lock.json
+      - name: Kontrol et
+        if: steps.has.outputs.count != '0'
+        working-directory: repo/web
+        run: |
+          npm ci --no-audit --no-fund --silent
+          curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/alarms-state/state.json?t=$(date +%s)" -o "$RUNNER_TEMP/state.json" || true
+          ALARMS="$GITHUB_WORKSPACE/alarms.json" STATE="$RUNNER_TEMP/state.json" FIRED="$RUNNER_TEMP/fired.json" \
+            DATA_BASE="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data" npm run alarms
+      - name: Bildir (GitHub kaydı; isteğe bağlı ntfy)
+        if: steps.has.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          OWNER: ${{ github.repository_owner }}
+          APP: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/#/alarmlar
+        run: |
+          [ -s "$RUNNER_TEMP/fired.json" ] || exit 0
+          n=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP+'/fired.json','utf8')).length)")
+          for i in $(seq 0 $((n - 1))); do
+            title=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP+'/fired.json','utf8'))[$i].title)")
+            text=$(node -e "console.log(JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP+'/fired.json','utf8'))[$i].text)")
+            printf '%s\n\n[Alarmları aç](%s)\n\n@%s\n' "$text" "$APP" "$OWNER" > body.md
+            url=$(gh issue create --repo "${{ github.repository }}" --title "Alarm: $title" --body-file body.md) && gh issue close "$url" --repo "${{ github.repository }}" || echo "Kayıt açılamadı"
+            if [ -n "$NTFY_TOPIC" ]; then curl -fsS -H "Title: $title" -H "Click: $APP" -d "$text" "https://ntfy.sh/$NTFY_TOPIC" > /dev/null || echo "ntfy gönderilemedi"; fi
+          done
+      - name: Sonucu yaz (alarms-state dalı)
+        if: steps.has.outputs.count != '0'
+        run: |
+          [ -s "$RUNNER_TEMP/state.json" ] || exit 0
+          mkdir out && cp "$RUNNER_TEMP/state.json" out/state.json && cd out
+          git init -q -b alarms-state
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state.json && git commit -qm "Alarm durumu"
+          git push -q --force "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" alarms-state

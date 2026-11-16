@@ -162,6 +162,7 @@ function Products({ s }: { s: PremiumState }) {
         {gold ? ` Gram altın ${tl(gold, 0)}` : ''}{silver ? `, gram gümüş ${tl(silver)}.` : ''}
         {!s.open && ' Aşağıdaki farklar son kapanışa göredir; maden fiyatı o zamandan beri değişti.'}
       </p>
+      <p className="st-alarm"><a className="btn small" href={href('alarmlar', { tur: 'avantaj' })}><Icon name="bell" />Al sinyali gelince haber ver</a></p>
       {s.error && <p className="note" style={{ color: 'var(--down)' }}>{s.error}; son bilinen değerler gösteriliyor.</p>}
 
       <table className="result-table prem-table">

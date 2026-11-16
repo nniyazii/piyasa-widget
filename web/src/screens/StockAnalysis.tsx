@@ -14,6 +14,7 @@ import { loadBars, withLive, type DeepBars } from '../data/bars'
 import { useApp } from '../data/store'
 import type { SearchHit } from '../core/catalog'
 import { scan, search } from '../data/tv'
+import { Icon } from '../ui/Icon'
 import { href, navigate } from '../ui/router'
 import { AfterChart, HitBar, SignalChart } from '../ui/SignalChart'
 
@@ -180,6 +181,8 @@ function Result({ symbol, a, frames, data, live }: { symbol: string; a: Analysis
           ? <>{tfOf(lead.stat.tf).label} veride “{rule(lead.stat)}” kuralı <b>{lead.stat.main.n} kez</b> sinyal verdi; {durationLabel(lead.stat.main.bars, lead.frame.spacing)} sonra <b>{inOf(Math.round((lead.stat.main.hit ?? 0) * lead.stat.main.n))}</b> fiyat {expected(lead.stat.side)}. {lead.stat.verdict === 'confirmed' ? 'Sinyal teyitli.' : 'Sinyal umut verici ama teyitli değil; tek başına güvenme.'}</>
           : <>{a.frames.length} zaman diliminde {a.frames.length * RULES_PER_FRAME} kural sınandı; hiçbiri {code} hissesinin olağan seyrinden belirgin biçimde iyi sonuç vermedi. {longest.bars < 150 ? `Geçmiş kısa: ${tfOf(longest.tf).adj} veride yalnızca ${longest.bars} çubuk var.` : 'Bu hissede bu göstergeler güvenilir bir dip ya da tepe işareti vermemiş.'}</>}
       </p>
+
+      <p className="st-alarm"><a className="btn small" href={href('alarmlar', { tur: 'sinyal', s: symbol })}><Icon name="bell" />Sinyal gelince haber ver</a><a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: symbol })}>Fiyat alarmı kur</a></p>
 
       <div className="vd-list">
         <SignalBlock side="dip" now={dip} a={a} bars={dip && frames[dip.stat.tf]} />

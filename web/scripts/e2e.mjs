@@ -247,6 +247,35 @@ await step('analiz: hisse seç, tarihsel teyit ve şu anki uzaklık', async () =
   for (const w of ['RSI ≤ 30', 'Bollinger alt bandı', '200 ortalamanın %10 altı', 'MACD']) if (!rules.includes(w)) throw new Error('kural yok: ' + w)
 })
 
+await step('alarmlar: fiyat, avantajlı fiyat ve hisse sinyali kur; çalan alarm bildirilir', async () => {
+  await page.goto(BASE + '/#/alarmlar')
+  await page.locator('.an-answer', { hasText: 'Henüz alarm yok' }).waitFor({ timeout: 10000 })
+  // Fiyat: zaten ötesinde olan düzey hemen çalar ve kapanır
+  await page.locator('.al-new .st-search input').fill('thyao')
+  await page.locator('.al-new .st-hits button', { hasText: 'THYAO' }).first().click()
+  await page.locator('.al-say input').fill('1000000')
+  await page.locator('.al-go .note', { hasText: 'alarm hemen çalar' }).waitFor({ timeout: 10000 })
+  await page.locator('.al-go .btn').click()
+  await page.locator('.al-row.done', { hasText: 'THYAO' }).waitFor({ timeout: 20000 })
+  await page.locator('.al-log li', { hasText: 'altına indi' }).waitFor({ timeout: 5000 })
+  // Avantajlı fiyat
+  await page.locator('.al-new .seg button, .al-new [role=radio], .al-new button', { hasText: 'Avantajlı fiyat' }).first().click()
+  await page.locator('.al-go .btn').click()
+  await page.locator('.al-row', { hasText: 'değerinin altına inerse' }).waitFor({ timeout: 5000 })
+  // Hisse sinyali: Analiz › Hisse sayfasındaki bağlantı formu hazır doldurur
+  await page.goto(BASE + '/#/analiz/hisse/BIST:THYAO')
+  await page.locator('.st-alarm a', { hasText: 'Sinyal gelince haber ver' }).click()
+  await page.locator('.al-say', { hasText: 'THYAO' }).waitFor({ timeout: 5000 })
+  await page.locator('.al-go .btn').click()
+  await page.locator('.al-row', { hasText: 'sinyali gelirse' }).waitFor({ timeout: 5000 })
+  if (await page.locator('.al-row').count() !== 3) throw new Error('3 alarm bekleniyordu')
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('piyasa.alarms.v1')).alarms.map((a) => a.type).sort().join())
+  if (saved !== 'premium,price,signal') throw new Error('kayıt: ' + saved)
+  // Sil
+  await page.locator('.al-row', { hasText: 'değerinin altına inerse' }).locator('.icon-btn').click()
+  if (await page.locator('.al-row').count() !== 2) throw new Error('silinmedi')
+})
+
 await step('sözlük: koşul çipinden terime, arama', async () => {
   await page.goto(BASE + '/#/listeler/d_bist_oversold_big')
   await page.locator('.conds a', { hasText: 'RSI' }).click()
