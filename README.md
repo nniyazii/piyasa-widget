@@ -146,7 +146,7 @@ Uygulamaya **18 hazır dinamik liste** gelir (eski kurulumlarda da eklenir; sile
 
 Web sürümündeki hesaplar uygulamada da var; aynı formüller Kotlin'e taşındı ve aynı örneklerle test ediliyor. Veriler web sürümünün yayımladığı dosyalardan okunur (banka fiyatları yarım saatte bir, diğerleri günlük); ağ yokken son kopya kullanılır.
 
-- **Analiz** (ana listenin en üstündeki kart; 0.12.0'dan beri beş sekme: Özet, Ürünler, Nereden almalı, Birikim, Para arzı). Her sekmede önce cevap, sonra veri:
+- **Analiz** (ana listenin en üstündeki kart; 0.13.0'dan beri altı sekme: Görünüm, Pratik, Ürünler, Nereden almalı, Birikim, Para arzı). **Görünüm** web'deki Analiz › Görünüm ile aynıdır: her varlık için birleştirilmiş görüş, güven, kanıtlar ve görüşü neyin değiştireceği; hesap sunucuda yapılır (`data/outlook.json`, `web/research/outlook-export.research.ts`), uygulama gösterir. Her sekmede önce cevap, sonra veri:
   - *Prim ve iskonto:* ALTIN.S1, GLDTR, ZGOLD, ISGLK ve GMSTR içlerindeki madenin değerine göre nerede; değerinin altına inince al sinyali. BIST kapalıyken sinyal verilmez.
   - *Banka mı, fon mu?* Altın ya da gümüş alıp bir süre sonra satmanın tüm masrafları (makas, BSMV, komisyon, yönetim gideri, stopaj): bankalar, fiziki alım, fon ve sertifika yan yana. Tutar, süre, beklenen artış ve komisyon değiştirilebilir; listede olmayan banka elle girilir.
   - *Birikim önerileri:* Altın boz, ev al / Altın biriktir; Dolar boz, ev al / Dolar biriktir; Altın sat, gümüş al / Gümüş sat, altın al.

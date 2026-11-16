@@ -1,5 +1,7 @@
 package com.piyasa.widget.ui
 
+import com.piyasa.widget.data.OutlookItem
+import com.piyasa.widget.data.OutlookData
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -93,12 +95,13 @@ fun AdvantageScreen(onClose: () -> Unit, onGlossary: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     val data by Remote.advantage.collectAsState()
     // Ekran açıkken dakikada bir yenile
-    LaunchedEffect(Unit) { while (true) { Remote.refreshAdvantage(context); delay(60_000) } }
-    AdvantageContent(data, onClose, onGlossary, onRefresh = { scope.launch { Remote.refreshAdvantage(context) } })
+    LaunchedEffect(Unit) { Remote.refreshOutlook(context); while (true) { Remote.refreshAdvantage(context); delay(60_000) } }
+    val outlook by Remote.outlook.collectAsState()
+    AdvantageContent(data, onClose, onGlossary, onRefresh = { scope.launch { Remote.refreshOutlook(context); Remote.refreshAdvantage(context) } }, outlook = outlook)
 }
 
 @Composable
-internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossary: (String) -> Unit, onRefresh: () -> Unit, initialTab: Int = 0) {
+internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossary: (String) -> Unit, onRefresh: () -> Unit, initialTab: Int = 0, outlook: OutlookData? = null) {
     var tab by rememberSaveable { mutableStateOf(initialTab) }
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -123,14 +126,19 @@ internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossa
             }
             LazyColumn(Modifier.weight(1f).testTag("advantage")) {
                 when (tab) {
-                    0 -> item { Overview(data) { tab = it } }
-                    1 -> {
+                    0 -> if (outlook == null) item { Hint("Görünüm alınıyor… İnternet bağlantısı gerekir.") } else {
+                        item { OutlookHead(outlook) }
+                        items(outlook.list, key = { it.id }) { o -> OutlookCard(o) }
+                        item { Text("Görüşler 12 ay içindir; değerleme, makro örüntü, benzer dönemler ve trendin birleşimidir. Soluk kanıtlar bu varlıkta geçmişte ayırt edici olmadığı için görüşe katılmaz. Ayrıntılar ve grafikler web sürümünde: Analiz › Görünüm ve Makro.", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                    1 -> item { Overview(data) { tab = it + 1 } }
+                    2 -> {
                         item { Lead(data) }
                         items(data.rows, key = { it.pair.symbol }) { r -> PremiumItem(r, data.open) }
                         item { HowItWorks(onGlossary) }
                     }
-                    2 -> if (data.rows.isNotEmpty()) item { CostCompare(data, onGlossary) } else item { Hint(data.error ?: "Fiyatlar alınıyor…") }
-                    3 -> {
+                    3 -> if (data.rows.isNotEmpty()) item { CostCompare(data, onGlossary) } else item { Hint(data.error ?: "Fiyatlar alınıyor…") }
+                    4 -> {
                         item {
                             val strong = data.advices.filter { it.strong }
                             Answer("Birikimimi neye çevirmeliyim?", if (strong.isEmpty()) "Şu an güçlü bir sinyal yok; oranlar olağan aralıkta." else strong.joinToString(". ") { it.action } + ".",
@@ -154,7 +162,63 @@ internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossa
     }
 }
 
-private val TABS = listOf("Özet", "Ürünler", "Nereden almalı", "Birikim", "Para arzı")
+private val TABS = listOf("Görünüm", "Pratik", "Ürünler", "Nereden almalı", "Birikim", "Para arzı")
+
+/** Görünüm başı: belirgin görüşler, makro tablonun kısa okuması */
+@Composable
+private fun OutlookHead(o: OutlookData) {
+    val pro = o.list.filter { it.clear && it.tone > 0 }.map { it.short }
+    val con = o.list.filter { it.clear && it.tone < 0 }.map { it.short }
+    val answer = listOfNotNull(pro.takeIf { it.isNotEmpty() }?.let { "Olumlu: " + it.joinToString(", ") + "." }, con.takeIf { it.isNotEmpty() }?.let { "Olumsuz: " + it.joinToString(", ") + "." }).joinToString(" ").ifEmpty { "Hiçbir varlıkta belirgin bir yön yok." }
+    Answer("Görünüm (${o.month}): hangi varlık için geçmiş ne söylüyor?", answer, if (o.analogs.isEmpty()) null else "Bugünkü tablo en çok ${o.analogs.take(3).joinToString(", ")} dönemlerine benziyor.")
+    Surface(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
+        Column(Modifier.padding(14.dp)) {
+            Text(o.regimeTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+            o.regimeLines.forEach { Text("• $it", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        }
+    }
+}
+
+private fun voteMark(v: Int) = when { v >= 2 -> "▲▲"; v == 1 -> "▲"; v <= -2 -> "▼▼"; v == -1 -> "▼"; else -> "–" }
+
+/** Bir varlığın görüşü: başlık, güven, gerekçe; dokununca kanıtlar ve görüşü neyin değiştireceği */
+@Composable
+private fun OutlookCard(o: OutlookItem) {
+    var open by rememberSaveable(o.id) { mutableStateOf(o.clear) }
+    val up = Color(0xFF0B7A4B); val down = Color(0xFFC2362F)
+    val tone = when (o.tone) { 1 -> up; -1 -> down; else -> MaterialTheme.colorScheme.onSurfaceVariant }
+    Column(Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(o.label + (o.price?.let { "  " + Fmt.number(it, if (it >= 1000) 0 else 2) } ?: ""), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(o.stance, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = tone)
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(o.layers.joinToString("  ") { voteMark(it.vote) }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (o.tone != 0) Text("güven ${o.conviction}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Text(o.why, Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodySmall)
+        if (open) {
+            o.layers.forEach { l ->
+                val c = when { !l.counts -> MaterialTheme.colorScheme.outline; l.vote > 0 -> up; l.vote < 0 -> down; else -> MaterialTheme.colorScheme.onSurfaceVariant }
+                Row(Modifier.padding(top = 10.dp)) {
+                    Text(voteMark(l.vote), Modifier.width(34.dp), color = c, style = MaterialTheme.typography.labelLarge)
+                    Column(Modifier.weight(1f)) {
+                        Text(l.label + if (l.counts || l.vote == 0) "" else " (görüşe katılmıyor)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        Text(l.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (l.hit != null && l.base != null && l.vote != 0) Text("Sicil: bu durumdayken 12 ay sonra ${pctAbs(l.hit)} yukarıdaydı, olağan ${pctAbs(l.base)}${l.n?.let { " ($it örnek)" } ?: ""}.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                    }
+                }
+            }
+            if (o.flips.isNotEmpty()) {
+                Text("Görüşü ne değiştirir", Modifier.padding(top = 12.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                o.flips.forEach { Text("• $it", Modifier.padding(top = 3.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            }
+        } else Text("Kanıtlar için dokun", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
 
 /** Sayfa başı: soru küçük, cevap büyük, altında bir cümle bağlam. */
 @Composable

@@ -12,6 +12,7 @@
     "snapshot": "node scripts/snapshot.mjs",
     "scores": "vitest run -c vitest.research.config.ts research/scores.research.ts",
     "research": "vitest run -c vitest.research.config.ts",
+    "outlook": "vitest run -c vitest.research.config.ts research/outlook-export.research.ts --disable-console-intercept",
     "setups": "vitest run -c vitest.research.config.ts research/setups.research.ts --disable-console-intercept",
     "rules": "vitest run -c vitest.research.config.ts research/rules.research.ts --disable-console-intercept",
     "alarms": "vitest run -c vitest.research.config.ts research/alarms.research.ts --disable-console-intercept"

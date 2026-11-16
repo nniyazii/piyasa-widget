@@ -73,7 +73,9 @@ class AdvantagePreviewTest {
     @Test fun advantageScreen() {
         assumeTrue(System.getProperty("previews") == "true")
         val d = data()
-        listOf("ozet", "urunler", "maliyet", "birikim", "para-arzi").forEachIndexed { i, n -> render("analiz-$n") { AdvantageContent(d, {}, {}, {}, initialTab = i) } }
+        listOf("ozet", "urunler", "maliyet", "birikim", "para-arzi").forEachIndexed { i, n -> render("analiz-$n") { AdvantageContent(d, {}, {}, {}, initialTab = i + 1) } }
+        val outlook = com.piyasa.widget.data.Remote.parseOutlook(java.io.File("../web/public/data/outlook.json").readText())
+        render("analiz-gorunum") { AdvantageContent(d, {}, {}, {}, initialTab = 0, outlook = outlook) }
     }
 
     @Test fun glossaryScreen() {

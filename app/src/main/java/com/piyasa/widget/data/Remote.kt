@@ -36,6 +36,16 @@ import java.io.File
 data class ReliabilityScore(val score: Int?, val label: String, val years: Int, val months: Int, val episodes: Int)
 
 /** Avantajlı fiyatlar ekranının verisi. */
+/** Görünüm: birleştirilmiş görüşler (web'deki Analiz › Görünüm ile aynı hesap) */
+data class OutlookLayer(val label: String, val vote: Int, val counts: Boolean, val text: String, val hit: Double?, val base: Double?, val n: Int?)
+data class OutlookItem(val id: String, val label: String, val short: String, val price: Double?, val stance: String, val conviction: String, val why: String, val flips: List<String>, val layers: List<OutlookLayer>) {
+    /** +1 olumlu, −1 olumsuz, 0 nötr */
+    val tone: Int get() = when (stance) { "Olumlu", "Hafif olumlu" -> 1; "Olumsuz", "Hafif olumsuz" -> -1; else -> 0 }
+    /** Başlıkta anılacak kadar belirgin mi */
+    val clear: Boolean get() = tone != 0 && (conviction != "düşük" || layers.filter { it.counts }.sumOf { it.vote }.let { kotlin.math.abs(it) >= 2 })
+}
+data class OutlookData(val generated: Long, val month: String, val regimeTitle: String, val regimeLines: List<String>, val analogs: List<String>, val list: List<OutlookItem>)
+
 data class AdvantageData(
     val rows: List<Premiums.Row> = emptyList(),
     val advices: List<Advices.Advice> = emptyList(),
@@ -61,6 +71,9 @@ object Remote {
 
     private val _advantage = MutableStateFlow(AdvantageData())
     val advantage: StateFlow<AdvantageData> = _advantage
+    private val _outlook = MutableStateFlow<OutlookData?>(null)
+    /** Görünüm: her varlık için birleştirilmiş görüş (sunucuda hesaplanır) */
+    val outlook: StateFlow<OutlookData?> = _outlook
     private val _scores = MutableStateFlow<Map<String, ReliabilityScore>>(emptyMap())
     /** Hazır liste kimliği → skor */
     val scores: StateFlow<Map<String, ReliabilityScore>> = _scores
@@ -106,6 +119,11 @@ object Remote {
         } catch (e: Exception) {
             _advantage.value = _advantage.value.copy(loading = false, error = "Fiyatlar alınamadı; bağlantıyı denetleyin")
         }
+    }
+
+    suspend fun refreshOutlook(context: Context) {
+        val text = file(context, "outlook.json", 3 * 3600_000L) ?: return
+        runCatching { parseOutlook(text) }.getOrNull()?.let { _outlook.value = it }
     }
 
     suspend fun refreshScores(context: Context) {
@@ -185,6 +203,34 @@ object Remote {
             out[sym] = DailySeries(days, close)
         }
         return out
+    }
+
+    fun parseOutlook(json: String): OutlookData {
+        val o = AppJson.parseToJsonElement(json).jsonObject
+        fun strs(e: JsonElement?) = (e as? JsonArray).orEmpty().mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        val regime = o["regime"]?.jsonObject
+        return OutlookData(
+            generated = o["generated"]?.jsonPrimitive?.content?.toLongOrNull() ?: 0L,
+            month = o["month"]?.jsonPrimitive?.content ?: "",
+            regimeTitle = regime?.get("title")?.jsonPrimitive?.content ?: "",
+            regimeLines = strs(regime?.get("lines")),
+            analogs = strs(o["analogs"]),
+            list = (o["list"] as? JsonArray).orEmpty().mapNotNull { e ->
+                val x = e as? JsonObject ?: return@mapNotNull null
+                OutlookItem(
+                    id = x["id"]?.jsonPrimitive?.content ?: return@mapNotNull null,
+                    label = x["label"]?.jsonPrimitive?.content ?: "", short = x["short"]?.jsonPrimitive?.content ?: "",
+                    price = x["price"].num(), stance = x["stance"]?.jsonPrimitive?.content ?: "Nötr", conviction = x["conviction"]?.jsonPrimitive?.content ?: "düşük",
+                    why = x["why"]?.jsonPrimitive?.content ?: "", flips = strs(x["flips"]),
+                    layers = (x["layers"] as? JsonArray).orEmpty().mapNotNull { le ->
+                        val l = le as? JsonObject ?: return@mapNotNull null
+                        val r = l["record"] as? JsonObject
+                        OutlookLayer(l["label"]?.jsonPrimitive?.content ?: "", l["vote"]?.jsonPrimitive?.intOrNull ?: 0, l["counts"]?.jsonPrimitive?.content == "true", l["text"]?.jsonPrimitive?.content ?: "",
+                            r?.get("hit").num(), r?.get("base").num(), r?.get("n")?.jsonPrimitive?.intOrNull)
+                    },
+                )
+            },
+        )
     }
 
     fun parseScores(json: String): Map<String, ReliabilityScore> {

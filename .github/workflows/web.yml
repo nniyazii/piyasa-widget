@@ -52,6 +52,11 @@ jobs:
           done
         timeout-minutes: 6
         continue-on-error: true
+      - name: Görünümün hazır hâli (Android uygulaması için)
+        run: |
+          if [ -f dist/data/macro.json ] && DATA=dist/data/macro.json OUT=dist/data/outlook.new.json npm run outlook; then mv dist/data/outlook.new.json dist/data/outlook.json; else rm -f dist/data/outlook.new.json; fi
+        timeout-minutes: 3
+        continue-on-error: true
       - name: Hazır listelerin güvenilirlik skorları (son 3 yıl)
         # Aynı motorla, yeni kopyadan; olmazsa yayındaki önceki skorlar korunur
         run: |
