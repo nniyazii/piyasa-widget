@@ -1191,3 +1191,34 @@ a.screen-item { text-decoration: none; color: inherit; }
   .st-facts { gap: 10px 20px; }
   .st-facts dd { font-size: 17px; }
 }
+
+/* Olaylar ve yön olasılıkları */
+.ev-answer { max-width: 34ch; font-size: clamp(20px, 2.6vw, 26px); }
+.ev-asset { margin-top: 18px; }
+.ev-asset h4 { margin: 0 0 2px; font-size: 15px; font-weight: 680; }
+.ev-asset h4 em { font-style: normal; font-weight: 400; font-size: 12.5px; color: var(--ink-3); margin-left: 6px; }
+.ev-row { border-bottom: 1px solid var(--rule-2); }
+.ev-row summary { display: grid; grid-template-columns: 78px minmax(0, 1fr) minmax(300px, 360px); gap: 6px 16px; align-items: center; padding: 10px 0; cursor: pointer; list-style: none; }
+.ev-row summary::-webkit-details-marker { display: none; }
+.ev-row summary:hover { background: var(--hover); box-shadow: -12px 0 0 var(--hover), 12px 0 0 var(--hover); }
+.ev-row .when { font-size: 13px; font-weight: 600; }
+.ev-row .when em, .ev-row .what em { display: block; font-style: normal; font-weight: 400; font-size: 12px; color: var(--ink-3); }
+.ev-row .what b { font-size: 14.5px; font-weight: 600; line-height: 1.35; }
+.ev-row.strong .what b { font-weight: 700; }
+.ev-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ev-table th { font-size: 11.5px; font-weight: 500; color: var(--ink-3); padding: 0 4px 2px; }
+.ev-table .c { text-align: center; }
+.ev-odds { padding: 4px 6px; border-radius: 6px; }
+.ev-odds b { display: block; font-size: 15px; font-weight: 680; }
+.ev-odds .s { display: block; font-size: 10.5px; color: var(--ink-3); white-space: nowrap; }
+.ev-odds .track { position: relative; display: block; height: 4px; margin: 3px 4px; border-radius: 2px; background: var(--sunken); }
+.ev-odds .track .f { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--ink-3); }
+.ev-odds .track .b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); }
+.ev-odds.up { background: var(--up-bg); } .ev-odds.up b { color: var(--up); } .ev-odds.up .track .f { background: var(--up); }
+.ev-odds.down { background: var(--down-bg); } .ev-odds.down b { color: var(--down); } .ev-odds.down .track .f { background: var(--down); }
+.ev-more { padding: 0 0 16px; max-width: 640px; }
+.k.box.up { background: var(--up); } .k.box.down { background: var(--down); }
+.sc-base.solid { stroke-dasharray: none; stroke: var(--ink-4); stroke-width: 2.25; }
+.ov-state { margin-top: 44px; padding-top: 6px; border-top: 2px solid var(--ink); }
+.ov-state > h3 { font-size: 15px; color: var(--ink); }
+@media (max-width: 860px) { .ev-row summary { grid-template-columns: 64px minmax(0, 1fr); } .ev-table { grid-column: 1 / -1; } }

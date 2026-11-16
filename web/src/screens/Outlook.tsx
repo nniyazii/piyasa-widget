@@ -8,6 +8,7 @@ import type { MacroData } from '../core/macro'
 import { LAYER_LABEL, outlookView, type Layer, type LayerId, type Outlook as View, type OutlookView, type Stance } from '../core/outlook'
 import { Icon } from '../ui/Icon'
 import { href } from '../ui/router'
+import { EventsSection, topEvent, useEvents } from './Events'
 
 const SEEN_KEY = 'piyasa.gorunum.v1'
 const p0 = (v: number) => '%' + Fmt.number(v * 100, 0)
@@ -57,14 +58,16 @@ export function Outlook({ practical }: { practical?: ReactNode }) {
   const [data, setData] = useState<MacroData | null | undefined>()
   useEffect(() => { let alive = true; void loadMacro().then((d) => { if (alive) setData(d ?? null) }); return () => { alive = false } }, [])
   const v = useMemo(() => (data ? outlookView(data) : undefined), [data])
+  const ev = useEvents(data)
   if (data === undefined) return <p className="an-answer" aria-live="polite">Görünüm hazırlanıyor…</p>
   if (!v) return <><p className="an-answer">Makro veriler alınamadı; görünüm hesaplanamıyor.</p>{practical}</>
-  return <Page v={v} generated={data!.generated} practical={practical} />
+  return <Page v={v} ev={ev} generated={data!.generated} practical={practical} />
 }
 
 const join = (a: string[]) => (a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' ve ' + a[a.length - 1])
 
-function Page({ v, generated, practical }: { v: OutlookView; generated: number; practical?: ReactNode }) {
+function Page({ v, ev, generated, practical }: { v: OutlookView; ev?: ReturnType<typeof useEvents>; generated: number; practical?: ReactNode }) {
+  const top = ev ? topEvent(ev) : undefined
   // Başlıkta yalnızca belirgin görüşler: en az iki oy ya da orta/yüksek güven
   const clear = (o: View) => o.stance !== 'Nötr' && (Math.abs(o.score) >= 2 || o.conviction !== 'düşük')
   const pro = v.list.filter((o) => clear(o) && TONE[o.stance] === 'up'), con = v.list.filter((o) => clear(o) && TONE[o.stance] === 'down')
@@ -73,15 +76,10 @@ function Page({ v, generated, practical }: { v: OutlookView; generated: number; 
   return (
     <>
       <header className="an-head">
-        <h2>Görünüm ({v.month}): hangi varlık için geçmiş ne söylüyor?</h2>
-        <p className="an-answer" aria-live="polite">
-          {pro.length || con.length
-            ? <>{pro.length ? <>Olumlu: {join(pro.map((o) => o.asset.short))}. </> : null}{con.length ? <>Olumsuz: {join(con.map((o) => o.asset.short))}.</> : null}</>
-            : 'Hiçbir varlıkta belirgin bir yön yok.'}
-        </p>
+        <h2>Görünüm ({v.month}): son dönemde ne oldu, bundan sonrası için geçmiş ne söylüyor?</h2>
+        <p className="an-answer ev-answer" aria-live="polite">{top ? top.text : 'Son dönemde yön olasılığını belirgin biçimde değiştiren bir olay yok.'}</p>
       </header>
-
-      {faint.length > 0 && <p className="an-sub">Zayıf işaretler (tek kanıt, düşük güven): {faint.map((o) => `${o.asset.short} ${o.stance.toLocaleLowerCase('tr')}`).join(', ')}. Diğerlerinde yön yok.</p>}
+      <p className="an-sub">Aşağıda son 6 ayın olayları ve her biri için geçmişe dayalı yön olasılıkları var. Olay tekrarlandığında ne beklenebileceğini görmek için satırlara dokun.</p>
 
       <section className="ov-regime">
         <b>{v.regime.title}</b>
@@ -96,8 +94,11 @@ function Page({ v, generated, practical }: { v: OutlookView; generated: number; 
         </section>
       )}
 
-      <section className="an-group">
-        <h3>Görüş tablosu (12 ay için)</h3>
+      {ev && <EventsSection v={ev} />}
+
+      <section className="an-group ov-state">
+        <h3>Bugünkü durumun özeti: görüş tablosu (12 ay için)</h3>
+        <p className="note">Yukarıdaki olaylardan bağımsız olarak, bugünkü tablonun dört kanıtla okunması: {pro.length || con.length ? <>{pro.length ? <>olumlu {join(pro.map((o) => o.asset.short))}</> : null}{pro.length && con.length ? '; ' : ''}{con.length ? <>olumsuz {join(con.map((o) => o.asset.short))}</> : null}.</> : 'belirgin bir yön yok.'}{faint.length > 0 && <> Zayıf işaretler: {faint.map((o) => `${o.asset.short} ${o.stance.toLocaleLowerCase('tr')}`).join(', ')}.</>}</p>
         <div className="mc-scroll">
           <table className="result-table ov-table">
             <thead><tr><th>Varlık</th><th>Görüş</th><th className="c">Güven</th>{ORDER.map((id) => <th key={id} className="c">{LAYER_LABEL[id]}</th>)}</tr></thead>
@@ -126,7 +127,9 @@ function Page({ v, generated, practical }: { v: OutlookView; generated: number; 
       <details className="an-how">
         <summary>Görüş nasıl oluşuyor, nelere dikkat etmeli</summary>
         <ul>
-          <li><b>Dört kanıt</b> ayrı ayrı hesaplanır. <b>Değerleme</b>: fiyatın ilgili para arzına oranı kendi geçmişinin neresinde (alt çeyrek ucuz, üst çeyrek pahalı). <b>Makro örüntü</b>: şu an geçerli olan ve geçmişte en az 8 ayrı dönemde, üç çağda aynı yönde sonuç vermiş durumlar. <b>Benzer dönemler</b>: bugünkü makro tabloya en yakın 8 dönemden 12 ay sonra olanlar. <b>Trend</b>: fiyat 10 aylık ortalamasının üstünde mi.</li>
+          <li><b>Olaylar</b>: bir durumun başladığı aydır (bir ayda 2 standart sapmadan sert hareket, 10 aylık ortalamanın kırılması, 12 ayın ya da 3 yılın zirvesi/dibi, art arda 4 ay aynı yön, zirveden %10 ve %20 gerileme; makro durumların başlaması). Aynı olayın iki başlangıcı arasında en az 6 ay aranır.</li>
+          <li><b>Yön olasılığı</b>: olayın geçmişteki her örneğinde, olaydan bugüne geçen süre kadar ilerlenir ve oradan sonraki 1, 3, 6, 12 ayda fiyatın yukarıda olma oranı ölçülür. Yanında tüm ayların olağan oranı verilir; fark asıl bilgidir. Örnek sayısı 10–40 arasında olduğu için oranlar kabadır; hücrenin üstüne gelince güven aralığı görünür.</li>
+          <li><b>Dört kanıt</b> (aşağıdaki görüş tablosu) ayrı ayrı hesaplanır. <b>Değerleme</b>: fiyatın ilgili para arzına oranı kendi geçmişinin neresinde (alt çeyrek ucuz, üst çeyrek pahalı). <b>Makro örüntü</b>: şu an geçerli olan ve geçmişte en az 8 ayrı dönemde, üç çağda aynı yönde sonuç vermiş durumlar. <b>Benzer dönemler</b>: bugünkü makro tabloya en yakın 8 dönemden 12 ay sonra olanlar. <b>Trend</b>: fiyat 10 aylık ortalamasının üstünde mi.</li>
           <li><b>Sicil şartı</b>: bir kanıt, o varlıkta geçmişte gerçekten ayırt edici olmuşsa görüşe katılır (kanıtın gösterdiği yönde, 12 ay sonraki yukarıda olma oranı olağandan en az 5 puan farklı). Olmamışsa tabloda soluk görünür. Örneğin değerleme bazı varlıklarda işe yarar, bazılarında yaramaz.</li>
           <li><b>Görüş</b>, katılan kanıtların oylarının toplamıdır (güçlü değerleme 2, diğerleri 1 oy). <b>Güven</b>: üç kanıt aynı yönde ve karşı çıkan yoksa yüksek, iki kanıt aynı yöndeyse orta, aksi hâlde düşük.</li>
           <li><b>Süre 12 aydır.</b> Bu sayfa kısa vadeli al-sat için değil, önümüzdeki yıl için hangi varlığın rüzgârı arkasında, hangisinin karşısında olduğunu görmek içindir.</li>

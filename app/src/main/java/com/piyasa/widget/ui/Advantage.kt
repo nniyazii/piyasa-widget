@@ -1,5 +1,6 @@
 package com.piyasa.widget.ui
 
+import com.piyasa.widget.data.OutlookEvent
 import com.piyasa.widget.data.OutlookItem
 import com.piyasa.widget.data.OutlookData
 import androidx.compose.foundation.Canvas
@@ -128,6 +129,11 @@ internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossa
                 when (tab) {
                     0 -> if (outlook == null) item { Hint("Görünüm alınıyor… İnternet bağlantısı gerekir.") } else {
                         item { OutlookHead(outlook) }
+                        if (outlook.events.isNotEmpty()) {
+                            item { SectionTitle("Son 6 ayda ne oldu; geçmişte aynı şeyden sonra ne olmuştu", "Bugünden sonraki 1, 3, 6, 12 ayda yukarıda olma oranı (parantezde olağan oran).") }
+                            items(outlook.events.size) { i -> EventCard(outlook.events[i]) }
+                            item { SectionTitle("Bugünkü durumun özeti (12 ay için)", null) }
+                        }
                         items(outlook.list, key = { it.id }) { o -> OutlookCard(o) }
                         item { Text("Görüşler 12 ay içindir; değerleme, makro örüntü, benzer dönemler ve trendin birleşimidir. Soluk kanıtlar bu varlıkta geçmişte ayırt edici olmadığı için görüşe katılmaz. Ayrıntılar ve grafikler web sürümünde: Analiz › Görünüm ve Makro.", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                     }
@@ -170,13 +176,34 @@ private fun OutlookHead(o: OutlookData) {
     val pro = o.list.filter { it.clear && it.tone > 0 }.map { it.short }
     val con = o.list.filter { it.clear && it.tone < 0 }.map { it.short }
     val answer = listOfNotNull(pro.takeIf { it.isNotEmpty() }?.let { "Olumlu: " + it.joinToString(", ") + "." }, con.takeIf { it.isNotEmpty() }?.let { "Olumsuz: " + it.joinToString(", ") + "." }).joinToString(" ").ifEmpty { "Hiçbir varlıkta belirgin bir yön yok." }
-    Answer("Görünüm (${o.month}): hangi varlık için geçmiş ne söylüyor?", answer, if (o.analogs.isEmpty()) null else "Bugünkü tablo en çok ${o.analogs.take(3).joinToString(", ")} dönemlerine benziyor.")
+    Answer("Görünüm (${o.month}): son dönemde ne oldu, bundan sonrası için geçmiş ne söylüyor?", answer, if (o.analogs.isEmpty()) null else "Bugünkü tablo en çok ${o.analogs.take(3).joinToString(", ")} dönemlerine benziyor.")
     Surface(Modifier.padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
         Column(Modifier.padding(14.dp)) {
             Text(o.regimeTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
             o.regimeLines.forEach { Text("• $it", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
     }
+}
+
+/** Olay ve dört vade için yön olasılıkları */
+@Composable
+private fun EventCard(e: OutlookEvent) {
+    val up = Color(0xFF0B7A4B); val down = Color(0xFFC2362F)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Text(e.month + (if (e.elapsed == 0) ", bu ay" else ", ${e.elapsed} ay önce") + "; geçmişte ${e.times} kez", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (e.macro) "${e.text} → ${e.asset}" else e.text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            e.odds.forEach { o ->
+                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("${o.months} ay", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(o.up?.let { pctAbs(it) } ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                        color = when (o.tone) { 1 -> up; -1 -> down; else -> MaterialTheme.colorScheme.onSurface })
+                    Text("(${pctAbs(o.base)})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                }
+            }
+        }
+    }
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 private fun voteMark(v: Int) = when { v >= 2 -> "▲▲"; v == 1 -> "▲"; v <= -2 -> "▼▼"; v == -1 -> "▼"; else -> "–" }
