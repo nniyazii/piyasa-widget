@@ -12,6 +12,8 @@ import { checkAlarms, sanitizeAlarms, type Source, type States } from '../src/co
 import { bistOpen, type Series } from '../src/core/premium'
 import { buildPremiums, PREMIUM_QUOTES, PREMIUM_SYMBOLS } from '../src/core/premiums'
 import { INDEX_OF, stockSetups, tableKey, toUsd, USDTRY, type SetupTable } from '../src/core/setups'
+import type { MacroData } from '../src/core/macro'
+import { outlookView } from '../src/core/outlook'
 import { analyze, marketOf, type Bars, type Timeframe, type Universe } from '../src/core/signals'
 
 const env = process.env
@@ -48,6 +50,10 @@ let setupFile: Promise<{ markets: Record<string, { setups: SetupTable }> } | und
 const dailyOf = async (symbol: string) => unpackBars(((await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[], number[]?]>> }).bars.D)
 
 const source: Source = {
+  async outlook() {
+    const d = await json<MacroData>(`${BASE}/macro.json`).catch(() => undefined)
+    return d ? Object.fromEntries(outlookView(d).list.map((o) => [o.asset.id, { stance: o.stance, conviction: o.conviction, name: o.asset.short, why: o.why }])) : undefined
+  },
   async setups(symbol) {
     const m = marketOf(symbol)
     if (!m) return undefined

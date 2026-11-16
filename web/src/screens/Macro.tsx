@@ -10,9 +10,8 @@ import { href } from '../ui/router'
 
 const pct = (v?: number, d = 0) => (v == null || Number.isNaN(v) ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), d))
 const p0 = (v?: number) => (v == null ? '—' : '%' + Fmt.number(v * 100, 0))
-const STANCE: Record<AssetView['stance'], string> = { lehine: 'Lehine', aleyhine: 'Aleyhine', karışık: 'Karışık', nötr: 'Belirgin örüntü yok' }
 
-import { loadMacro as load } from './Outlook'
+import { loadMacro as load, OutlookLine } from './Outlook'
 
 export function Macro() {
   const [data, setData] = useState<MacroData | null | undefined>()
@@ -38,6 +37,7 @@ function View({ m, generated }: { m: MacroView; generated: number }) {
             : 'Şu an belirgin bir makro örüntü yok.'}
         </p>
       </header>
+      <p className="an-sub">Bu sayfa <a href={href('analiz')}>Görünüm</a>’ün iki kanıtını ayrıntılı gösterir: makro örüntüler ve benzer dönemler.</p>
       <p className="an-sub">
         Bugünkü tablo en çok <b>{list(top3)}</b> dönemlerine benziyor. Şu an geçerli {m.activeConditions.length} makro durum var
         {m.activeConditions.length ? <>: {list(m.activeConditions.map((c) => `“${c.label}”`))}</> : ''}. Aşağıda her varlık için bu durumların ve benzer dönemlerin geçmişte neyle sonuçlandığı var; sonuçlar {HORIZON} ay sonrası içindir.
@@ -165,7 +165,8 @@ function AssetRow({ a, m }: { a: AssetView; m: MacroView }) {
   return (
     <article className={'st-sig mc-asset' + (a.stance === 'lehine' || a.stance === 'aleyhine' ? ' strong' : '')}>
       <h3>{a.asset.label}</h3>
-      <p className="vd-act">{a.stance === 'nötr' ? 'Belirgin örüntü yok' : `Geçmiş örüntüler ${a.stance === 'karışık' ? 'karışık' : a.asset.short.toLocaleLowerCase('tr') + ' ' + a.stance}`}<span className="vd-str">{STANCE[a.stance]}</span></p>
+      <p className="vd-act">{a.stance === 'nötr' ? 'Geçerli makro örüntü yok' : `Makro örüntüler ${a.stance}`}<span className="vd-str">yalnızca makro</span></p>
+      <OutlookLine asset={a.asset.id} prefix="Bütün kanıtlarla görünüm:" />
       <dl className="st-facts">
         <div><dt>Geçerli tutarlı örüntü</dt><dd className="num">{a.active.length ? `${a.active.filter((p) => p.sign > 0).length} lehine, ${a.active.filter((p) => p.sign < 0).length} aleyhine` : 'yok'}</dd></div>
         <div><dt>Benzer dönemlerden 12 ay sonra</dt><dd className="num">{an ? <>{an.up} / {an.n} yukarıda<small>ortanca {pct(an.median)}</small></> : '—'}</dd></div>

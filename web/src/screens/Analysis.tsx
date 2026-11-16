@@ -18,7 +18,10 @@ import { Icon } from '../ui/Icon'
 import { href } from '../ui/router'
 import { bestRoute, CostCompare } from './CostCompare'
 import { Macro } from './Macro'
-import { Outlook } from './Outlook'
+import { Outlook, OutlookLine } from './Outlook'
+
+/** Para arzı değerlendirmesinin Görünüm'deki varlığı */
+const OUTLOOK_OF: Record<string, string> = { 'm2-usdtry': 'USDTRY', 'm2-gold-usd': 'GOLD', 'm2-gold-try': 'GAUTRY', 'm2-bist': 'XU100USD' }
 import { StockAnalysis } from './StockAnalysis'
 
 const TABS = [
@@ -254,7 +257,7 @@ function Money({ s }: { s: PremiumState }) {
         {!s.money.length ? 'Para arzı verisi alınamadı.'
           : <>{cheap.length ? <><b>Ucuz:</b> {list(cheap)}. </> : ''}{dear.length ? <><b>Pahalı:</b> {list(dear)}.</> : ''}</>}
       </Question>
-      <p className="an-sub">Para basıldıkça fiyatların da artması beklenir. Her fiyat ilgili para arzına (M2) bölünür ve kendi geçmiş ortancasıyla karşılaştırılır: ortancanın üstündeyse fiyat, basılan paradan hızlı artmıştır.</p>
+      <p className="an-sub">Para basıldıkça fiyatların da artması beklenir. Her fiyat ilgili para arzına (M2) bölünür ve kendi geçmiş ortancasıyla karşılaştırılır: ortancanın üstündeyse fiyat, basılan paradan hızlı artmıştır. Bu sayfa <a href={href('analiz')}>Görünüm</a>’ün dört kanıtından yalnızca biridir (değerleme); her kartın altında bütün kanıtlarla varılan görüş yazar.</p>
       <div className="vd-list">{s.money.map((a) => <Verdict key={a.id} a={a} />)}</div>
       <How term="para-arzi">
         <li><b>M2</b>, dolaşımdaki para ile vadesiz ve vadeli mevduatın toplamıdır.</li>
@@ -283,7 +286,7 @@ function Verdict({ a }: { a: Advice }) {
     <article className={'vd ' + (a.strength === 'strong' ? 'strong' : 'weak')}>
       <div className="vd-main">
         <h3>{money ? `${a.subject}, ${a.basis}` : a.title}</h3>
-        <p className="adv-act vd-act">{a.action}<span className="vd-str">{a.strength === 'strong' ? 'Güçlü sinyal' : 'Zayıf sinyal'}</span></p>
+        <p className="adv-act vd-act">{a.action}<span className="vd-str">{money ? (a.strength === 'strong' ? 'Yalnızca değerleme: belirgin' : 'Yalnızca değerleme: hafif') : a.strength === 'strong' ? 'Güçlü sinyal' : 'Zayıf sinyal'}</span></p>
         <p className="vd-why">
           {money
             ? <>Uzun dönem ortancasının <b className="num">{pct0(a.vsMedian)}</b> {a.vsMedian < 0 ? 'altında' : 'üstünde'}: {subj} {a.cheap ? 'ucuz' : 'pahalı'}{a.id === 'm2-usdtry' ? (a.cheap ? ', TL pahalı' : ', TL ucuz') : ''}.</>
@@ -291,6 +294,7 @@ function Verdict({ a }: { a: Advice }) {
               ? <>Ev, {what} cinsinden uzun dönem ortancasının <b className="num">{pct0(a.vsMedian)}</b> {a.vsMedian < 0 ? 'altında' : 'üstünde'}.</>
               : <>1 ons altın <b className="num">{Fmt.number(a.value, 1)}</b> ons gümüş ediyor; son 20 yılın ortancası <b className="num">{Fmt.number(a.median, 1)}</b>.</>}
         </p>
+        {OUTLOOK_OF[a.id] && <OutlookLine asset={OUTLOOK_OF[a.id]} />}
       </div>
       <div className="vd-range">
         <div className="vd-bar" role="img" aria-label={`Bugünkü oran geçmiş aralığın yüzde ${Math.round(a.percentile * 100)} diliminde`}>

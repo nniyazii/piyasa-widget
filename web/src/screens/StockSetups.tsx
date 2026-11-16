@@ -10,6 +10,7 @@ import { Icon } from '../ui/Icon'
 import { Segmented } from '../ui/overlay'
 import { href } from '../ui/router'
 import { EventChart, PathChart, StateChart, type ChartMark } from '../ui/SignalChart'
+import { OutlookLine } from './Outlook'
 
 const pct = (v?: number, d = 1) => (v == null ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), d))
 const p0 = (v: number) => '%' + Fmt.number(v * 100, 0)
@@ -80,6 +81,10 @@ export function SetupsView({ d, symbol, onBasis }: { d: SetupData; symbol: strin
         {strong.length > 0 && <a className="btn small" href={href('alarmlar', { tur: 'sinyal', s: symbol })}><Icon name="bell" />{anyActive ? 'Yeni kurulum oluşunca haber ver' : 'Güçlü kurulum oluşunca haber ver'}</a>}
         <a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: symbol })}>Fiyat alarmı kur</a>
       </p>
+      <div className="ov-context">
+        <OutlookLine asset={d.market === 'TR' ? 'XU100USD' : 'SPX'} prefix={d.market === 'TR' ? 'Pazarın 12 aylık görünümü (BIST, dolar bazında):' : 'Pazarın 12 aylık görünümü (ABD borsası):'} />
+        {d.market === 'TR' && <OutlookLine asset="USDTRY" prefix="Dolar/TL görünümü:" />}
+      </div>
       {d.market === 'TR' && (
         <div className="st-basis">
           <Segmented value={d.basis} onChange={onBasis} label="Fiyat bazı" options={[{ value: 'usd', label: 'Dolar bazında' }, { value: 'try', label: 'TL bazında' }]} />

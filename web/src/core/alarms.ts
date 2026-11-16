@@ -20,7 +20,9 @@ export interface PriceAlarm extends Base { type: 'price'; symbol: string; op: 'b
 /** target: ürün kodu (GMSTR…), 'any' (herhangi bir ürün) ya da bir öneri kimliği */
 export interface PremiumAlarm extends Base { type: 'premium'; target: string }
 export interface SignalAlarm extends Base { type: 'signal'; symbol: string; side: 'dip' | 'top' | 'both'; level: 'confirmed' | 'promising' }
-export type Alarm = PriceAlarm | PremiumAlarm | SignalAlarm
+/** Görünüm alarmı: varlığın birleştirilmiş görüşü olumluya (up) ya da olumsuza (down) dönerse */
+export interface OutlookAlarm extends Base { type: 'outlook'; asset: string; to: 'up' | 'down' }
+export type Alarm = PriceAlarm | PremiumAlarm | SignalAlarm | OutlookAlarm
 
 export interface AlarmState {
   /** Koşul şu an sağlanıyor mu */
@@ -41,6 +43,8 @@ export interface Source {
   prices(symbols: string[]): Promise<Map<string, number>>
   premiums(): Promise<{ rows: PremiumRow[]; advices: Advice[]; open: boolean }>
   analysis(symbol: string): Promise<Analysis | undefined>
+  /** Görünüm: varlık kimliği → görüş (Olumlu, Hafif olumlu, Nötr, Hafif olumsuz, Olumsuz) ve güven */
+  outlook?(): Promise<Record<string, { stance: string; conviction: string; name: string; why: string }> | undefined>
   /** Güçlü kurulumlar (hisse değilse undefined) */
   setups?(symbol: string): Promise<StockSetups | undefined>
 }
@@ -63,13 +67,16 @@ const SIDE = { dip: 'dip', top: 'tepe', both: 'dip ya da tepe' }
 /** Alarmın cümlesi: "SNDK 770 altına inerse" */
 export function describe(a: Alarm): string {
   if (a.type === 'price') return `${code(a.symbol)} ${num(a.value)} ${a.op === 'below' ? 'altına inerse' : 'üstüne çıkarsa'}`
+  if (a.type === 'outlook') return `${OUTLOOK_NAMES[a.asset] ?? a.asset} görünümü ${a.to === 'up' ? 'olumluya' : 'olumsuza'} dönerse`
   if (a.type === 'signal') return `${code(a.symbol)} için ${a.level === 'confirmed' ? `güçlü ${SIDE[a.side]} kurulumu oluşursa` : `güçlü ${SIDE[a.side]} kurulumu ya da hisseye özgü teyitli sinyal gelirse`}`
   if (a.target === 'any') return 'Altın ya da gümüş ürünlerinden biri değerinin altına inerse'
   const adv = ADVICE_TARGETS.find((x) => x.id === a.target)
   if (adv) return `${adv.label} güçlü sinyal verirse`
   return `${a.target} değerinin altına inerse`
 }
-export const TYPE_LABEL: Record<Alarm['type'], string> = { price: 'Fiyat', premium: 'Avantajlı fiyat', signal: 'Hisse sinyali' }
+export const TYPE_LABEL: Record<Alarm['type'], string> = { price: 'Fiyat', premium: 'Avantajlı fiyat', signal: 'Hisse sinyali', outlook: 'Görünüm' }
+/** Görünüm sayfasındaki varlıklar (alarm formu ve cümlesi için) */
+export const OUTLOOK_NAMES: Record<string, string> = { GOLD: 'Altın', GAUTRY: 'Gram altın', SILVER: 'Gümüş', USDTRY: 'Dolar/TL', XU100USD: 'BIST (dolar)', SPX: 'ABD borsası', OIL: 'Petrol', COPPER: 'Bakır' }
 
 const pct = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), 1)
 
@@ -108,6 +115,13 @@ async function evaluate(a: Alarm, src: Source, cache: { prices?: Map<string, num
       title: `${buys.map((r) => r.pair.code).join(', ')} değerinin altında`,
       text: buys.map((r) => `${r.pair.code} içindeki madenin değerine göre ${pct(r.premium!)} (fiyat ${num(r.price!)} ₺).`).join(' '),
     }
+  }
+  if (a.type === 'outlook') {
+    const all = await src.outlook?.()
+    const o = all?.[a.asset]
+    if (!o) throw new Error('görünüm hesaplanamadı')
+    const up = o.stance === 'Olumlu' || o.stance === 'Hafif olumlu', down = o.stance === 'Olumsuz' || o.stance === 'Hafif olumsuz'
+    return { on: a.to === 'up' ? up : down, now: `${o.stance.toLocaleLowerCase('tr')}${o.stance === 'Nötr' ? '' : ', güven ' + o.conviction}`, title: `${o.name} görünümü: ${o.stance.toLocaleLowerCase('tr')}`, text: `${o.name} görünümü ${o.stance.toLocaleLowerCase('tr')} oldu (güven ${o.conviction}). ${o.why}` }
   }
   // Önce güçlü kurulumlar (pazar genelinde üç dönemde sınanmış); istenirse hisseye özgü teyitli kurallar da
   const su = await src.setups?.(a.symbol)
@@ -181,6 +195,7 @@ export function sanitizeAlarms(raw: unknown): Alarm[] {
     const sym = typeof x.symbol === 'string' && /^[A-Z0-9_.!]+:[A-Z0-9_.!]+$/i.test(x.symbol) ? x.symbol.toUpperCase() : undefined
     if (x.type === 'price' && sym && (x.op === 'below' || x.op === 'above') && typeof x.value === 'number' && x.value > 0) out.push({ ...base, type: 'price', symbol: sym, op: x.op, value: x.value })
     else if (x.type === 'premium' && typeof x.target === 'string' && (x.target === 'any' || isAdvice(x.target) || PRODUCT_TARGETS.includes(x.target))) out.push({ ...base, type: 'premium', target: x.target })
+    else if (x.type === 'outlook' && typeof x.asset === 'string' && x.asset in OUTLOOK_NAMES && (x.to === 'up' || x.to === 'down')) out.push({ ...base, type: 'outlook', asset: x.asset, to: x.to })
     else if (x.type === 'signal' && sym && (x.side === 'dip' || x.side === 'top' || x.side === 'both') && (x.level === 'confirmed' || x.level === 'promising')) out.push({ ...base, type: 'signal', symbol: sym, side: x.side, level: x.level })
   }
   return out.slice(0, 50)

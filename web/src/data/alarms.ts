@@ -7,6 +7,8 @@
  */
 import { useEffect, useSyncExternalStore } from 'react'
 import { checkAlarms, newId, sanitizeAlarms, type Alarm, type Fired, type Source, type States } from '../core/alarms'
+import type { MacroData } from '../core/macro'
+import { outlookView } from '../core/outlook'
 import { analyze, type Analysis } from '../core/signals'
 import { loadBars, loadSetups, loadUniverse, withLive } from './bars'
 import { getPremiums, refreshPremiums } from './premium'
@@ -155,6 +157,11 @@ const clientSource: Source = {
     const p = getPremiums()
     if (!p.rows.length) throw new Error('fiyatlar alınamadı')
     return { rows: p.rows, advices: [...p.advices, ...p.money], open: p.open }
+  },
+  async outlook() {
+    const d = await fetch('data/macro.json', { cache: 'no-cache' }).then((r) => (r.ok ? (r.json() as Promise<MacroData>) : undefined)).catch(() => undefined)
+    if (!d) return undefined
+    return Object.fromEntries(outlookView(d).list.map((o) => [o.asset.id, { stance: o.stance, conviction: o.conviction, name: o.asset.short, why: o.why }]))
   },
   async setups(symbol) {
     const data = await loadBars(symbol)

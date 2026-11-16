@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import * as Fmt from '../core/format'
 import type { MacroData } from '../core/macro'
 import { LAYER_LABEL, outlookView, type Layer, type LayerId, type Outlook as View, type OutlookView, type Stance } from '../core/outlook'
+import { Icon } from '../ui/Icon'
 import { href } from '../ui/router'
 
 const SEEN_KEY = 'piyasa.gorunum.v1'
@@ -16,6 +17,33 @@ const ORDER: LayerId[] = ['deger', 'makro', 'benzer', 'trend']
 
 let cache: Promise<MacroData | undefined> | undefined
 export const loadMacro = () => (cache ??= fetch('data/macro.json', { cache: 'no-cache' }).then((r) => (r.ok ? (r.json() as Promise<MacroData>) : undefined)).catch(() => undefined))
+
+let viewCache: { data: MacroData; view: OutlookView } | undefined
+/** Görünüm (diğer sayfalar için): veri bir kez yüklenir, hesap bir kez yapılır */
+export function useOutlook(): OutlookView | undefined {
+  const [v, setV] = useState<OutlookView | undefined>(viewCache?.view)
+  useEffect(() => {
+    let alive = true
+    void loadMacro().then((d) => { if (!d || !alive) return; if (viewCache?.data !== d) viewCache = { data: d, view: outlookView(d) }; setV(viewCache.view) })
+    return () => { alive = false }
+  }, [])
+  return v
+}
+
+/** Başka sayfalarda tek satırlık görünüm: "Görünüm: Hafif olumsuz (güven düşük)" ve bağlantı */
+export function OutlookLine({ asset, prefix }: { asset: string; prefix?: string }) {
+  const v = useOutlook()
+  const o = v?.list.find((x) => x.asset.id === asset)
+  if (!o) return null
+  const val = o.layers.find((l) => l.id === 'deger')
+  return (
+    <p className="ov-line">
+      {prefix ?? `${o.asset.short}: bütün kanıtlarla görünüm`} <a className={'ov-stance ' + TONE[o.stance]} href={href('analiz')}>{o.stance}</a>
+      {o.stance !== 'Nötr' && <span> güven {o.conviction}</span>}
+      {!prefix && val && val.vote !== 0 && <span>. Değerleme bu varlıkta geçmişte {val.counts ? 'ayırt edici olmuş; görüşe katılıyor' : 'ayırt edici olmamış; görüşe katılmıyor'}.</span>}
+    </p>
+  )
+}
 
 /** Oy simgesi: ▲▲ güçlü lehine … ▼▼ güçlü aleyhine; görüşe katılmayan kanıt soluk */
 function Vote({ l }: { l?: Layer }) {
@@ -76,7 +104,7 @@ function Page({ v, generated, practical }: { v: OutlookView; generated: number; 
             <tbody>
               {v.list.map((o) => (
                 <tr key={o.asset.id}>
-                  <td><a href={'#gorunum-' + o.asset.id} className="n">{o.asset.short}</a><span className="s num">{price(o.price)}</span></td>
+                  <td><button type="button" className="n" onClick={() => { const el = document.getElementById('gorunum-' + o.asset.id); el?.querySelector('details')?.setAttribute('open', ''); el?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>{o.asset.short}</button><span className="s num">{price(o.price)}</span></td>
                   <td><span className={'ov-stance ' + TONE[o.stance]}>{o.stance}</span></td>
                   <td className="c">{o.stance === 'Nötr' ? '—' : o.conviction}</td>
                   {ORDER.map((id) => <td key={id} className="c"><Vote l={o.layers.find((l) => l.id === id)} /></td>)}
@@ -116,6 +144,7 @@ function Card({ o, open }: { o: View; open: boolean }) {
       <h3>{o.asset.label}{o.price != null && <span className="num"> {price(o.price)}</span>}</h3>
       <p className="vd-act">{o.stance}<span className="vd-str">{o.stance === 'Nötr' ? 'yön yok' : `güven ${o.conviction}`}</span></p>
       <p className="vd-why">{o.why}</p>
+      <p className="st-alarm"><a className="btn ghost small" href={href('alarmlar', { tur: 'gorunum', s: o.asset.id })}><Icon name="bell" />Görüş değişince haber ver</a></p>
       <details className="an-how st-frame" open={open || undefined}>
       <summary>Kanıtlar ve görüşü ne değiştirir</summary>
       <ul className="ov-layers">

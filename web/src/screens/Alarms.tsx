@@ -4,7 +4,7 @@
  *   #/alarmlar?tur=sinyal&s=SEMBOL  hazır doldurulmuş (diğer sayfalardaki "haber ver" bağlantıları)
  */
 import { useEffect, useState } from 'react'
-import { ADVICE_TARGETS, describe, PRODUCT_TARGETS, TYPE_LABEL, type Alarm, type AlarmState } from '../core/alarms'
+import { ADVICE_TARGETS, describe, OUTLOOK_NAMES, PRODUCT_TARGETS, TYPE_LABEL, type Alarm, type AlarmState } from '../core/alarms'
 import type { SearchHit } from '../core/catalog'
 import * as Fmt from '../core/format'
 import { alarmActions, askNotifyPermission, getToken, loadServerState, notifyPermission, REPO, runAlarmCheck, setToken, syncAlarms, useAlarms, type LogEntry } from '../data/alarms'
@@ -15,7 +15,7 @@ import { Segmented, useToast } from '../ui/overlay'
 import { href } from '../ui/router'
 
 type Kind = Alarm['type']
-const KIND_OF: Record<string, Kind> = { fiyat: 'price', avantaj: 'premium', sinyal: 'signal' }
+const KIND_OF: Record<string, Kind> = { fiyat: 'price', avantaj: 'premium', sinyal: 'signal', gorunum: 'outlook' }
 const price = (v: number) => Fmt.number(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4)
 
 export function Alarms({ query }: { query: URLSearchParams }) {
@@ -58,6 +58,7 @@ export function Alarms({ query }: { query: URLSearchParams }) {
           <li>Alarm, koşul sağlanmıyorken sağlanır hâle geldiğinde <b>bir kez</b> çalar. Koşul bozulup yeniden sağlanırsa yeniden çalar. Fiyat alarmları bir kez çalıp kapanır; listeden yeniden kurabilirsin.</li>
           <li><b>Fiyat</b>: TradingView’in son fiyatı. BIST fiyatları 15 dakika gecikmelidir.</li>
           <li><b>Avantajlı fiyat</b>: Analiz bölümündeki “al sinyali” ve güçlü önerilerle aynı hesap. Ürün sinyalleri yalnızca BIST seansı içinde sayılır.</li>
+          <li><b>Görünüm</b>: Analiz bölümünün açılış sayfasındaki birleştirilmiş görüş (değerleme, makro örüntü, benzer dönemler, trend) seçtiğin yöne döndüğünde çalar. Görüşler aylık veriye dayandığı için seyrek değişir.</li>
           <li><b>Hisse sinyali</b>: Analiz › Hisse sayfasındaki güçlü kurulumlardan biri oluştuğunda çalar (pazar genelinde üç ayrı dönemde sınanmış kurulumlar; şu an yalnızca ABD hisselerinde ve dip tarafında var). Bildirimde kurulum ve geçmişteki isabeti yazar.</li>
           <li>Uygulama açıkken kontrol dakikada bir yapılır. Kapalıyken GitHub 10 dakikada bir kontrol eder; GitHub’ın zamanlayıcısı yoğun saatlerde 5–20 dakika gecikebilir, bu yüzden bildirim anlık değildir.</li>
           <li>Alarmlar yatırım tavsiyesi değildir; yalnızca belirlediğin koşul gerçekleştiğinde haber verir.</li>
@@ -85,8 +86,10 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
   const [target, setTarget] = useState('any')
   const [side, setSide] = useState<'dip' | 'top' | 'both'>('both')
   const [level, setLevel] = useState<'confirmed' | 'promising'>('confirmed')
+  const [asset, setAsset] = useState(initialSymbol && initialSymbol.toUpperCase() in OUTLOOK_NAMES ? initialSymbol.toUpperCase() : 'GOLD')
+  const [to, setTo] = useState<'up' | 'down'>('up')
   const [now, setNow] = useState<number | undefined>()
-  useEffect(() => { setKind(initialKind); if (initialSymbol) setSymbol(initialSymbol.toUpperCase()) }, [initialKind, initialSymbol])
+  useEffect(() => { setKind(initialKind); if (initialSymbol) { const u = initialSymbol.toUpperCase(); if (initialKind === 'outlook') { if (u in OUTLOOK_NAMES) setAsset(u) } else setSymbol(u) } }, [initialKind, initialSymbol])
   useEffect(() => {
     setNow(undefined)
     if (!symbol) return
@@ -95,13 +98,14 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
     return () => { alive = false }
   }, [symbol])
   const v = Fmt.parseInput(value)
-  const ready = kind === 'premium' || (symbol && (kind === 'signal' || (v != null && v > 0)))
+  const ready = kind === 'premium' || kind === 'outlook' || (symbol && (kind === 'signal' || (v != null && v > 0)))
   // Fiyat zaten o taraftaysa alarm kurulur kurulmaz çalar: önceden söyle
   const already = kind === 'price' && now != null && v != null && (op === 'below' ? now <= v : now >= v)
   const add = () => {
     if (!ready) return
     const a = kind === 'price' ? alarmActions.add({ type: 'price', symbol: symbol!, op, value: v! })
       : kind === 'premium' ? alarmActions.add({ type: 'premium', target })
+        : kind === 'outlook' ? alarmActions.add({ type: 'outlook', asset, to })
         : alarmActions.add({ type: 'signal', symbol: symbol!, side, level })
     toast('Alarm kuruldu: ' + describe(a))
     setValue('')
@@ -109,8 +113,8 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
   }
   return (
     <section className="al-new" aria-label="Yeni alarm">
-      <Segmented value={kind} onChange={setKind} label="Alarm türü" options={[{ value: 'price', label: TYPE_LABEL.price }, { value: 'premium', label: TYPE_LABEL.premium }, { value: 'signal', label: TYPE_LABEL.signal }]} />
-      {kind !== 'premium' && <SymbolField value={symbol} onChange={setSymbol} />}
+      <Segmented value={kind} onChange={setKind} label="Alarm türü" options={[{ value: 'price', label: TYPE_LABEL.price }, { value: 'outlook', label: TYPE_LABEL.outlook }, { value: 'premium', label: TYPE_LABEL.premium }, { value: 'signal', label: TYPE_LABEL.signal }]} />
+      {kind !== 'premium' && kind !== 'outlook' && <SymbolField value={symbol} onChange={setSymbol} />}
       <p className="cost-say al-say">
         {kind === 'price' && (
           <>
@@ -133,6 +137,12 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
             {target === 'any' || PRODUCT_TARGETS.includes(target) ? 'değerinin altına inerse' : 'güçlü sinyal verirse'} haber ver.
           </>
         )}
+        {kind === 'outlook' && (
+          <>
+            <select value={asset} onChange={(e) => setAsset(e.target.value)} aria-label="Varlık">{Object.entries(OUTLOOK_NAMES).map(([id, n]) => <option key={id} value={id}>{n}</option>)}</select>{' '}
+            görünümü <select value={to} onChange={(e) => setTo(e.target.value as 'up' | 'down')} aria-label="Yön"><option value="up">olumluya</option><option value="down">olumsuza</option></select> dönerse haber ver.
+          </>
+        )}
         {kind === 'signal' && (
           <>
             <b>{symbol ? Fmt.ticker(symbol) : 'Seçtiğim hisse'}</b> için{' '}
@@ -147,6 +157,7 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
           {kind === 'price' && symbol && now != null && <>Şu an {price(now)}. {already ? 'Fiyat zaten bu düzeyin ötesinde; alarm hemen çalar.' : ''}</>}
           {kind === 'signal' && symbol && <a href={href('analiz/hisse/' + symbol)}>{Fmt.ticker(symbol)} için sinyalleri gör</a>}
           {kind === 'premium' && <a href={href('analiz/urunler')}>Şu anki durumu gör</a>}
+          {kind === 'outlook' && <a href={href('analiz')}>Şu anki görünümü gör</a>}
         </span>
       </div>
     </section>

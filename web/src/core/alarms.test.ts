@@ -69,6 +69,21 @@ group('alarmlar', () => {
     expect(describe(a[0])).toBe('TEST için güçlü dip kurulumu oluşursa')
   })
 
+  it('görünüm: görüş seçilen yöne döndüğünde çalar', async () => {
+    const a: Alarm[] = [{ id: 'o', created: 1, type: 'outlook', asset: 'GOLD', to: 'up' }]
+    const at = (stance: string) => src({ outlook: async () => ({ GOLD: { stance, conviction: 'orta', name: 'Altın', why: 'Lehine: trend.' } }) })
+    let r = await checkAlarms(a, {}, at('Hafif olumsuz'))
+    expect(r.fired).toHaveLength(0)
+    expect(r.states.o.now).toBe('hafif olumsuz, güven orta')
+    r = await checkAlarms(a, r.states, at('Nötr'))
+    expect(r.fired).toHaveLength(0)
+    r = await checkAlarms(a, r.states, at('Hafif olumlu'))
+    expect(r.fired).toHaveLength(1)
+    expect(r.fired[0].title).toBe('Altın görünümü: hafif olumlu')
+    expect(describe(a[0])).toBe('Altın görünümü olumluya dönerse')
+    expect(sanitizeAlarms([{ id: 'x', created: 1, type: 'outlook', asset: 'GOLD', to: 'down' }, { id: 'y', created: 1, type: 'outlook', asset: 'HACK', to: 'up' }]).map((x) => x.id)).toEqual(['x'])
+  })
+
   it('dışarıdan gelen veri doğrulanır', () => {
     expect(sanitizeAlarms([
       { id: 'a', created: 1, type: 'price', symbol: 'nasdaq:sndk', op: 'below', value: 5 },
