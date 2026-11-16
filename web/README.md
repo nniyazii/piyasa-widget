@@ -29,6 +29,7 @@ Kurulum istemez; veriler (listen, formüllerin, panoların) yalnızca tarayıcı
   - Düzenleyicide yazarken canlı önizleme gösterilir.
   - Liste tek tıkla panoya eklenir.
 - **Analiz** (`#/analiz`). Bir sayfa, bir soru: her sayfada önce cevap, sonra veri, en altta hesabın açıklaması.
+  - **Hisse** (`#/analiz/hisse/NASDAQ:SNDK`): seçilen hissede haftalık, günlük, 4 saatlik ve saatlik RSI'ın 40 eşiği (dip 20–40, tepe 60–80) geçmişteki tüm sinyallerle sınanır. Sonuç hissenin olağan seyriyle karşılaştırılır; yalnızca en az 8 sinyalli, isabetinin %95 güven alt sınırı olağanın üstünde ve iki yarıda da tutmuş sinyaller "teyitli" sayılır. Sayfa, bugünkü fiyatın sinyale uzaklığını (tetik fiyatı) gösterir. Motor `src/core/signals.ts`; veri `data/bars/{W,D,H4,H1}/{00–63}.json` (günde bir yenilenir, `server/bars.mjs`), sunucu varken `/api/tv/bars?symbol=`.
   - **Özet:** tüm soruların cevabı tek ekranda, soru → cevap satırları; güçlü sinyaller işaretli.
   - **Ürünler:** altın ve gümüş ürünleri içlerindeki madenin değerine göre primli mi iskontolu mu?
     - *ALTIN.S1* her zaman 0,01 gram altındır; gram altının altına inerse al sinyali.

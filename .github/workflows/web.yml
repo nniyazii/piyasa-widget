@@ -41,7 +41,7 @@ jobs:
       - name: Fiyat geçmişi kopyası (TradingView, Yahoo yedek)
         # Yeni çekilemeyen semboller yayındaki önceki kopyadan korunur
         run: node scripts/snapshot.mjs dist/data "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data"
-        timeout-minutes: 12
+        timeout-minutes: 20
         continue-on-error: true
       - name: Hazır listelerin güvenilirlik skorları (son 3 yıl)
         # Aynı motorla, yeni kopyadan; olmazsa yayındaki önceki skorlar korunur

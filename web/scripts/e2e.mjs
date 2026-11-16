@@ -219,6 +219,22 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   for (const s of ['Dolar (al|sat)', 'Altın (al|sat)', 'Gram altın (al|sat)', 'BIST (al|sat)', 'Ev (al|için bekle)']) if (!money.some((t) => new RegExp('^' + s).test(t))) throw new Error('para arzı kartı yok: ' + s + ' | ' + money.join(' ¦ '))
 })
 
+await step('analiz: hisse seç, tarihsel teyit ve şu anki uzaklık', async () => {
+  await page.goto(BASE + '/#/analiz')
+  await page.locator('.an-tabs a', { hasText: 'Hisse' }).click()
+  await page.locator('.st-search input').fill('thyao')
+  await page.locator('.st-hits button', { hasText: 'THYAO' }).first().click()
+  await page.locator('.st-table tbody tr').nth(3).waitFor({ timeout: 30000 })
+  if (!/analiz\/hisse\/BIST(:|%3A)THYAO/.test(page.url())) throw new Error('adres: ' + page.url())
+  const head = await page.locator('.an-answer').textContent()
+  if (!/sinyali|sinyaline|sinyal yok/.test(head)) throw new Error('cevap: ' + head)
+  if (await page.locator('.vd').count() !== 2) throw new Error('dip ve tepe bloğu bekleniyordu')
+  // Dört zaman dilimi, her birinde 10 eşik
+  await page.locator('.st-frame summary').first().click()
+  const n = await page.locator('.st-frame').first().locator('tbody tr:not(.st-sep)').count()
+  if (n !== 10) throw new Error('eşik satırı: ' + n)
+})
+
 await step('sözlük: koşul çipinden terime, arama', async () => {
   await page.goto(BASE + '/#/listeler/d_bist_oversold_big')
   await page.locator('.conds a', { hasText: 'RSI' }).click()

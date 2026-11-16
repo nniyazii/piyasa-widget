@@ -5,8 +5,9 @@
  *   #/analiz/maliyet     Nereden almalı? (banka, fiziki, fon)
  *   #/analiz/birikim     Birikimimi neye çevirmeliyim? (ev, altın, dolar, gümüş)
  *   #/analiz/para-arzi   Para arzına göre ne ucuz, ne pahalı?
+ *   #/analiz/hisse/:sembol  Hissede geçmişte tutmuş dip ya da tepe sinyali var mı?
  */
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import { monthLabel, type Advice } from '../core/advice'
 import * as Fmt from '../core/format'
 import { FUND_BUY, METALS, TYPICAL_DAYS, type PremiumRow } from '../core/premium'
@@ -15,6 +16,7 @@ import { refreshPremiums, usePremiums, type PremiumState } from '../data/premium
 import { Icon } from '../ui/Icon'
 import { href } from '../ui/router'
 import { bestRoute, CostCompare } from './CostCompare'
+import { StockAnalysis } from './StockAnalysis'
 
 const TABS = [
   { path: '', label: 'Özet' },
@@ -22,21 +24,25 @@ const TABS = [
   { path: 'maliyet', label: 'Nereden almalı' },
   { path: 'birikim', label: 'Birikim' },
   { path: 'para-arzi', label: 'Para arzı' },
+  { path: 'hisse', label: 'Hisse' },
 ]
 
 const pct = (v?: number) => (v == null ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), 1))
 const pct0 = (v: number) => '%' + Fmt.number(Math.abs(v * 100), 0)
 const tl = (v?: number, d = 2) => (v == null ? '—' : Fmt.number(v, d) + ' ₺')
 
-export function Analysis({ tab }: { tab?: string }) {
+export function Analysis({ tab, arg }: { tab?: string; arg?: string }) {
   const s = usePremiums()
   const current = TABS.find((t) => t.path === (tab ?? '')) ?? TABS[0]
+  // Dar ekranda sekmeler kayar: seçili olan görünür kalsın
+  useEffect(() => { document.querySelector('.an-tabs a[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }, [current])
   return (
     <div className="an">
       <nav className="an-tabs" aria-label="Analiz sayfaları">
         {TABS.map((t) => <a key={t.path} href={href('analiz' + (t.path ? '/' + t.path : ''))} aria-current={t === current ? 'page' : undefined}>{t.label}</a>)}
       </nav>
-      {!s.rows.length && !s.advices.length
+      {current.path === 'hisse' ? <StockAnalysis symbol={arg} />
+        : !s.rows.length && !s.advices.length
         ? <p className="an-answer" aria-live="polite">{s.error ?? 'Fiyatlar alınıyor…'}</p>
         : current.path === 'urunler' ? <Products s={s} />
           : current.path === 'maliyet' ? <Where s={s} />
@@ -97,6 +103,11 @@ function Overview({ s }: { s: PremiumState }) {
         </Row>
         {gold && <Row q="Altını nereden almalı?" to="maliyet" note={`masraf ${pct0(gold.costRate)}`}>{gold.route.name}</Row>}
         {silver && <Row q="Gümüşü nereden almalı?" to="maliyet" note={`masraf ${pct0(silver.costRate)}`}>{silver.route.name}</Row>}
+      </section>
+
+      <section className="an-group">
+        <h3>Hisse</h3>
+        <Row q="Bir hissede geçmişte tutmuş dip ya da tepe sinyali var mı?" to="hisse">Hisse seç, geçmişi taransın</Row>
       </section>
 
       {s.advices.length > 0 && (

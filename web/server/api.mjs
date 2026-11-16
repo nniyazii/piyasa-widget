@@ -4,6 +4,7 @@
  *   GET /api/yahoo/chart/:symbol?range=6y&interval=1mo  → Yahoo Finance chart yanıtı (önbellekli)
  *   GET /api/tv/daily?symbols=BIST:THYAO,NASDAQ:AAPL     → günlük kapanışlar (geçmişte test)
  *   GET /api/tv/monthly?symbols=…                         → aylık çubuklar (5 yıllık dip/zirve, ortalama F/K)
+ *   GET /api/tv/bars?symbol=NASDAQ:SNDK                   → haftalık, günlük, 4 saatlik, saatlik kapanışlar (hisse analizi; 10 dk önbellek)
  *   GET /api/banks                                        → bankaların gram altın/gümüş alış-satış fiyatları (2 dk önbellek)
  *   GET /api/ratios                                       → uzun dönem aylık seriler (konut endeksi, altın, gümüş, dolar)
  *
@@ -39,6 +40,16 @@ export async function handleApi(req, res) {
   try {
     const url = new URL(req.url, 'http://local')
     if (url.pathname === '/api/health') return send(res, 200, { ok: true, yahoo: true, daily: true, monthly: true })
+    if (url.pathname === '/api/tv/bars') {
+      const symbol = (url.searchParams.get('symbol') ?? '').toUpperCase()
+      if (!/^[A-Z0-9_]+:[A-Z0-9_.!]+$/.test(symbol)) return send(res, 400, { error: 'symbol gerekli (ör. NASDAQ:SNDK)' })
+      const hit = cache.get('bars:' + symbol)
+      if (hit && Date.now() - hit.time < 10 * 60_000) return send(res, 200, hit.body)
+      const { symbolBars } = await import('./bars.mjs')
+      const body = await symbolBars(symbol)
+      if (Object.keys(body.bars).length) cache.set('bars:' + symbol, { time: Date.now(), body })
+      return send(res, 200, body)
+    }
     if (url.pathname === '/api/banks') {
       const hit = cache.get('banks')
       if (hit && Date.now() - hit.time < 2 * 60_000) return send(res, 200, hit.body)

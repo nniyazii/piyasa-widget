@@ -195,7 +195,34 @@
     "example": "14 günde ortalama kazanç 2 ₺, ortalama kayıp 1 ₺ ise RS = 2 ve RSI = 100 − 100 ÷ 3 ≈ 66,7.",
     "inApp": "Her gün ortalamalar Wilder yöntemiyle güncellenir: yeni ortalama = (eski ortalama × 13 + bugünkü değer) ÷ 14.",
     "related": [
-     "geri-cekilme"
+     "geri-cekilme",
+     "rsi-sinyali"
+    ]
+   },
+   {
+    "id": "rsi-sinyali",
+    "term": "Tarihsel teyitli RSI sinyali",
+    "aka": [
+     "dip sinyali",
+     "tepe sinyali",
+     "tarihsel teyit",
+     "tetik fiyatı",
+     "hisse analizi",
+     "teyitli sinyal"
+    ],
+    "short": "Bir hissede RSI belirli bir eşiği geçtiğinde sonrasında ne olduğunun geçmişteki tüm örneklerle sınanması.",
+    "body": [
+     "“RSI 30’un altına inince al” genel bir kuraldır; her hissede tutmaz. Bazı hisseler 40’ta döner, bazıları 20’ye kadar düşer, bazılarında RSI hiçbir şey söylemez. Hisse analizi, seçilen hissenin kendi geçmişine bakar: haftalık, günlük, 4 saatlik ve saatlik RSI’ın her eşiği için geçmişteki sinyalleri bulur, sonrasındaki getiriyi ölçer.",
+     "Sinyalin başarısı hissenin olağan seyriyle karşılaştırılır. Sürekli yükselen bir hissede hangi gün alınsa kazandırır; bu yüzden “10 seferin 8’inde yükseldi” tek başına bir şey kanıtlamaz. Hissede herhangi bir günden sonra da 10 seferin 7’sinde yükseliş varsa sinyalin katkısı küçüktür.",
+     "Teyitli: en az 8 sonuçlanmış sinyal, en az %65 isabet, isabetin güven alt sınırı olağanın üstünde, ortanca getiri olağandan iyi ve sinyaller tarih sırasıyla ikiye bölündüğünde iki yarıda da olağandan iyi. Umut verici: en az 4 sinyal ve %60 isabetle olağandan iyi, ama teyit koşullarını sağlamıyor.",
+     "Tetik fiyatı: sıradaki çubuk bu fiyattan kapanırsa RSI eşiğe gelir. Bugünkü fiyatla arasındaki fark, sinyale ne kadar uzak olunduğunu gösterir.",
+     "Sınır: her hissede 40 eşik birden denenir, bu kadar denemede birkaçı şans eseri iyi görünebilir. Saatlik veri yaklaşık 1 yılı, 4 saatlik veri 2–3 yılı kapsar; kısa dönemde tutmuş bir sinyal farklı bir piyasa koşulunda tutmayabilir."
+    ],
+    "example": "THYAO’da günlük RSI son 12 yılda 24 kez 30’un altına indi; 21 işlem günü sonra 18’inde fiyat yukarıdaydı (%75). Hissede herhangi bir günden 21 gün sonra yukarıda olma oranı %54 olduğu için sinyal teyitli sayılır.",
+    "inApp": "Analiz bölümündeki Hisse sayfası. Sinyal, RSI’ın eşiği geçtiği ilk çubuktur; RSI eşikten 10 puan uzaklaşmadan aynı hareket yeniden sayılmaz.",
+    "related": [
+     "rsi",
+     "guvenilirlik"
     ]
    }
   ]

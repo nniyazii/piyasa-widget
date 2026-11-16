@@ -121,6 +121,38 @@ try {
     if (r?.ok) writeFileSync(join(OUT, 'ratios.json'), await r.text())
   } catch { /* önceki kopya da yok */ }
 }
+// Hisse analizi için derin geçmiş (haftalık, günlük, 4 saatlik, saatlik), parçalara bölünmüş.
+// Yayındaki kopya 20 saatten yeniyse yeniden çekilmez, olduğu gibi taşınır (her yayında TradingView'a yüklenmemek için).
+try {
+  const { DEEP, SHARDS, deepBars, shardOf } = await import('../server/bars.mjs')
+  // Hisseler, hazır listedeki semboller ve sık bakılan birkaç gösterge
+  const all = [...new Set([...bist, ...us, ...misc, 'BITSTAMP:BTCUSD', 'BITSTAMP:ETHUSD', 'FX:EURUSD', 'TVC:DXY', 'FX:UKOIL', 'NASDAQ:IXIC', 'DJ:DJI'])]
+  const prevMeta = BASE ? await fetch(`${BASE}/bars/meta.json`).then((x) => (x.ok ? x.json() : undefined)).catch(() => undefined) : undefined
+  const fresh = prevMeta && Date.now() - prevMeta.generated < 20 * 3600_000 && prevMeta.shards === SHARDS
+  const nn = (i) => String(i).padStart(2, '0')
+  const counts = {}
+  for (const tf of Object.keys(DEEP)) {
+    mkdirSync(join(OUT, 'bars', tf), { recursive: true })
+    if (fresh) {
+      let copied = 0
+      await Promise.all(Array.from({ length: SHARDS }, async (_, i) => {
+        const r = await fetch(`${BASE}/bars/${tf}/${nn(i)}.json`)
+        if (r.ok) { writeFileSync(join(OUT, 'bars', tf, `${nn(i)}.json`), await r.text()); copied++ }
+      }))
+      counts[tf] = prevMeta.counts?.[tf] ?? copied
+      continue
+    }
+    if (Date.now() - started > 15 * 60_000) { console.log(`bars ${tf}: süre doldu, atlandı`); continue }
+    const data = await deepBars(all, tf)
+    const shards = Array.from({ length: SHARDS }, () => ({}))
+    for (const [s, p] of Object.entries(data)) shards[shardOf(s)][s] = p
+    shards.forEach((b, i) => writeFileSync(join(OUT, 'bars', tf, `${nn(i)}.json`), JSON.stringify({ bars: b })))
+    counts[tf] = Object.keys(data).length
+  }
+  writeFileSync(join(OUT, 'bars', 'meta.json'), JSON.stringify({ generated: fresh ? prevMeta.generated : Date.now(), shards: SHARDS, counts }))
+  console.log(`bars: ${fresh ? 'önceki kopya taşındı' : 'yeniden çekildi'} (${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', ')})`)
+} catch (e) { console.log(`bars alınamadı (${e.message})`) }
+
 // Banka alış/satış fiyatları (ayrıca yarım saatte bir banks.yml ile yenilenir)
 try {
   const { fetchBanks } = await import('../server/banks.mjs')

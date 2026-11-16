@@ -902,3 +902,27 @@ a.screen-item { text-decoration: none; color: inherit; }
 .bt-tabs button[aria-current='page'] { color: var(--ink); border-bottom-color: var(--ink); font-weight: 660; }
 .bt-tabs + .bt-sect, .bt-tabs + .rel-panel { margin-top: 0; }
 .bt-lead.an-sub { font-size: 15px; margin-top: 14px; }
+
+/* Analiz › Hisse */
+.st-pick { position: relative; margin: 0 0 24px; max-width: 460px; }
+.st-search { display: block; }
+.st-search .input { width: 100%; }
+.st-hits { position: absolute; z-index: 5; left: 0; right: 0; top: 100%; margin: 4px 0 0; padding: 4px; list-style: none; background: var(--surface); border: 1px solid var(--rule); border-radius: var(--radius); box-shadow: 0 8px 24px rgb(0 0 0 / 0.12); }
+.st-hits button { display: grid; grid-template-columns: 8ch minmax(0, 1fr) auto; gap: 10px; align-items: baseline; width: 100%; padding: 9px 10px; border: 0; border-radius: var(--radius-s); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.st-hits button:hover, .st-hits button:focus-visible { background: var(--hover); }
+.st-hits span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); font-size: 14px; }
+.st-hits em { font-style: normal; font-size: 12px; color: var(--ink-3); }
+.st-hits .none { padding: 9px 10px; color: var(--ink-3); font-size: 14px; }
+.st-quick { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 8px 0 0; font-size: 13.5px; }
+.st-quick a { color: var(--ink-3); text-decoration: none; font-weight: 600; }
+.st-quick a:hover { color: var(--ink); text-decoration: underline; }
+.st-table .s { display: block; font-size: 12px; color: var(--ink-3); font-weight: 400; }
+.st-table .st-sep td { padding-top: 16px; font-size: 12.5px; font-weight: 650; color: var(--ink-3); border-bottom-color: var(--rule); }
+.st-frame { max-width: none; }
+.st-frame .result-table { margin-top: 4px; }
+.st-events { width: 100%; margin-top: 16px; border-collapse: collapse; font-size: 13px; }
+.st-events caption { text-align: left; font-size: 12px; color: var(--ink-3); padding-bottom: 4px; }
+.st-events td { padding: 5px 0; border-bottom: 1px solid var(--rule-2); }
+.st-events td.r { text-align: right; padding-left: 12px; }
+.st-events .pos { color: var(--up); }
+.st-events .neg { color: var(--down); }

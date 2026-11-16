@@ -5,7 +5,7 @@ import { useSyncExternalStore } from 'react'
  *   #/                 Piyasalar (liste)        #/?s=USDTRY   seçili satır
  *   #/panolar          Panolar                  #/pano/:id     tam ekran pano
  *   #/listeler         Dinamik listeler         #/listeler/:id liste sonucu
- *   #/analiz           Analiz özeti             #/analiz/:sayfa urunler | maliyet | birikim | para-arzi
+ *   #/analiz           Analiz özeti             #/analiz/:sayfa urunler | maliyet | birikim | para-arzi | hisse/:sembol
  *   #/sozluk           Terimler sözlüğü         #/sozluk/:id   terime git
  *   #/ayarlar          Ayarlar
  */

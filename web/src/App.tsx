@@ -160,7 +160,7 @@ function Shell() {
           {section === 'listeler' && !screenId && <ScreensIndex onNew={() => setScreenEdit({})} />}
           {section === 'listeler' && screenId && !testing && <ScreenView id={screenId} onEdit={(s) => setScreenEdit({ screen: s })} />}
           {testing && screenId && <BacktestView id={screenId} />}
-          {section === 'analiz' && <Analysis tab={route.path[1]} />}
+          {section === 'analiz' && <Analysis tab={route.path[1]} arg={route.path[2]} />}
           {section === 'sozluk' && <Glossary target={route.path[1]} />}
           {section === 'ayarlar' && <Settings />}
         </div>
