@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { analyze, durationLabel, findEvents, rsiSeries, signalStat, triggerPrice, wilsonLower, type Bars } from './signals'
+import { analyze, crossings, durationLabel, FILTERS, findEvents, indicators, nextValue, RULES_PER_FRAME, rsiSeries, signalStat, triggerClose, triggerLabel, triggerPrice, TRIGGERS, wilsonLower, type Bars } from './signals'
+
+const T = (id: string) => TRIGGERS.find((t) => t.id === id)!
 
 const bars = (c: number[], step = 86400): Bars => ({ t: c.map((_, i) => 1_700_000_000 + i * step), c })
 /** Tekrarlanabilir rastgele sayı (LCG) */
@@ -54,8 +56,8 @@ describe('hisse analizi', () => {
       for (let i = 0; i < 16; i++) c.push(c.at(-1)! * 1.012)
       for (let i = 0; i < 40; i++) c.push(c.at(-1)! * (i % 2 ? 1.004 : 0.996))
     }
-    const b = bars(c); const { rsi } = rsiSeries(c)
-    const s = signalStat(b, rsi, 'D', 'dip', 30)
+    const b = bars(c)
+    const s = signalStat(b, indicators(c), 'D', T('rsi:dip:30'))
     expect(s.events.length).toBeGreaterThanOrEqual(11) // ilk düşüş RSI hesaplanmadan önce başlar
     expect(s.main.hit).toBe(1)
     expect(s.main.median!).toBeGreaterThan(s.main.baseMedian!)
@@ -75,8 +77,51 @@ describe('hisse analizi', () => {
     for (let i = 0; i < 60; i++) c.push(c[i] * (1 + (r() - 0.5) * 0.05))
     const a = analyze({ W: bars(c, 7 * 86400), D: bars([1, 2, 3]) })
     expect(a.frames.map((f) => f.tf)).toEqual(['W']) // 3 çubukluk günlük seri atlanır
-    expect(a.frames[0].dips.find((x) => x.level === 20)!.verdict).toBe('thin')
+    expect(a.frames[0].dips.find((x) => x.trigger.id === 'rsi:dip:20')!.verdict).toBe('thin')
     expect(a.frames[0].rsi).toBeGreaterThan(0)
+  })
+
+  it('diğer göstergeler: tetik fiyatı o kapanışta göstergeyi tam eşiğe getirir', () => {
+    const r = rng(11); const c = [100]
+    for (let i = 0; i < 400; i++) c.push(c[i] * (1 + (r() - 0.5) * 0.04))
+    const s = indicators(c)
+    const last = c.at(-1)!
+    for (const id of ['rsi:dip:30', 'bb:dip:-2', 'd200:dip:-0.2', 'bb:top:2', 'd200:top:0.3', 'rsi:top:70']) {
+      const t = T(id)
+      const x = triggerClose(c, s, t)
+      if (x == null) continue
+      expect(t.dir === 'below' ? x < last : x > last).toBe(true)
+      expect(nextValue(c, s, t.ind, x)).toBeCloseTo(t.level, 6)
+      // Aynı değer seriye eklenip baştan hesaplanınca da çıkar
+      const again = indicators([...c, x])
+      expect(again[t.ind].at(-1)).toBeCloseTo(t.level, 5)
+    }
+    expect(triggerClose(c, s, T('rsi:dip:30'))).toBeCloseTo(triggerPrice(last, s.gain, s.loss, 30, 'dip')!, 6)
+    expect(nextValue(c, s, 'macd', c.at(-1)! * 1.01)).toBeCloseTo(indicators([...c, c.at(-1)! * 1.01]).macd.at(-1)!, 9)
+  })
+
+  it('bağlam: kural yalnızca koşul sağlanırken sayılır, olağan sonuç da aynı koşuldan', () => {
+    const r = rng(5); const c = [100]
+    for (let i = 0; i < 1500; i++) c.push(c[i] * (1 + (r() - 0.48) * 0.04))
+    const b = bars(c); const s = indicators(c)
+    const any = signalStat(b, s, 'D', T('rsi:dip:35'))
+    const up = signalStat(b, s, 'D', T('rsi:dip:35'), 'above200')
+    const down = signalStat(b, s, 'D', T('rsi:dip:35'), 'below200')
+    expect(up.events.length + down.events.length).toBeLessThanOrEqual(any.events.length) // ilk 200 çubukta bağlam bilinmez
+    expect(up.events.length).toBeGreaterThan(0)
+    expect(up.events.every((e) => c[e.i] > s.sma200[e.i])).toBe(true)
+    expect(down.events.every((e) => c[e.i] <= s.sma200[e.i])).toBe(true)
+    expect(up.main.baseHit).not.toBe(any.main.baseHit)
+    const a = analyze({ D: b })
+    expect(a.frames[0].dips.length + a.frames[0].tops.length).toBe(RULES_PER_FRAME)
+    expect(new Set(a.frames[0].dips.map((x) => x.filter)).size).toBe(FILTERS.length)
+    expect(triggerLabel(T('d200:dip:-0.2'))).toBe('200 ortalamanın %20 altı')
+    expect(triggerLabel(T('bb:top:2.5'))).toBe('Bollinger üst bandının ötesi (2,5σ)')
+    // MACD: kesişim yalnızca çizgi doğru taraftayken
+    const m = signalStat(b, s, 'D', T('macd:dip:0'))
+    expect(m.events.length).toBeGreaterThan(3)
+    expect(m.events.every((e) => s.macdLine[e.i] < 0 && s.macd[e.i] >= 0 && s.macd[e.i - 1] < 0)).toBe(true)
+    expect(crossings([NaN, -1, 1, 2, -1, 1], 0, 'above', 0)).toEqual([2, 5])
   })
 
   it('süre etiketi takvim süresine göre', () => {

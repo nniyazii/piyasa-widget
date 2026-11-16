@@ -926,3 +926,5 @@ a.screen-item { text-decoration: none; color: inherit; }
 .st-events td.r { text-align: right; padding-left: 12px; }
 .st-events .pos { color: var(--up); }
 .st-events .neg { color: var(--down); }
+.st-table .st-sep.sub td { padding-top: 10px; font-weight: 560; }
+.st-table td .prem-st + .s { margin-top: 3px; max-width: 24ch; margin-left: auto; }

@@ -19,10 +19,46 @@ export const TIMEFRAMES: { id: Timeframe; label: string; adj: string }[] = [
   { id: 'H4', label: '4 saatlik', adj: '4 saatlik' },
   { id: 'H1', label: 'Saatlik', adj: 'saatlik' },
 ]
-export const DIP_LEVELS = [20, 25, 30, 35, 40]
-export const TOP_LEVELS = [60, 65, 70, 75, 80]
 /** Sonrası kaç çubuk ölçülür: kısa, orta (asıl ölçüt), uzun */
 export const HORIZONS: Record<Timeframe, [number, number, number]> = { W: [4, 13, 26], D: [5, 21, 63], H4: [6, 20, 60], H1: [7, 35, 140] }
+
+/**
+ * Göstergeler (hepsi kapanıştan):
+ *   rsi   RSI (14)
+ *   bb    Bollinger: kapanışın 20 çubukluk ortalamadan kaç standart sapma uzakta olduğu (−2 = alt bant)
+ *   d200  Fiyatın 200 çubukluk ortalamaya uzaklığı (oran; −0,1 = %10 altında)
+ *   macd  MACD (12, 26, 9) histogramı ÷ fiyat; sıfırı kesmesi MACD'nin sinyal çizgisini kesmesidir
+ */
+export type Indicator = 'rsi' | 'bb' | 'd200' | 'macd'
+export interface Trigger { id: string; ind: Indicator; side: Side; level: number; dir: 'below' | 'above'; rearm: number }
+const trig = (ind: Indicator, side: Side, level: number, dir: Trigger['dir'], rearm: number): Trigger => ({ id: `${ind}:${side}:${level}`, ind, side, level, dir, rearm })
+export const TRIGGERS: Trigger[] = [
+  ...[20, 25, 30, 35, 40].map((l) => trig('rsi', 'dip', l, 'below', 10)),
+  ...[-2, -2.5].map((l) => trig('bb', 'dip', l, 'below', 1)),
+  ...[-0.1, -0.2, -0.3].map((l) => trig('d200', 'dip', l, 'below', 0.05)),
+  trig('macd', 'dip', 0, 'above', 0), // MACD sıfırın altındayken sinyal çizgisini yukarı keser
+  ...[60, 65, 70, 75, 80].map((l) => trig('rsi', 'top', l, 'above', 10)),
+  ...[2, 2.5].map((l) => trig('bb', 'top', l, 'above', 1)),
+  ...[0.15, 0.3, 0.5].map((l) => trig('d200', 'top', l, 'above', 0.05)),
+  trig('macd', 'top', 0, 'below', 0), // MACD sıfırın üstündeyken sinyal çizgisini aşağı keser
+]
+/** Bağlam: sinyal yalnızca bu durumdayken sayılır; olağan sonuç da aynı durumdaki çubuklardan hesaplanır. */
+export type FilterId = 'any' | 'above200' | 'below200' | 'up' | 'down'
+export const FILTERS: FilterId[] = ['any', 'above200', 'below200', 'up', 'down']
+export const FILTER_LABEL: Record<FilterId, string> = {
+  any: '', above200: 'fiyat 200 ortalamanın üstündeyken', below200: 'fiyat 200 ortalamanın altındayken',
+  up: '50 ortalama 200’ün üstündeyken', down: '50 ortalama 200’ün altındayken',
+}
+const num = (v: number, d: number) => v.toFixed(d).replace('.', ',').replace(/,0+$/, '').replace('-', '−')
+export function triggerLabel(t: Trigger): string {
+  if (t.ind === 'rsi') return `RSI ${t.dir === 'below' ? '≤' : '≥'} ${t.level}`
+  if (t.ind === 'bb') return Math.abs(t.level) === 2 ? `Bollinger ${t.side === 'dip' ? 'alt' : 'üst'} bandı` : `Bollinger ${t.side === 'dip' ? 'alt' : 'üst'} bandının ötesi (${num(t.level, 1)}σ)`
+  if (t.ind === 'd200') return `200 ortalamanın %${num(Math.abs(t.level) * 100, 0)} ${t.level < 0 ? 'altı' : 'üstü'}`
+  return t.side === 'dip' ? 'MACD sıfırın altında yukarı kesti' : 'MACD sıfırın üstünde aşağı kesti'
+}
+export const INDICATOR_LABEL: Record<Indicator, string> = { rsi: 'RSI', bb: 'Bollinger', d200: '200 ortalamaya uzaklık', macd: 'MACD' }
+/** Kaç kural sınanıyor (her zaman diliminde) */
+export const RULES_PER_FRAME = TRIGGERS.length * FILTERS.length - TRIGGERS.filter((t) => t.ind === 'd200').length * 2
 const REARM = 10
 const PERIOD = 14
 
@@ -81,6 +117,10 @@ export interface SignalStat {
   tf: Timeframe
   side: Side
   level: number
+  trigger: Trigger
+  filter: FilterId
+  /** Bağlam koşulu şu an sağlanıyor mu */
+  filterNow: boolean
   events: SignalEvent[]
   horizons: HorizonStat[]
   /** Asıl ölçüt: orta süre */
@@ -108,47 +148,148 @@ export function wilsonLower(hits: number, n: number, z = 1.645): number {
   return (p + z2 / (2 * n) - z * Math.sqrt((p * (1 - p) + z2 / (4 * n)) / n)) / (1 + z2 / n)
 }
 
-/** Eşiği geçiş anları (yeniden kurulma payıyla). */
-export function findEvents(rsi: number[], level: number, side: Side): number[] {
+/** Eşiği geçiş anları: değer eşikten [rearm] kadar uzaklaşmadan aynı hareket yeniden sayılmaz. */
+export function crossings(v: number[], level: number, dir: 'below' | 'above', rearm: number, ok?: (i: number) => boolean): number[] {
   const out: number[] = []
   let armed = true
-  for (let i = 1; i < rsi.length; i++) {
-    const r = rsi[i], p = rsi[i - 1]
+  for (let i = 1; i < v.length; i++) {
+    const r = v[i], p = v[i - 1]
     if (Number.isNaN(r) || Number.isNaN(p)) continue
-    if (side === 'dip') {
-      if (armed && r <= level && p > level) { out.push(i); armed = false } else if (r >= level + REARM) armed = true
-    } else if (armed && r >= level && p < level) { out.push(i); armed = false } else if (r <= level - REARM) armed = true
+    if (dir === 'below') {
+      if (armed && r <= level && p > level) { if (!ok || ok(i)) out.push(i); armed = false } else if (r >= level + rearm) armed = true
+    } else if (armed && r >= level && p < level) { if (!ok || ok(i)) out.push(i); armed = false } else if (r <= level - rearm) armed = true
   }
   return out
 }
+export const findEvents = (rsi: number[], level: number, side: Side) => crossings(rsi, level, side === 'dip' ? 'below' : 'above', REARM)
 
-export function signalStat(bars: Bars, rsi: number[], tf: Timeframe, side: Side, level: number): SignalStat {
+// ------------------------------------------------------------------ göstergeler
+
+export interface Series {
+  rsi: number[]; bb: number[]; d200: number[]; macd: number[]
+  /** MACD çizgisi (işareti için) */
+  macdLine: number[]
+  sma50: number[]; sma200: number[]
+  /** Bir sonraki çubuğun değerini hesaplamak için son durum */
+  gain: number; loss: number; e12: number; e26: number; sig: number
+}
+
+function sma(c: number[], n: number): number[] {
+  const out = new Array<number>(c.length).fill(NaN)
+  let sum = 0
+  for (let i = 0; i < c.length; i++) { sum += c[i]; if (i >= n) sum -= c[i - n]; if (i >= n - 1) out[i] = sum / n }
+  return out
+}
+const zOf = (w: number[]) => { const m = w.reduce((a, b) => a + b, 0) / w.length; const sd = Math.sqrt(w.reduce((a, b) => a + (b - m) ** 2, 0) / w.length); return sd > 0 ? (w[w.length - 1] - m) / sd : NaN }
+
+export function indicators(c: number[]): Series {
+  const { rsi, gain, loss } = rsiSeries(c)
+  const n = c.length
+  const bb = new Array<number>(n).fill(NaN)
+  for (let i = 19; i < n; i++) bb[i] = zOf(c.slice(i - 19, i + 1))
+  const sma50 = sma(c, 50), sma200 = sma(c, 200)
+  const d200 = c.map((x, i) => x / sma200[i] - 1)
+  const macd = new Array<number>(n).fill(NaN), macdLine = new Array<number>(n).fill(NaN)
+  let e12 = c[0], e26 = c[0], sig = 0
+  for (let i = 1; i < n; i++) {
+    e12 += (c[i] - e12) * (2 / 13); e26 += (c[i] - e26) * (2 / 27)
+    const m = e12 - e26
+    sig += (m - sig) * (2 / 10)
+    if (i >= 60) { macd[i] = (m - sig) / c[i]; macdLine[i] = m } // ortalamalar oturana kadar bekle
+  }
+  return { rsi, bb, d200, macd, macdLine, sma50, sma200, gain, loss, e12, e26, sig }
+}
+
+/** Bir sonraki çubuk [x] kapanırsa göstergenin alacağı değer */
+export function nextValue(c: number[], s: Series, ind: Indicator, x: number): number {
+  const last = c[c.length - 1]
+  if (ind === 'rsi') {
+    const d = x - last
+    const g = (s.gain * 13 + Math.max(d, 0)) / 14, l = (s.loss * 13 + Math.max(-d, 0)) / 14
+    return l === 0 ? 100 : 100 - 100 / (1 + g / l)
+  }
+  if (ind === 'bb') return c.length < 19 ? NaN : zOf([...c.slice(-19), x])
+  if (ind === 'd200') { if (c.length < 199) return NaN; let sum = x; for (let i = c.length - 199; i < c.length; i++) sum += c[i]; return x / (sum / 200) - 1 }
+  const e12 = s.e12 + (x - s.e12) * (2 / 13), e26 = s.e26 + (x - s.e26) * (2 / 27)
+  const m = e12 - e26
+  return (m - (s.sig + (m - s.sig) * (2 / 10))) / x
+}
+
+/**
+ * Sinyalin gelmesi için bir sonraki çubuğun kapanması gereken fiyat (ikiye bölerek arama; göstergelerin hepsi
+ * kapanışla birlikte artar). Tek çubukta ulaşılamıyorsa ya da koşul zaten sağlanıyorsa undefined.
+ */
+export function triggerClose(c: number[], s: Series, t: Trigger): number | undefined {
+  const last = c[c.length - 1]
+  let lo = last * 0.2, hi = last * 5
+  const f = (x: number) => nextValue(c, s, t.ind, x) - t.level
+  if (!(f(lo) < 0 && f(hi) > 0)) return undefined
+  for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (f(mid) < 0) lo = mid; else hi = mid }
+  const x = (lo + hi) / 2
+  if (t.dir === 'below' ? x >= last : x <= last) return undefined
+  if (t.ind === 'macd') {
+    // Kesişim ancak MACD doğru taraftayken sayılır
+    const m = s.e12 + (x - s.e12) * (2 / 13) - (s.e26 + (x - s.e26) * (2 / 27))
+    if (t.side === 'dip' ? m >= 0 : m <= 0) return undefined
+  }
+  return x
+}
+
+/** Bağlam koşulu [i] çubuğunda sağlanıyor mu (ortalama henüz yoksa hayır) */
+export function filterHolds(f: FilterId, c: number[], s: Series, i: number): boolean {
+  if (f === 'any') return true
+  const m200 = s.sma200[i]
+  if (Number.isNaN(m200)) return false
+  if (f === 'above200') return c[i] > m200
+  if (f === 'below200') return c[i] <= m200
+  return f === 'up' ? s.sma50[i] > m200 : s.sma50[i] <= m200
+}
+
+/** Olağan sonuç: bağlamı sağlayan her çubuktan [h] çubuk sonraki getiri */
+type BaseCache = Map<string, { up: number; n: number; median?: number }>
+function baseline(c: number[], s: Series, f: FilterId, h: number, cache: BaseCache) {
+  const key = f + ':' + h
+  let b = cache.get(key)
+  if (!b) {
+    const rets: number[] = []
+    for (let j = PERIOD; j + h < c.length; j++) if (filterHolds(f, c, s, j)) rets.push(c[j + h] / c[j] - 1)
+    b = { up: rets.filter((r) => r > 0).length, n: rets.length, median: median(rets) }
+    cache.set(key, b)
+  }
+  return b
+}
+
+export function signalStat(bars: Bars, s: Series, tf: Timeframe, trigger: Trigger, filter: FilterId = 'any', cache: BaseCache = new Map()): SignalStat {
   const { c, t } = bars
   const hs = HORIZONS[tf]
+  const { side, level } = trigger
   const sign = side === 'dip' ? 1 : -1
-  const idx = findEvents(rsi, level, side)
+  const v = s[trigger.ind]
+  const ok = (i: number) => filterHolds(filter, c, s, i) && (trigger.ind !== 'macd' || (side === 'dip' ? s.macdLine[i] < 0 : s.macdLine[i] > 0))
+  const idx = crossings(v, level, trigger.dir, trigger.rearm, ok)
   const events: SignalEvent[] = idx.map((i) => {
     const ret = hs.map((h) => (i + h < c.length ? c[i + h] / c[i] - 1 : undefined))
     // Orta süre içinde en kötü ve en iyi nokta (sinyalden sonra ne kadar daha gitti)
     let worst: number | undefined, best: number | undefined
     for (let j = i + 1; j <= Math.min(c.length - 1, i + hs[1]); j++) { const r = c[j] / c[i] - 1; worst = Math.min(worst ?? r, r); best = Math.max(best ?? r, r) }
-    return { i, t: t[i], price: c[i], rsi: rsi[i], ret, worst, best }
+    return { i, t: t[i], price: c[i], rsi: s.rsi[i], ret, worst, best }
   })
   const horizons: HorizonStat[] = hs.map((h, k) => {
     const rets = events.map((e) => e.ret[k]).filter((x): x is number => x != null)
-    const base: number[] = []
-    for (let j = PERIOD; j + h < c.length; j++) base.push(c[j + h] / c[j] - 1)
+    const b = baseline(c, s, filter, h, cache)
     return {
       bars: h, n: rets.length,
       hit: rets.length ? rets.filter((r) => r * sign > 0).length / rets.length : undefined,
       median: median(rets), mean: mean(rets),
-      baseHit: base.length ? base.filter((r) => r * sign > 0).length / base.length : undefined,
-      baseMedian: median(base),
+      baseHit: b.n ? (sign > 0 ? b.up : b.n - b.up) / b.n : undefined,
+      baseMedian: b.median,
     }
   })
   const main = horizons[1]
   const hits = main.hit != null ? Math.round(main.hit * main.n) : 0
-  const lower = wilsonLower(hits, main.n)
+  // Bağlamlı kurallar çok daha fazla deneme demektir: daha çok örnek ve daha sıkı güven sınırı istenir
+  const combo = filter !== 'any'
+  const lower = wilsonLower(hits, main.n, combo ? 2 : 1.645)
   const excess = main.median != null && main.baseMedian != null ? (main.median - main.baseMedian) * sign : undefined
   // İki yarı sınaması: sonucu belli sinyaller tarih sırasıyla ikiye bölünür, iki yarıda da isabet olağanın üstünde olmalı
   const done = events.filter((e) => e.ret[1] != null)
@@ -158,19 +299,21 @@ export function signalStat(bars: Bars, rsi: number[], tf: Timeframe, side: Side,
   // Teyit: yeterince tekrar, yüksek isabet, olağandan belirgin biçimde iyi (güven alt sınırıyla), ortanca getiri de iyi
   // ve sonuç tek bir döneme bağlı değil
   const verdict: Verdict = main.n < 4 ? 'thin'
-    : main.n >= 8 && (main.hit ?? 0) >= 0.65 && lower > (main.baseHit ?? 1) && (excess ?? -1) > 0 && stable ? 'confirmed'
+    : main.n >= (combo ? 10 : 8) && (main.hit ?? 0) >= 0.65 && lower > (main.baseHit ?? 1) && (excess ?? -1) > 0 && stable ? 'confirmed'
       : (main.hit ?? 0) >= 0.6 && (main.hit ?? 0) > (main.baseHit ?? 1) && (excess ?? -1) > 0 ? 'promising' : 'none'
-  const lastR = rsi[rsi.length - 1]
-  const active = side === 'dip' ? lastR <= level : lastR >= level
+  const n = c.length - 1
+  const now = v[n]
+  const active = !Number.isNaN(now) && (trigger.dir === 'below' ? now <= level : now >= level) && ok(n)
   const last = events[events.length - 1]
   return {
-    tf, side, level, events, horizons, main, verdict,
+    tf, side, level, trigger, filter, events, horizons, main, verdict,
     score: main.n ? lower - (main.baseHit ?? 0.5) : -1,
     stable,
     span: events.length > 1 ? events[events.length - 1].t - events[0].t : 0,
     active,
-    sinceBars: last ? c.length - 1 - last.i : undefined,
-    sinceReturn: last ? c[c.length - 1] / last.price - 1 : undefined,
+    filterNow: filterHolds(filter, c, s, n),
+    sinceBars: last ? n - last.i : undefined,
+    sinceReturn: last ? c[n] / last.price - 1 : undefined,
   }
 }
 
@@ -186,8 +329,11 @@ export interface TimeframeAnalysis {
   rsiMin: number
   rsiMax: number
   close: number
-  gain: number
-  loss: number
+  /** Göstergelerin şu anki değeri ve geçmişte gördüğü aralık */
+  values: Record<Indicator, { now: number; min: number; max: number }>
+  /** Bir sonraki çubukta sinyalin gelmesi için gereken kapanış (kural kimliğine göre) */
+  triggers: Record<string, number | undefined>
+  /** Tüm kurallar: önce bağlamsız (her tetikleyici bir kez), sonra bağlamlı */
   dips: SignalStat[]
   tops: SignalStat[]
 }
@@ -207,14 +353,22 @@ export function analyze(data: Partial<Record<Timeframe, Bars>>): Analysis {
   for (const { id } of TIMEFRAMES) {
     const b = data[id]
     if (!b || b.c.length < PERIOD + 10) continue
-    const { rsi, gain, loss } = rsiSeries(b.c)
+    const s = indicators(b.c)
     const n = b.c.length
-    const seen = rsi.filter((x) => !Number.isNaN(x))
+    const range = (v: number[]) => { let min = Infinity, max = -Infinity; for (const x of v) if (!Number.isNaN(x)) { if (x < min) min = x; if (x > max) max = x }; return { now: v[n - 1], min, max } }
+    const cache: BaseCache = new Map()
+    const all: SignalStat[] = []
+    for (const f of FILTERS) for (const t of TRIGGERS) {
+      if (t.ind === 'd200' && (f === 'above200' || f === 'below200')) continue // uzaklık zaten hangi tarafta olduğunu söyler
+      all.push(signalStat(b, s, id, t, f, cache))
+    }
     frames.push({
       tf: id, bars: n, from: b.t[0], to: b.t[n - 1], spacing: (b.t[n - 1] - b.t[0]) / Math.max(1, n - 1),
-      rsi: rsi[n - 1], rsiMin: Math.min(...seen), rsiMax: Math.max(...seen), close: b.c[n - 1], gain, loss,
-      dips: DIP_LEVELS.map((l) => signalStat(b, rsi, id, 'dip', l)),
-      tops: TOP_LEVELS.map((l) => signalStat(b, rsi, id, 'top', l)),
+      rsi: s.rsi[n - 1], rsiMin: range(s.rsi).min, rsiMax: range(s.rsi).max, close: b.c[n - 1],
+      values: { rsi: range(s.rsi), bb: range(s.bb), d200: range(s.d200), macd: range(s.macd) },
+      triggers: Object.fromEntries(TRIGGERS.map((t) => [t.id, triggerClose(b.c, s, t)])),
+      dips: all.filter((x) => x.side === 'dip'),
+      tops: all.filter((x) => x.side === 'top'),
     })
   }
   const pick = (side: Side) => frames.flatMap((f) => (side === 'dip' ? f.dips : f.tops)).filter((s) => s.verdict === 'confirmed' || s.verdict === 'promising').sort(better)[0]

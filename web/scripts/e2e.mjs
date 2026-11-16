@@ -229,10 +229,12 @@ await step('analiz: hisse seç, tarihsel teyit ve şu anki uzaklık', async () =
   const head = await page.locator('.an-answer').textContent()
   if (!/sinyali|sinyaline|sinyal yok/.test(head)) throw new Error('cevap: ' + head)
   if (await page.locator('.vd').count() !== 2) throw new Error('dip ve tepe bloğu bekleniyordu')
-  // Dört zaman dilimi, her birinde 10 eşik
+  // Her zaman diliminde 22 bağlamsız kural (RSI, Bollinger, 200 ortalama, MACD); öne çıkan bağlamlı kurallar eklenir
   await page.locator('.st-frame summary').first().click()
   const n = await page.locator('.st-frame').first().locator('tbody tr:not(.st-sep)').count()
-  if (n !== 10) throw new Error('eşik satırı: ' + n)
+  if (n < 22) throw new Error('kural satırı: ' + n)
+  const rules = await page.locator('.st-frame').first().locator('tbody').textContent()
+  for (const w of ['RSI ≤ 30', 'Bollinger alt bandı', '200 ortalamanın %10 altı', 'MACD']) if (!rules.includes(w)) throw new Error('kural yok: ' + w)
 })
 
 await step('sözlük: koşul çipinden terime, arama', async () => {
