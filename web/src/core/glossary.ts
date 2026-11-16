@@ -107,6 +107,19 @@ export const GLOSSARY: TermGroup[] = [
         related: ['geri-cekilme', 'rsi-sinyali'],
       },
       {
+        id: 'gorunum', term: 'Görünüm (birleştirilmiş görüş)', aka: ['görüş', 'güven düzeyi', 'sicil', 'olumlu', 'olumsuz', 'kanıt'],
+        short: 'Bir varlık için değerleme, makro örüntü, benzer dönemler ve trendin tek bir görüşte birleştirilmesi.',
+        body: [
+          'Dört kanıt ayrı ayrı hesaplanır. Değerleme: fiyatın para arzına oranı kendi geçmişinin neresinde. Makro örüntü: şu an geçerli olan, tarihsel olarak tutarlı durumlar. Benzer dönemler: bugüne en çok benzeyen dönemlerden 12 ay sonra olanlar. Trend: fiyat 10 aylık ortalamasının üstünde mi.',
+          'Sicil şartı: bir kanıt, o varlıkta geçmişte gerçekten ayırt edici olmuşsa görüşe katılır. Örneğin “pahalı” olması altında geçmişte sonraki getiriyi pek değiştirmediyse, değerleme altının görüşüne oy vermez; tabloda soluk görünür.',
+          'Görüş, katılan kanıtların oylarının toplamıdır: Olumlu, Hafif olumlu, Nötr, Hafif olumsuz, Olumsuz. Güven, aynı yönü gösteren kanıt sayısına bağlıdır: üç kanıt aynı yönde ve karşı çıkan yoksa yüksek, iki kanıt aynı yöndeyse orta, aksi hâlde düşük.',
+          '“Görüşü ne değiştirir” satırları, trendin hangi fiyatta döneceğini ve gerçekleşirse görüşü tersine çevirecek makro gelişmeleri söyler.',
+          'Süre 12 aydır ve görüş bir tahmin değildir; geçmişte benzer koşullarda ne olduğunun özetidir.',
+        ],
+        inApp: 'Analiz bölümünün açılış sayfası. Diğer sekmeler (Makro, Para arzı, Hisse…) bu görüşün kanıt sayfalarıdır.',
+        related: ['makro-oruntu', 'para-arzi'],
+      },
+      {
         id: 'makro-oruntu', term: 'Makro örüntü ve benzer dönemler', aka: ['makro analiz', 'reel faiz', 'getiri eğrisi', 'dolar endeksi', 'DXY', 'VIX', 'tarih tekerrür', 'benzer dönem', 'korelasyon', 'para arzı'],
         short: 'Para arzı, faiz, dolar, enflasyon, VIX ve petrol gibi makro değişkenlerin belirli bir durumdayken varlıkların sonraki 12 ayda ne yaptığının geçmişten ölçülmesi.',
         body: [

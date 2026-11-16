@@ -1133,3 +1133,40 @@ a.screen-item { text-decoration: none; color: inherit; }
 
 .mc-patterns li .mc-eras > span { display: grid; margin: 0; }
 .mc-patterns li .mc-eras > span > .track { display: block; margin: 0; }
+
+/* Görünüm */
+.ov-regime { margin: 18px 0 0; padding: 14px 16px; border-radius: var(--radius); background: var(--sunken); max-width: 78ch; }
+.ov-regime > b { font-size: 16px; font-weight: 680; }
+.ov-regime ul { margin: 8px 0 8px; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.ov-regime a { font-size: 13.5px; }
+.ov-changes { margin: 14px 0 0; padding: 12px 16px; border-left: 3px solid var(--brass); background: var(--brass-bg); border-radius: 0 var(--radius-s) var(--radius-s) 0; max-width: 78ch; font-size: 14px; }
+.ov-changes ul { margin: 6px 0 0; padding-left: 18px; }
+.ov-table th.c, .ov-table td.c { text-align: center; }
+.ov-table td { vertical-align: middle; }
+.ov-table .n { font-weight: 650; text-decoration: none; color: inherit; }
+.ov-table .n:hover { text-decoration: underline; }
+.ov-table .s { display: block; font-size: 12px; color: var(--ink-3); }
+.ov-stance { display: inline-block; padding: 3px 10px; border-radius: 6px; font-size: 13.5px; font-weight: 660; background: var(--sunken); color: var(--ink-2); white-space: nowrap; }
+.ov-stance.up { background: var(--up-bg); color: var(--up); }
+.ov-stance.down { background: var(--down-bg); color: var(--down); }
+.ov-vote { display: inline-block; min-width: 26px; font-size: 13px; letter-spacing: -1px; text-align: center; color: var(--ink-3); }
+.ov-vote.up { color: var(--up); }
+.ov-vote.down { color: var(--down); }
+.ov-vote.dim { opacity: 0.35; }
+.ov-card h3 .num { margin-left: 8px; color: var(--ink-2); }
+.ov-card.up .vd-act { color: var(--up); }
+.ov-card.down .vd-act { color: var(--down); }
+.ov-card .vd-act .vd-str { color: var(--ink-3); background: var(--sunken); }
+.ov-layers { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 12px; max-width: 80ch; }
+.ov-layers li { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; }
+.ov-layers li > div > b { display: block; font-size: 14px; font-weight: 650; }
+.ov-layers li > div > b a { margin-left: 10px; font-weight: 400; font-size: 12.5px; }
+.ov-layers li > div > span { display: block; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.ov-layers li.dim > div > span { color: var(--ink-3); }
+.ov-layers .rec { font-size: 12.5px !important; color: var(--ink-3) !important; }
+.ov-layers .rec .hitbar { display: inline-block; vertical-align: 1px; margin: 0 8px 0 0; }
+.ov-flips { margin: 16px 0 0; max-width: 80ch; font-size: 13.5px; color: var(--ink-2); }
+.ov-flips b { font-size: 13.5px; color: var(--ink); }
+.ov-flips ul { margin: 4px 0 0; padding-left: 18px; display: grid; gap: 4px; line-height: 1.5; }
+.ov-practical { margin-top: 40px; padding-top: 6px; border-top: 2px solid var(--ink); }
+.ov-practical h3 { font-size: 15px; color: var(--ink); }

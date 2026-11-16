@@ -12,8 +12,7 @@ const pct = (v?: number, d = 0) => (v == null || Number.isNaN(v) ? '—' : (v > 
 const p0 = (v?: number) => (v == null ? '—' : '%' + Fmt.number(v * 100, 0))
 const STANCE: Record<AssetView['stance'], string> = { lehine: 'Lehine', aleyhine: 'Aleyhine', karışık: 'Karışık', nötr: 'Belirgin örüntü yok' }
 
-let cache: Promise<MacroData | undefined> | undefined
-const load = () => (cache ??= fetch('data/macro.json', { cache: 'no-cache' }).then((r) => (r.ok ? (r.json() as Promise<MacroData>) : undefined)).catch(() => undefined))
+import { loadMacro as load } from './Outlook'
 
 export function Macro() {
   const [data, setData] = useState<MacroData | null | undefined>()

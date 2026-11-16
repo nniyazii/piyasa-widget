@@ -174,6 +174,9 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   await page.goto(BASE + '/#/listeler')
   await page.locator('.nav a', { hasText: 'Analiz' }).click()
   // Özet: soru → cevap satırları; satır ilgili sayfaya götürür
+  // Açılış: Görünüm (görüş tablosu, varlık kartları); altında pratik sorular
+  await page.locator('.ov-table tbody tr').nth(5).waitFor({ timeout: 30000 })
+  if (await page.locator('.ov-card').count() < 6) throw new Error('varlık kartları eksik')
   await page.locator('.an-row').nth(5).waitFor({ timeout: 20000 })
   await page.locator('.an-row', { hasText: 'Değerinin altında' }).click()
   await page.locator('.prem-table tbody tr').nth(4).waitFor({ timeout: 20000 })

@@ -1,6 +1,6 @@
 /**
  * Analiz: bir sayfa, bir soru. Her sayfada önce cevap, sonra veri, en altta hesabın açıklaması.
- *   #/analiz             Özet: tüm soruların cevabı tek ekranda
+ *   #/analiz             Görünüm: her varlık için birleştirilmiş görüş ve pratik sorular
  *   #/analiz/urunler     Altın ve gümüş ürünleri değerinin altında mı?
  *   #/analiz/maliyet     Nereden almalı? (banka, fiziki, fon)
  *   #/analiz/birikim     Birikimimi neye çevirmeliyim? (ev, altın, dolar, gümüş)
@@ -18,16 +18,17 @@ import { Icon } from '../ui/Icon'
 import { href } from '../ui/router'
 import { bestRoute, CostCompare } from './CostCompare'
 import { Macro } from './Macro'
+import { Outlook } from './Outlook'
 import { StockAnalysis } from './StockAnalysis'
 
 const TABS = [
-  { path: '', label: 'Özet' },
+  { path: '', label: 'Görünüm' },
+  { path: 'makro', label: 'Makro' },
+  { path: 'para-arzi', label: 'Para arzı' },
+  { path: 'birikim', label: 'Birikim' },
   { path: 'urunler', label: 'Ürünler' },
   { path: 'maliyet', label: 'Nereden almalı' },
-  { path: 'birikim', label: 'Birikim' },
-  { path: 'para-arzi', label: 'Para arzı' },
   { path: 'hisse', label: 'Hisse' },
-  { path: 'makro', label: 'Makro' },
 ]
 
 const pct = (v?: number) => (v == null ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), 1))
@@ -46,6 +47,7 @@ export function Analysis({ tab, arg }: { tab?: string; arg?: string }) {
       </nav>
       {current.path === 'hisse' ? <StockAnalysis symbol={arg} />
         : current.path === 'makro' ? <Macro />
+        : current.path === '' ? <Outlook practical={s.rows.length || s.advices.length ? <Overview s={s} /> : undefined} />
         : !s.rows.length && !s.advices.length
         ? <p className="an-answer" aria-live="polite">{s.error ?? 'Fiyatlar alınıyor…'}</p>
         : current.path === 'urunler' ? <Products s={s} />
@@ -96,8 +98,10 @@ function Overview({ s }: { s: PremiumState }) {
   }
   return (
     <>
-      <Question q="Bugün ne yapmalı?">{strong ? `Bugün ${strong} güçlü sinyal var.` : 'Bugün güçlü bir sinyal yok.'}</Question>
-      <p className="an-sub">Her sorunun cevabı aşağıda tek satırda; güçlü sinyaller işaretli. Gerekçesi için satıra dokun.</p>
+      <section className="an-group ov-practical">
+        <h3>Pratik sorular: {strong ? `bugün ${strong} güçlü sinyal var` : 'bugün güçlü bir sinyal yok'}</h3>
+        <p className="note">Her sorunun cevabı tek satırda; güçlü sinyaller işaretli. Gerekçesi için satıra dokun.</p>
+      </section>
 
       <section className="an-group">
         <h3>Altın ve gümüş ürünleri</h3>
@@ -107,11 +111,6 @@ function Overview({ s }: { s: PremiumState }) {
         </Row>
         {gold && <Row q="Altını nereden almalı?" to="maliyet" note={`masraf ${pct0(gold.costRate)}`}>{gold.route.name}</Row>}
         {silver && <Row q="Gümüşü nereden almalı?" to="maliyet" note={`masraf ${pct0(silver.costRate)}`}>{silver.route.name}</Row>}
-      </section>
-
-      <section className="an-group">
-        <h3>Büyük resim</h3>
-        <Row q="Makro tablo geçmişte hangi dönemlere benziyor, sonrasında ne oldu?" to="makro">Para arzı, faiz, dolar, enflasyon, VIX, petrol</Row>
       </section>
 
       <section className="an-group">
