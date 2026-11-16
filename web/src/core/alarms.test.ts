@@ -1,7 +1,7 @@
 import { describe as group, expect, it } from 'vitest'
 import { checkAlarms, describe, sanitizeAlarms, type Alarm, type Source } from './alarms'
 import { PREMIUM_PAIRS, premiumRow } from './premium'
-import { analyze } from './signals'
+import { stockSetups, type SetupEvidence } from './setups'
 
 const price = (_p: number): Alarm => ({ id: 'p', created: 1, type: 'price', symbol: 'NASDAQ:SNDK', op: 'below', value: 770 })
 const src = (over: Partial<Source>): Source => ({
@@ -29,7 +29,7 @@ group('alarmlar', () => {
     const prev = { s: { on: true, firedAt: 5 } }
     const r = await checkAlarms(a, prev, src({}), 10)
     expect(r.fired).toHaveLength(0)
-    expect(r.states.s).toMatchObject({ on: true, firedAt: 5, error: 'geçmiş veri alınamadı' })
+    expect(r.states.s).toMatchObject({ on: true, firedAt: 5, error: expect.stringContaining('alınamadı') })
   })
 
   it('avantajlı fiyat: al sinyali gelince çalar, bozulup yeniden gelince yine çalar; BIST kapalıyken çalmaz', async () => {
@@ -50,24 +50,23 @@ group('alarmlar', () => {
     expect(r.fired).toHaveLength(2)
   })
 
-  it('hisse sinyali: teyitli kural açıldığında çalar', async () => {
-    // Her dipten sonra yükselen seri; son çubuklarda yeni bir sert düşüş (RSI eşiğin altında)
-    const c: number[] = [100]
-    for (let k = 0; k < 24; k++) {
-      for (let i = 0; i < 6; i++) c.push(c.at(-1)! * 0.97)
-      for (let i = 0; i < 16; i++) c.push(c.at(-1)! * 1.012)
-      for (let i = 0; i < 40; i++) c.push(c.at(-1)! * (i % 2 ? 1.004 : 0.996))
-    }
-    const uni = { 'D|rsi:dip:30|any': { n: 5000, stocks: 400, diff: 0.06, z: 8 }, 'D|rsi:dip:25|any': { n: 5000, stocks: 400, diff: 0.06, z: 8 }, 'D|rsi:dip:35|any': { n: 5000, stocks: 400, diff: 0.06, z: 8 } }
-    const calm = analyze({ D: { t: c.map((_, i) => i * 86400), c } }, uni)
-    for (let i = 0; i < 6; i++) c.push(c.at(-1)! * 0.97)
-    const dip = analyze({ D: { t: c.map((_, i) => i * 86400), c } }, uni)
-    const a: Alarm[] = [{ id: 's', created: 1, type: 'signal', symbol: 'BIST:TEST', side: 'dip', level: 'confirmed' }, { id: 't', created: 1, type: 'signal', symbol: 'BIST:TEST', side: 'top', level: 'confirmed' }]
-    let r = await checkAlarms(a, {}, src({ analysis: async () => calm }))
+  it('hisse sinyali: güçlü kurulum oluştuğunda çalar; istenirse hisseye özgü teyitli kural da', async () => {
+    const mk = (n: number) => { const c = [100]; for (let i = 0; i < 700; i++) c.push(c.at(-1)! * (i % 2 ? 1.004 : 0.997)); for (let i = 0; i < n; i++) c.push(c.at(-1)! * 0.96); return { t: c.map((_, i) => 1.42e9 + i * 86400), c } }
+    const ev = { stocks: 500, periods: [[500, 0.8, 0.6, 0.6, 0.5, 0.1, 0.02], [500, 0.78, 0.6, 0.6, 0.5, 0.1, 0.02], [500, 0.75, 0.6, 0.6, 0.5, 0.1, 0.02]] } as SetupEvidence
+    const table = { 'rsi30|any': ev }
+    const a: Alarm[] = [{ id: 's', created: 1, type: 'signal', symbol: 'NASDAQ:TEST', side: 'dip', level: 'confirmed' }, { id: 't', created: 1, type: 'signal', symbol: 'NASDAQ:TEST', side: 'top', level: 'confirmed' }]
+    let r = await checkAlarms(a, {}, src({ setups: async () => stockSetups(mk(0), undefined, table) }))
     expect(r.fired).toHaveLength(0)
-    r = await checkAlarms(a, r.states, src({ analysis: async () => dip }))
+    expect(r.states.s.now).toBe('güçlü kurulum yok')
+    r = await checkAlarms(a, r.states, src({ setups: async () => stockSetups(mk(12), undefined, table) }))
     expect(r.fired.map((f) => f.alarm.id)).toEqual(['s'])
-    expect(r.fired[0].text).toMatch(/TEST: Dip sinyali \(teyitli\)\. Kural: günlük veride /)
+    expect(r.fired[0].title).toBe('TEST: güçlü dip kurulumu')
+    expect(r.fired[0].text).toContain('RSI 30’un altında')
+    expect(r.fired[0].text).toContain('%75 yukarıdaydı (olağan %60)')
+    // Hisse dışı sembolde kurulum yok: hata olarak işaretlenir, çalmaz
+    r = await checkAlarms([a[0]], {}, src({ setups: async () => undefined }))
+    expect(r.states.s.error).toContain('kurulum verisi alınamadı')
+    expect(describe(a[0])).toBe('TEST için güçlü dip kurulumu oluşursa')
   })
 
   it('dışarıdan gelen veri doğrulanır', () => {

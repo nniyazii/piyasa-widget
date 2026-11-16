@@ -12,6 +12,7 @@
 import type { Advice, AdviceId } from './advice'
 import * as Fmt from './format'
 import { PREMIUM_PAIRS, type PremiumRow } from './premium'
+import { REGIME_LABEL, type StockSetups } from './setups'
 import { FILTER_LABEL, TIMEFRAMES, triggerLabel, type Analysis, type SignalStat } from './signals'
 
 interface Base { id: string; created: number }
@@ -40,6 +41,8 @@ export interface Source {
   prices(symbols: string[]): Promise<Map<string, number>>
   premiums(): Promise<{ rows: PremiumRow[]; advices: Advice[]; open: boolean }>
   analysis(symbol: string): Promise<Analysis | undefined>
+  /** Güçlü kurulumlar (hisse değilse undefined) */
+  setups?(symbol: string): Promise<StockSetups | undefined>
 }
 
 export const ADVICE_TARGETS: { id: AdviceId; label: string }[] = [
@@ -60,7 +63,7 @@ const SIDE = { dip: 'dip', top: 'tepe', both: 'dip ya da tepe' }
 /** Alarmın cümlesi: "SNDK 770 altına inerse" */
 export function describe(a: Alarm): string {
   if (a.type === 'price') return `${code(a.symbol)} ${num(a.value)} ${a.op === 'below' ? 'altına inerse' : 'üstüne çıkarsa'}`
-  if (a.type === 'signal') return `${code(a.symbol)} için ${a.level === 'confirmed' ? 'teyitli' : 'teyitli ya da zayıf kanıtlı'} ${SIDE[a.side]} sinyali gelirse`
+  if (a.type === 'signal') return `${code(a.symbol)} için ${a.level === 'confirmed' ? `güçlü ${SIDE[a.side]} kurulumu oluşursa` : `güçlü ${SIDE[a.side]} kurulumu ya da hisseye özgü teyitli sinyal gelirse`}`
   if (a.target === 'any') return 'Altın ya da gümüş ürünlerinden biri değerinin altına inerse'
   const adv = ADVICE_TARGETS.find((x) => x.id === a.target)
   if (adv) return `${adv.label} güçlü sinyal verirse`
@@ -106,18 +109,34 @@ async function evaluate(a: Alarm, src: Source, cache: { prices?: Map<string, num
       text: buys.map((r) => `${r.pair.code} içindeki madenin değerine göre ${pct(r.premium!)} (fiyat ${num(r.price!)} ₺).`).join(' '),
     }
   }
+  // Önce güçlü kurulumlar (pazar genelinde üç dönemde sınanmış); istenirse hisseye özgü teyitli kurallar da
+  const su = await src.setups?.(a.symbol)
+  const strongNow = (su?.list ?? []).filter((x) => x.active && x.strength?.strong && (a.side === 'both' || x.setup.side === a.side))
+    .sort((x, y) => (y.strength!.hit - y.strength!.base) - (x.strength!.hit - x.strength!.base))[0]
+  if (strongNow) {
+    const st = strongNow.strength!
+    const what = strongNow.setup.side === 'dip' ? 'dip' : 'tepe'
+    return {
+      on: true, now: `güçlü ${what} kurulumu açık`,
+      title: `${code(a.symbol)}: güçlü ${what} kurulumu`,
+      text: `${code(a.symbol)}: ${strongNow.setup.label}, ${REGIME_LABEL[strongNow.regime]}. Benzer durumlarda 3 ay sonra fiyat, sınanan üç dönemin en kötüsünde bile %${Math.round(st.hit * 100)} ${what === 'dip' ? 'yukarıdaydı' : 'aşağıdaydı'} (olağan %${Math.round(st.base * 100)}).`,
+    }
+  }
+  if (a.level === 'confirmed') {
+    if (!su) throw new Error('kurulum verisi alınamadı (yalnızca BIST ve ABD hisselerinde çalışır)')
+    return { on: false, now: su.list.some((x) => x.strength?.strong) ? 'güçlü kurulum yok' : 'bu pazarda güçlü kurulum tanımlı değil' }
+  }
   const an = await src.analysis(a.symbol)
   if (!an || !an.frames.length) throw new Error('geçmiş veri alınamadı')
-  const act = activeSignals(an, a.side, a.level)
-  const any = an.frames.flatMap((f) => [...f.dips, ...f.tops]).some((s) => s.verdict === 'confirmed' || (a.level === 'promising' && s.verdict === 'promising'))
+  const act = activeSignals(an, a.side, 'confirmed')
   const s = act[0]
-  if (!s) return { on: false, now: any ? 'sinyal yok' : 'bu hissede izlenecek sinyal yok' }
+  if (!s) return { on: false, now: 'sinyal yok' }
   const hits = Math.round((s.main.hit ?? 0) * s.main.n)
   const what = `${s.side === 'dip' ? 'Dip' : 'Tepe'} sinyali`
   return {
     on: true, now: `${what.toLowerCase()} açık`,
     title: `${code(a.symbol)}: ${what.toLowerCase()} geldi`,
-    text: `${code(a.symbol)}: ${what} (${s.verdict === 'confirmed' ? 'teyitli' : 'zayıf kanıtlı'}). Kural: ${ruleText(s)}. Geçmişte ${s.main.n} sinyalin ${hits} tanesi tuttu.${act.length > 1 ? ` Aynı anda ${act.length - 1} kural daha açık.` : ''}`,
+    text: `${code(a.symbol)}: ${what} (hisseye özgü, teyitli). Kural: ${ruleText(s)}. Geçmişte ${s.main.n} sinyalin ${hits} tanesi tuttu.${act.length > 1 ? ` Aynı anda ${act.length - 1} kural daha açık.` : ''}`,
   }
 }
 

@@ -200,8 +200,34 @@
     ]
    },
    {
+    "id": "guclu-kurulum",
+    "term": "Güçlü kurulum",
+    "aka": [
+     "kurulum",
+     "dip kurulumu",
+     "tepe kurulumu",
+     "piyasa durumu",
+     "güçlü sinyal",
+     "hisse analizi"
+    ],
+    "short": "Pazardaki tüm hisselerde, üç ayrı dönemde sınanmış ve üçünde de olağandan belirgin biçimde iyi sonuç vermiş dip ya da tepe durumu.",
+    "body": [
+     "Tek bir hissenin kendi geçmişi bir sinyali güvenle sınamaya yetmez: hisse başına 10–30 örnek çıkar ve yüzlerce kural denendiğinde birkaçı şans eseri iyi görünür. Bu yüzden az sayıda, önceden tanımlı kurulum pazardaki tüm hisselerde birlikte sınanır; her kurulum için binlerce örnek oluşur.",
+     "Kurulum iki parçadan oluşur: hissenin durumu (örneğin RSI 30’un altında, fiyat 200 günlük ortalamanın %20 altında, dört gösterge birlikte dipte) ve piyasanın durumu (endeks 200 günlük ortalamasının üstünde mi, altında mı). Sonuç 63 işlem günü, yani yaklaşık 3 ay sonra ölçülür.",
+     "Güçlü sayılması için üç ayrı dönemin (2019’a kadar, 2020–2023, 2024’ten beri) üçünde de: en az 100 örnek, isabet aynı dönemin olağanından en az 5 puan yüksek ve dip kurulumlarında en az %65. Gösterilen isabet üç dönemin en düşüğüdür.",
+     "Olağan, aynı piyasa durumundaki herhangi bir günden 3 ay sonra fiyatın yukarıda olma oranıdır. Piyasa düşüşteyken hisselerin çoğu zaten toparlandığı için bu oran yüksektir; kurulumun değeri ona eklediği kadardır.",
+     "Bugünkü sonuç: ABD hisselerinde üç dip kurulumu güçlü çıktı. BIST’te hiçbir kurulum üç dönemin üçünde de tutmadı (2020–2023’te iyi görünenler 2024’ten sonra olağanın altında kaldı). Tepe (satım) tarafında iki pazarda da güvenilir kurulum bulunamadı. Kurulumlar hisseye özgü bir üstünlük göstermez; yakaladıkları şey sert düşüşlerden sonraki genel toparlanmadır."
+    ],
+    "example": "ABD hisselerinde “haftalık RSI 30’un altında, S&P 500 200 günlük ortalamasının altındayken” kurulumu 1.992 kez oluştu. 3 ay sonra fiyat üç dönemde %84, %74 ve %81 yukarıdaydı; aynı dönemlerin olağanı %77, %59 ve %72.",
+    "inApp": "Analiz bölümündeki Hisse sayfasının üst kısmı. Sayfa, seçilen hissenin her güçlü kuruluma göre şu anki durumunu ve eksik koşulun sağlanması için gereken fiyatı gösterir. Alarmlar sayfasından “güçlü kurulum oluşursa” alarmı kurulabilir.",
+    "related": [
+     "rsi",
+     "rsi-sinyali"
+    ]
+   },
+   {
     "id": "rsi-sinyali",
-    "term": "Tarihsel teyitli dip ve tepe sinyali",
+    "term": "Hisseye özgü kural (tarihsel teyitli sinyal)",
     "aka": [
      "RSI sinyali",
      "Bollinger",
@@ -228,9 +254,10 @@
      "Sınır: her hissede yaklaşık 530 kural birden denenir, bu kadar denemede birkaçı şans eseri iyi görünebilir. Aynı yeri birkaç farklı kural gösteriyorsa bulgu daha güvenilirdir. Saatlik veri yaklaşık 1 yılı, 4 saatlik veri 2–3 yılı kapsar; kısa dönemde tutmuş bir sinyal farklı bir piyasa koşulunda tutmayabilir."
     ],
     "example": "THYAO’da “günlük RSI 30’un altına indi, fiyat 200 ortalamanın altındayken” kuralı 12 yılda 21 bağımsız sinyal verdi, 16’sı tuttu (%76; olağan %53). Keşif döneminde 16 sinyalin 12’si, doğrulama döneminde 5 sinyalin 4’ü tuttu. Aynı kural BIST’te 574 hissede olağandan 4,4 puan daha sık tutmuş. Dört şart da sağlandığı için teyitli.",
-    "inApp": "Analiz bölümündeki Hisse sayfası. Sinyal, göstergenin eşiği geçtiği ilk çubuktur; gösterge eşikten uzaklaşmadan (RSI’da 10 puan) aynı hareket yeniden sayılmaz.",
+    "inApp": "Analiz bölümündeki Hisse sayfasının alt kısmı (“Bu hisseye özgü kurallar”); kanıtı güçlü kurulumlara göre daha zayıftır. Sinyal, göstergenin eşiği geçtiği ilk çubuktur; gösterge eşikten uzaklaşmadan (RSI’da 10 puan) aynı hareket yeniden sayılmaz.",
     "related": [
      "rsi",
+     "guclu-kurulum",
      "guvenilirlik"
     ]
    }

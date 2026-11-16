@@ -2,6 +2,7 @@
  * Hisse analizi verisi: dört zaman diliminde kapanışlar. Sunucu varsa her sembol canlı (api/tv/bars),
  * statik yayında günlük kopyadaki parçalardan (data/bars/{W|D|H4|H1}/{nn}.json).
  */
+import { INDEX_OF, stockSetups, type SetupTable, type StockSetups } from '../core/setups'
 import { marketOf, type Bars, type Timeframe, type Universe } from '../core/signals'
 import { historySource } from './history'
 
@@ -82,4 +83,19 @@ export async function loadUniverse(symbol: string): Promise<{ rules: Universe; s
   const r = await rules
   if (!r) { rules = undefined; return undefined }
   return r.markets[m] ? { rules: r.markets[m].rules, stocks: r.markets[m].stocks, generated: r.generated } : undefined
+}
+
+let setupFile: Promise<{ generated: number; markets: Record<string, { stocks: number; setups: SetupTable }> } | undefined> | undefined
+export interface SetupData extends StockSetups { market: 'TR' | 'US'; stocks: number; generated: number; bars: Bars }
+/** Güçlü kurulumlar: hissenin günlük verisi, pazar endeksi ve pazar geneli kanıt tablosuyla (hisse değilse undefined) */
+export async function loadSetups(symbol: string, daily: Bars | undefined, live?: number): Promise<SetupData | undefined> {
+  const m = marketOf(symbol)
+  if (!m || !daily) return undefined
+  setupFile ??= json('data/setups.json')
+  const [file, index] = await Promise.all([setupFile, loadBars(INDEX_OF[m])])
+  if (!file) setupFile = undefined
+  const table = file?.markets[m]
+  // Endeksin son çubuğu da canlı fiyatla güncellenmez; piyasa durumu günlük kapanışa göredir
+  void live
+  return { ...stockSetups(daily, index?.frames.D, table?.setups), market: m, stocks: table?.stocks ?? 0, generated: file?.generated ?? 0, bars: daily }
 }

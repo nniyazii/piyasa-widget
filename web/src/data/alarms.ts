@@ -8,7 +8,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { checkAlarms, newId, sanitizeAlarms, type Alarm, type Fired, type Source, type States } from '../core/alarms'
 import { analyze, type Analysis } from '../core/signals'
-import { loadBars, loadUniverse, withLive } from './bars'
+import { loadBars, loadSetups, loadUniverse, withLive } from './bars'
 import { getPremiums, refreshPremiums } from './premium'
 import { scan } from './tv'
 
@@ -155,6 +155,10 @@ const clientSource: Source = {
     const p = getPremiums()
     if (!p.rows.length) throw new Error('fiyatlar alınamadı')
     return { rows: p.rows, advices: [...p.advices, ...p.money], open: p.open }
+  },
+  async setups(symbol) {
+    const data = await loadBars(symbol)
+    return loadSetups(symbol, data?.frames.D)
   },
   async analysis(symbol) {
     // Geçmiş veri ağırdır: sembol başına 10 dakikada bir

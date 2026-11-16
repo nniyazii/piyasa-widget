@@ -219,18 +219,23 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   for (const s of ['Dolar (al|sat)', 'Altın (al|sat)', 'Gram altın (al|sat)', 'BIST (al|sat)', 'Ev (al|için bekle)']) if (!money.some((t) => new RegExp('^' + s).test(t))) throw new Error('para arzı kartı yok: ' + s + ' | ' + money.join(' ¦ '))
 })
 
-await step('analiz: hisse seç, tarihsel teyit ve şu anki uzaklık', async () => {
+await step('analiz: hisse seç, güçlü kurulumlar ve hisseye özgü kurallar', async () => {
   await page.goto(BASE + '/#/analiz')
   await page.locator('.an-tabs a', { hasText: 'Hisse' }).click()
   await page.locator('.st-search input').fill('thyao')
   await page.locator('.st-hits button', { hasText: 'THYAO' }).first().click()
-  await page.locator('.st-table tbody tr').nth(3).waitFor({ timeout: 30000 })
+  await page.locator('.st-own').waitFor({ timeout: 40000 })
   if (!/analiz\/hisse\/BIST(:|%3A)THYAO/.test(page.url())) throw new Error('adres: ' + page.url())
-  const head = await page.locator('.an-answer').textContent()
-  if (!/sinyali|sinyaline|sinyal yok/.test(head)) throw new Error('cevap: ' + head)
-  if (await page.locator('.st-sig').count() !== 2) throw new Error('dip ve tepe bloğu bekleniyordu')
-  // Grafikler: fiyat üzerinde sinyal noktaları, imleçle ayrıntı, sinyalden sonraki seyir
-  const sig = page.locator('.st-sig', { has: page.locator('.sc') }).first()
+  // BIST: güvenilirliği kanıtlanmış kurulum yok; sınanan kurulumlar dönem dönem listelenir
+  const tr = await page.locator('.an-answer').first().textContent()
+  if (!/BIST hisselerinde güvenilirliği kanıtlanmış bir kurulum yok/.test(tr)) throw new Error('BIST cevabı: ' + tr)
+  await page.locator('.st-frame summary', { hasText: 'Sınanan kurulumlar' }).click()
+  if (await page.locator('.st-frame[open] tbody tr').count() < 30) throw new Error('kurulum tablosu eksik')
+  // Hisseye özgü kurallar: grafikler, dört kanıt şartı, tüm kurallar
+  await page.locator('.st-own > summary').click()
+  await page.locator('.st-own .st-table tbody tr').nth(3).waitFor({ timeout: 10000 })
+  if (await page.locator('.st-own .st-sig').count() !== 2) throw new Error('dip ve tepe bloğu bekleniyordu')
+  const sig = page.locator('.st-own .st-sig', { has: page.locator('.sc') }).first()
   if (await sig.count()) {
     if (await sig.locator('.sc').count() !== 2) throw new Error('iki grafik bekleniyordu')
     if (!(await sig.locator('.sc-mark').count())) throw new Error('sinyal noktası yok')
@@ -238,15 +243,19 @@ await step('analiz: hisse seç, tarihsel teyit ve şu anki uzaklık', async () =
     const bb = await sig.locator('.sc-plot svg').first().boundingBox()
     await page.mouse.move(bb.x + bb.width * 0.5, bb.y + bb.height * 0.4)
     await sig.locator('.sc-tip').first().waitFor({ timeout: 3000 })
-    if (!(await sig.locator('.sc-median').count())) throw new Error('ortanca çizgisi yok')
     if (await sig.locator('.st-checks li').count() !== 4) throw new Error('dört kanıt şartı bekleniyordu')
   }
-  // Her zaman diliminde 22 bağlamsız kural (RSI, Bollinger, 200 ortalama, MACD); öne çıkan bağlamlı kurallar eklenir
-  await page.locator('.st-frame summary').first().click()
-  const n = await page.locator('.st-frame').first().locator('tbody tr:not(.st-sep)').count()
-  if (n < 29) throw new Error('kural satırı: ' + n)
-  const rules = await page.locator('.st-frame').first().locator('tbody').textContent()
-  for (const w of ['RSI ≤ 30', 'Bollinger alt bandı', '200 ortalamanın %10 altı', 'MACD', 'Zirvesinden %25 geriledi', 'Sert düşüş']) if (!rules.includes(w)) throw new Error('kural yok: ' + w)
+  const frame = page.locator('.st-own details.st-frame', { hasText: 'tüm kurallar' }).first()
+  await frame.locator('summary').click()
+  if (await frame.locator('tbody tr:not(.st-sep)').count() < 29) throw new Error('kural satırı eksik')
+  // ABD: üç güçlü kurulum, her birinde üç dönemin sonucu ve koşulların şu anki durumu
+  await page.goto(BASE + '/#/analiz/hisse/NASDAQ:AAPL')
+  await page.locator('.st-sig .st-periods').nth(2).waitFor({ timeout: 40000 })
+  const us = await page.locator('.an-answer').first().textContent()
+  if (!/güçlü|Güçlü/.test(us)) throw new Error('ABD cevabı: ' + us)
+  if (await page.locator('.st-sig .st-periods').first().locator('> div').count() !== 3) throw new Error('üç dönem bekleniyordu')
+  if (!(await page.locator('.st-checks-list li').count())) throw new Error('koşullar yok')
+  if (!/S&P 500/.test(await page.locator('.st-regime').textContent())) throw new Error('piyasa durumu yok')
 })
 
 await step('alarmlar: fiyat, avantajlı fiyat ve hisse sinyali kur; çalan alarm bildirilir', async () => {
@@ -265,11 +274,11 @@ await step('alarmlar: fiyat, avantajlı fiyat ve hisse sinyali kur; çalan alarm
   await page.locator('.al-go .btn').click()
   await page.locator('.al-row', { hasText: 'değerinin altına inerse' }).waitFor({ timeout: 5000 })
   // Hisse sinyali: Analiz › Hisse sayfasındaki bağlantı formu hazır doldurur
-  await page.goto(BASE + '/#/analiz/hisse/BIST:THYAO')
-  await page.locator('.st-alarm a', { hasText: 'Sinyal gelince haber ver' }).click()
-  await page.locator('.al-say', { hasText: 'THYAO' }).waitFor({ timeout: 5000 })
+  await page.goto(BASE + '/#/analiz/hisse/NASDAQ:AAPL')
+  await page.locator('.st-alarm a', { hasText: 'haber ver' }).first().click()
+  await page.locator('.al-say', { hasText: 'AAPL' }).waitFor({ timeout: 5000 })
   await page.locator('.al-go .btn').click()
-  await page.locator('.al-row', { hasText: 'sinyali gelirse' }).waitFor({ timeout: 5000 })
+  await page.locator('.al-row', { hasText: 'kurulumu oluşursa' }).waitFor({ timeout: 5000 })
   if (await page.locator('.al-row').count() !== 3) throw new Error('3 alarm bekleniyordu')
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('piyasa.alarms.v1')).alarms.map((a) => a.type).sort().join())
   if (saved !== 'premium,price,signal') throw new Error('kayıt: ' + saved)

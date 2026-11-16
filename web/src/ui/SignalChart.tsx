@@ -261,3 +261,60 @@ export function HitBar({ hit, base }: { hit?: number; base?: number }) {
     </span>
   )
 }
+
+/** Kurulumun bu hissede oluştuğu günler: günlük fiyat üzerinde noktalar (3 ay sonraki sonuca göre). */
+export function EventChart({ bars, events, side }: { bars: Bars; events: { i: number; t: number; price: number; ret?: number }[]; side: 'dip' | 'top' }) {
+  const { c, t } = bars
+  const n = c.length
+  const [box, W] = useWidth(720)
+  const H = 220, P = { l: 8, r: 64, t: 10, b: 22 }
+  const [hover, setHover] = useState<number | undefined>()
+  const sign = side === 'dip' ? 1 : -1
+  const out = (e: { ret?: number }): Outcome => (e.ret == null ? 'open' : e.ret * sign > 0 ? 'hit' : 'miss')
+  const g = useMemo(() => {
+    const keep = new Set(events.map((e) => e.i))
+    const stride = Math.max(1, Math.ceil(n / 900))
+    const idx: number[] = []
+    for (let i = 0; i < n; i++) if (i % stride === 0 || i === n - 1 || keep.has(i)) idx.push(i)
+    let lo = Infinity, hi = -Infinity
+    for (const v of c) { if (v < lo) lo = v; if (v > hi) hi = v }
+    const log = hi / lo > 4
+    const f = (p: number) => (log ? Math.log(p) : p)
+    const x = (i: number) => P.l + (i / Math.max(1, n - 1)) * (W - P.l - P.r)
+    const y = (p: number) => P.t + (H - P.t - P.b) - 6 - ((f(p) - f(lo)) / (f(hi) - f(lo) || 1)) * (H - P.t - P.b - 12)
+    const d = idx.map((i, k) => `${k ? 'L' : 'M'}${x(i).toFixed(1)} ${y(c[i]).toFixed(1)}`).join('')
+    const ticks = [0, 1, 2, 3, 4].map((k) => { const i = Math.round(((n - 1) * k) / 4); return { x: x(i), label: yearFmt.format(t[i] * 1000) } })
+    return { x, y, d, ticks, log }
+  }, [bars, events, W])
+  const onMove = (e: PointerEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const px = ((e.clientX - r.left) / r.width) * W
+    let best = Math.max(0, Math.min(n - 1, Math.round(((px - P.l) / (W - P.l - P.r)) * (n - 1)))), near = 12
+    for (const ev of events) { const dd = Math.abs(g.x(ev.i) - px); if (dd < near) { near = dd; best = ev.i } }
+    setHover(best)
+  }
+  const hv = hover != null ? events.find((e) => e.i === hover) : undefined
+  return (
+    <figure className="sc">
+      <div className="sc-plot" ref={box}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Günlük fiyat; kurulum ${events.length} kez oluştu`} onPointerMove={onMove} onPointerLeave={() => setHover(undefined)}>
+          <line className="sc-axis" x1={P.l} x2={W - P.r} y1={H - P.b} y2={H - P.b} />
+          {g.ticks.map((k, i) => <text key={i} className="sc-tick" x={k.x} y={H - 6} textAnchor={i === 0 ? 'start' : i === 4 ? 'end' : 'middle'}>{k.label}</text>)}
+          <path d={g.d} className="sc-price" />
+          <circle className="sc-now" cx={g.x(n - 1)} cy={g.y(c[n - 1])} r={3.5} />
+          <text className="sc-tag strong" x={W - P.r + 6} y={g.y(c[n - 1]) + 4}>{price(c[n - 1])}</text>
+          {events.map((e) => <Mark key={e.i} x={g.x(e.i)} y={g.y(e.price)} o={out(e)} />)}
+          {hover != null && <><line className="sc-cursor" x1={g.x(hover)} x2={g.x(hover)} y1={P.t} y2={H - P.b} /><circle className="sc-now" cx={g.x(hover)} cy={g.y(c[hover])} r={3.5} /></>}
+        </svg>
+        {hover != null && (
+          <div className="sc-tip" style={{ left: `${(g.x(hover) / W) * 100}%` }} data-side={g.x(hover) > W * 0.6 ? 'left' : 'right'}>
+            <span>{dayFmt.format(t[hover] * 1000)}</span>
+            <b className="num">{price(c[hover])}</b>
+            {hv && <span className="ev">Kurulum: 3 ay sonra <b className="num">{hv.ret == null ? 'bekleniyor' : pct(hv.ret)}</b> ({OUTCOME_LABEL[out(hv)]})</span>}
+          </div>
+        )}
+      </div>
+      <Legend>{g.log && <span>dikey eksen logaritmik</span>}</Legend>
+    </figure>
+  )
+}

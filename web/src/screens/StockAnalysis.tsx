@@ -10,7 +10,8 @@ import {
   type Analysis, type Bars, type Evidence, type Indicator, type Side, type SignalStat, type Timeframe, type TimeframeAnalysis,
 } from '../core/signals'
 import { chartUrl } from '../core/tradingview'
-import { loadBars, loadUniverse, withLive, type DeepBars } from '../data/bars'
+import { loadBars, loadSetups, loadUniverse, withLive, type DeepBars, type SetupData } from '../data/bars'
+import { setupHeadline, SetupsHow, SetupsView } from './StockSetups'
 import { useApp } from '../data/store'
 import type { SearchHit } from '../core/catalog'
 import { scan, search } from '../data/tv'
@@ -44,7 +45,7 @@ const hourFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short
 const monthFmt = new Intl.DateTimeFormat('tr-TR', { month: 'short', year: 'numeric' })
 const when = (t: number, tf: Timeframe) => (tf === 'W' || tf === 'D' ? dayFmt : hourFmt).format(t * 1000)
 
-interface Loaded { symbol: string; data?: DeepBars; live?: number; error?: string; universe?: Awaited<ReturnType<typeof loadUniverse>> }
+interface Loaded { symbol: string; data?: DeepBars; live?: number; error?: string; universe?: Awaited<ReturnType<typeof loadUniverse>>; setups?: SetupData }
 
 export function StockAnalysis({ symbol }: { symbol?: string }) {
   const sym = symbol?.toUpperCase()
@@ -62,9 +63,12 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
       loadUniverse(sym),
       loadBars(sym),
       scan('global', { symbols: { tickers: [sym] }, columns: ['close'] }).then((r) => (typeof r[0]?.d[0] === 'number' ? (r[0].d[0] as number) : undefined)).catch(() => undefined),
-    ]).then(([universe, data, live]) => {
+    ]).then(async ([universe, data, live]) => {
+      // Kurulumlar günlük veriden; kopya eskiyse son gün canlı fiyatla güncellenir
+      const daily = data ? (data.source === 'snapshot' ? withLive(data.frames, live) : data.frames).D : undefined
+      const setups = await loadSetups(sym, daily).catch(() => undefined)
       if (!alive) return
-      setState({ symbol: sym, data, live, universe })
+      setState({ symbol: sym, data, live, universe, setups })
       if (data) try { localStorage.setItem(LAST_KEY, sym) } catch { /* depolama kapalı */ }
     })
     return () => { alive = false }
@@ -83,7 +87,7 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
       {!sym ? <Empty />
         : !state || state.symbol !== sym ? <p className="an-answer" aria-live="polite">Geçmiş veriler alınıyor…</p>
           : !result || !result.a.frames.length ? <Missing symbol={sym} />
-            : <Result symbol={sym} a={result.a} frames={result.frames} data={state.data!} live={state.data!.source === 'snapshot' && state.live != null} />}
+            : <Result symbol={sym} a={result.a} frames={result.frames} setups={state.setups} data={state.data!} live={state.data!.source === 'snapshot' && state.live != null} />}
     </>
   )
 }
@@ -165,26 +169,16 @@ function nowOf(a: Analysis, stat?: SignalStat): Now | undefined {
 const sideName = (side: Side) => (side === 'dip' ? 'Dip' : 'Tepe')
 const expected = (side: Side) => (side === 'dip' ? 'yukarıdaydı' : 'aşağıdaydı')
 
-function Result({ symbol, a, frames, data, live }: { symbol: string; a: Analysis; frames: DeepBars['frames']; data: DeepBars; live: boolean }) {
+function Result({ symbol, a, frames, data, live, setups }: { symbol: string; a: Analysis; frames: DeepBars['frames']; data: DeepBars; live: boolean; setups?: SetupData }) {
   const code = Fmt.ticker(symbol)
   const dip = nowOf(a, a.bestDip), top = nowOf(a, a.bestTop)
   // Başlıkta teyitli sinyal önce gelir; ikisi de aynı düzeydeyse şu an açık olan ya da fiyata yakın olan
   const lead = [dip, top].filter((x): x is Now => !!x).sort((x, y) =>
     Number(y.stat.verdict === 'confirmed') - Number(x.stat.verdict === 'confirmed') || Number(y.stat.filterNow) - Number(x.stat.filterNow) || Number(y.stat.active) - Number(x.stat.active) || Math.abs(x.distance ?? 9) - Math.abs(y.distance ?? 9))[0]
   const longest = a.frames[0]
-  return (
+  const head = setups ? setupHeadline(setups) : undefined
+  const own = (
     <>
-      <header className="an-head">
-        <h2>{code}: geçmişte tutmuş bir dip ya da tepe sinyali var mı, şu an neresinde?</h2>
-        <p className="an-answer" aria-live="polite">{!lead ? 'Geçmişte tutmuş bir sinyal yok.' : lead.stat.verdict === 'confirmed' ? <Headline now={lead} /> : 'Teyitli bir sinyal yok.'}</p>
-      </header>
-      <p className="an-sub">
-        {lead
-          ? <>{tfOf(lead.stat.tf).label} veride “{rule(lead.stat)}” kuralı <b>{lead.stat.main.n} kez</b> sinyal verdi; {durationLabel(lead.stat.main.bars, lead.frame.spacing)} sonra <b>{inOf(Math.round((lead.stat.main.hit ?? 0) * lead.stat.main.n))}</b> fiyat {expected(lead.stat.side)}. {lead.stat.verdict === 'confirmed' ? 'Sinyal teyitli.' : 'Bu kural teyitli değil, yalnızca en yakın aday: araştırmada bu düzeydeki kurallar sonraki dönemde olağandan ayırt edilemedi.'}</>
-          : <>{a.frames.length} zaman diliminde {a.frames.length * RULES_PER_FRAME} kural sınandı; hiçbiri {code} hissesinin olağan seyrinden belirgin biçimde iyi sonuç vermedi. {longest.bars < 150 ? `Geçmiş kısa: ${tfOf(longest.tf).adj} veride yalnızca ${longest.bars} çubuk var.` : 'Bu hissede bu göstergeler güvenilir bir dip ya da tepe işareti vermemiş.'}</>}
-      </p>
-
-      <p className="st-alarm"><a className="btn small" href={href('alarmlar', { tur: 'sinyal', s: symbol })}><Icon name="bell" />Sinyal gelince haber ver</a><a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: symbol })}>Fiyat alarmı kur</a></p>
 
       <div className="vd-list">
         <SignalBlock side="dip" now={dip} a={a} bars={dip && frames[dip.stat.tf]} symbol={symbol} />
@@ -211,9 +205,44 @@ function Result({ symbol, a, frames, data, live }: { symbol: string; a: Analysis
 
       {a.frames.map((f) => <FrameDetail key={f.tf} f={f} />)}
 
+    </>
+  )
+  return (
+    <>
+      {head ? (
+        <>
+          <header className="an-head">
+            <h2>{code}: şu an güvenilir bir dip ya da tepe durumu var mı?</h2>
+            <p className="an-answer" aria-live="polite">{head.answer}</p>
+          </header>
+          <p className="an-sub">{head.sub}</p>
+          <SetupsView d={setups!} symbol={symbol} />
+          <details className="an-how st-own">
+            <summary>Bu hisseye özgü kurallar (daha zayıf kanıt): {a.bestDip?.verdict === 'confirmed' || a.bestTop?.verdict === 'confirmed' ? 'teyitli kural var' : 'teyitli kural yok'}</summary>
+            <p className="an-sub">Bu bölüm yalnızca {code} hissesinin kendi geçmişine bakar: yaklaşık {a.frames.length * RULES_PER_FRAME} kural sınanır. Örnek az olduğu için kanıt zayıftır: araştırmada teyitli kurallar sonraki dönemde %54 tuttu (olağan %47).</p>
+            {own}
+          </details>
+        </>
+      ) : (
+        <>
+          <header className="an-head">
+            <h2>{code}: geçmişte tutmuş bir dip ya da tepe sinyali var mı, şu an neresinde?</h2>
+            <p className="an-answer" aria-live="polite">{!lead ? 'Geçmişte tutmuş bir sinyal yok.' : lead.stat.verdict === 'confirmed' ? <Headline now={lead} /> : 'Teyitli bir sinyal yok.'}</p>
+          </header>
+          <p className="an-sub">
+            {lead
+              ? <>{tfOf(lead.stat.tf).label} veride “{rule(lead.stat)}” kuralı <b>{lead.stat.main.n} kez</b> sinyal verdi; {durationLabel(lead.stat.main.bars, lead.frame.spacing)} sonra <b>{inOf(Math.round((lead.stat.main.hit ?? 0) * lead.stat.main.n))}</b> fiyat {expected(lead.stat.side)}. {lead.stat.verdict === 'confirmed' ? 'Sinyal teyitli.' : 'Bu kural teyitli değil, yalnızca en yakın aday: araştırmada bu düzeydeki kurallar sonraki dönemde olağandan ayırt edilemedi.'}</>
+              : <>{a.frames.length} zaman diliminde {a.frames.length * RULES_PER_FRAME} kural sınandı; hiçbiri {code} hissesinin olağan seyrinden belirgin biçimde iyi sonuç vermedi. {longest.bars < 150 ? `Geçmiş kısa: ${tfOf(longest.tf).adj} veride yalnızca ${longest.bars} çubuk var.` : 'Bu hissede bu göstergeler güvenilir bir dip ya da tepe işareti vermemiş.'}</>}
+          </p>
+          <p className="st-alarm"><a className="btn small" href={href('alarmlar', { tur: 'sinyal', s: symbol })}><Icon name="bell" />Sinyal gelince haber ver</a><a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: symbol })}>Fiyat alarmı kur</a></p>
+          {own}
+        </>
+      )}
+
       <details className="an-how">
         <summary>Nasıl hesaplanıyor, nelere dikkat etmeli</summary>
         <ul>
+          {setups && <SetupsHow d={setups} />}
           <li><b>Göstergeler</b> (hepsi kapanıştan): RSI (14), Bollinger bantları (20 çubuk, 2 ve 2,5 standart sapma), fiyatın 200 çubukluk ortalamaya uzaklığı, MACD (12, 26, 9) kesişimi, son 250 çubuğun zirvesinden gerileme (%15, %25, %35) ve hissenin kendi oynaklığına göre sert 5 çubukluk hareket (2 ve 3 standart sapma).</li>
           <li><b>Bağlam</b>: her kural tek başına ve dört koşulla birlikte sınanır: fiyat 200 ortalamanın üstünde ya da altında, 50 ortalama 200’ün üstünde ya da altında. “RSI 30’un altında, fiyat 200 ortalamanın üstündeyken” gibi.</li>
           <li><b>Sinyal</b>: gösterge eşiği geçtiği ilk çubuk. Aynı harekette tekrar saymamak için gösterge eşikten uzaklaşmadan (RSI’da 10 puan) yeni sinyal sayılmaz.</li>
@@ -230,7 +259,7 @@ function Result({ symbol, a, frames, data, live }: { symbol: string; a: Analysis
           <li>Her hissede yaklaşık {4 * RULES_PER_FRAME} kural birden sınanır; bu kadar denemede birkaçı şans eseri iyi görünebilir. Aynı bulgu birkaç kuralda birden çıkıyorsa (örneğin RSI ve Bollinger aynı yeri gösteriyorsa) daha güvenilirdir. Teyit koşulları bunu azaltır, yok etmez. Geçmişte tutmuş olması gelecekte tutacağını garanti etmez.</li>
           <li>Veri TradingView’den: haftalık en çok 1000, günlük 3000, 4 saatlik 1500, saatlik 2000 çubuk. Fiyatlar bölünme ve temettüye göre düzeltilmiştir. {live ? `Geçmiş ${Fmt.dateTime(data.generated)} kopyasından; son çubuk canlı fiyatla (BIST’te 15 dakika gecikmeli) güncellendi.` : `Veri ${Fmt.dateTime(data.generated)} itibarıyla.`}</li>
         </ul>
-        <p><a href={href('sozluk/rsi-sinyali')}>Sözlükte ayrıntısı</a>. <a href={chartUrl(symbol)} target="_blank" rel="noreferrer">{code} grafiği</a></p>
+        <p><a href={href(setups ? 'sozluk/guclu-kurulum' : 'sozluk/rsi-sinyali')}>Sözlükte ayrıntısı</a>. <a href={chartUrl(symbol)} target="_blank" rel="noreferrer">{code} grafiği</a></p>
       </details>
     </>
   )

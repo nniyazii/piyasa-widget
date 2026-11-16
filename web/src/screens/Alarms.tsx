@@ -58,7 +58,7 @@ export function Alarms({ query }: { query: URLSearchParams }) {
           <li>Alarm, koşul sağlanmıyorken sağlanır hâle geldiğinde <b>bir kez</b> çalar. Koşul bozulup yeniden sağlanırsa yeniden çalar. Fiyat alarmları bir kez çalıp kapanır; listeden yeniden kurabilirsin.</li>
           <li><b>Fiyat</b>: TradingView’in son fiyatı. BIST fiyatları 15 dakika gecikmelidir.</li>
           <li><b>Avantajlı fiyat</b>: Analiz bölümündeki “al sinyali” ve güçlü önerilerle aynı hesap. Ürün sinyalleri yalnızca BIST seansı içinde sayılır.</li>
-          <li><b>Hisse sinyali</b>: Analiz › Hisse sayfasındaki tarihsel teyitli kurallardan biri açıldığında çalar. Hangi kuralın açıldığı ve geçmişte kaç kez tuttuğu bildirimde yazar.</li>
+          <li><b>Hisse sinyali</b>: Analiz › Hisse sayfasındaki güçlü kurulumlardan biri oluştuğunda çalar (pazar genelinde üç ayrı dönemde sınanmış kurulumlar; şu an yalnızca ABD hisselerinde ve dip tarafında var). Bildirimde kurulum ve geçmişteki isabeti yazar.</li>
           <li>Uygulama açıkken kontrol dakikada bir yapılır. Kapalıyken GitHub 10 dakikada bir kontrol eder; GitHub’ın zamanlayıcısı yoğun saatlerde 5–20 dakika gecikebilir, bu yüzden bildirim anlık değildir.</li>
           <li>Alarmlar yatırım tavsiyesi değildir; yalnızca belirlediğin koşul gerçekleştiğinde haber verir.</li>
         </ul>
@@ -136,8 +136,8 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
         {kind === 'signal' && (
           <>
             <b>{symbol ? Fmt.ticker(symbol) : 'Seçtiğim hisse'}</b> için{' '}
-            <select value={level} onChange={(e) => setLevel(e.target.value as 'confirmed' | 'promising')} aria-label="Sinyal düzeyi"><option value="confirmed">teyitli</option><option value="promising">teyitli ya da zayıf kanıtlı</option></select>{' '}
-            <select value={side} onChange={(e) => setSide(e.target.value as 'dip' | 'top' | 'both')} aria-label="Yön"><option value="both">dip ya da tepe</option><option value="dip">dip</option><option value="top">tepe</option></select> sinyali gelirse haber ver.
+            <select value={level} onChange={(e) => setLevel(e.target.value as 'confirmed' | 'promising')} aria-label="Sinyal düzeyi"><option value="confirmed">yalnızca güçlü</option><option value="promising">güçlü ya da hisseye özgü teyitli</option></select>{' '}
+            <select value={side} onChange={(e) => setSide(e.target.value as 'dip' | 'top' | 'both')} aria-label="Yön"><option value="both">dip ya da tepe</option><option value="dip">dip</option><option value="top">tepe</option></select> kurulumu oluşursa haber ver.
           </>
         )}
       </p>

@@ -11,6 +11,7 @@ import type { RatioData } from '../src/core/advice'
 import { checkAlarms, sanitizeAlarms, type Source, type States } from '../src/core/alarms'
 import { bistOpen, type Series } from '../src/core/premium'
 import { buildPremiums, PREMIUM_QUOTES, PREMIUM_SYMBOLS } from '../src/core/premiums'
+import { INDEX_OF, stockSetups, type SetupTable } from '../src/core/setups'
 import { analyze, marketOf, type Bars, type Timeframe, type Universe } from '../src/core/signals'
 
 const env = process.env
@@ -43,7 +44,17 @@ function unpackBars(p: [number, number[], number[]] | undefined): Bars | undefin
 
 let rules: Promise<{ markets: Record<string, { rules: Universe }> } | undefined> | undefined
 
+let setupFile: Promise<{ markets: Record<string, { setups: SetupTable }> } | undefined> | undefined
+const dailyOf = async (symbol: string) => unpackBars(((await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[]]>> }).bars.D)
+
 const source: Source = {
+  async setups(symbol) {
+    const m = marketOf(symbol)
+    if (!m) return undefined
+    setupFile ??= json<{ markets: Record<string, { setups: SetupTable }> }>(`${BASE}/setups.json`).catch(() => undefined)
+    const [daily, index, file] = await Promise.all([dailyOf(symbol), dailyOf(INDEX_OF[m]), setupFile])
+    return daily ? stockSetups(daily, index, file?.markets[m]?.setups) : undefined
+  },
   prices: quotes,
   async premiums() {
     const [price, daily, long] = await Promise.all([

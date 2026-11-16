@@ -1050,3 +1050,25 @@ a.screen-item { text-decoration: none; color: inherit; }
 .st-checks li.no b { color: var(--ink-2); }
 .st-checks li span { display: block; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
 .st-risk { margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+
+/* Güçlü kurulumlar */
+.st-regime { margin: 14px 0 0; font-size: 14px; color: var(--ink-2); }
+.st-regime b { color: var(--ink); }
+.st-periods { display: grid; gap: 8px; margin: 18px 0 0; max-width: 560px; }
+.st-periods > div { display: grid; grid-template-columns: 96px minmax(80px, 1fr) auto; align-items: center; gap: 12px; font-size: 12.5px; color: var(--ink-3); }
+.st-periods .track { position: relative; height: 6px; border-radius: 3px; background: var(--sunken); }
+.st-periods .track i { position: absolute; top: 50%; }
+.st-periods .track .b { width: 2px; height: 14px; margin: -7px 0 0 -1px; background: var(--ink-4); }
+.st-periods .track .h { width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--up); box-shadow: 0 0 0 2px var(--paper); }
+.st-periods .val b { color: var(--ink); font-size: 14px; }
+.st-periods .val em { font-style: normal; margin-left: 8px; }
+.st-checks-list { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 10px; max-width: 78ch; }
+.st-checks-list li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: start; }
+.st-checks-list li svg.i { width: 18px; height: 18px; margin-top: 1px; }
+.st-checks-list li.ok svg.i { color: var(--up); }
+.st-checks-list li.no svg.i { color: var(--ink-4); }
+.st-checks-list li b { display: block; font-size: 14px; font-weight: 650; }
+.st-checks-list li span { display: block; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.st-own { max-width: none; margin-top: 26px; padding-top: 6px; border-top: 1px solid var(--rule-2); }
+.st-own > summary { font-size: 15px; }
+@media (max-width: 860px) { .st-periods > div { grid-template-columns: 84px minmax(60px, 1fr); } .st-periods .val { grid-column: 1 / -1; } }
