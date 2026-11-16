@@ -988,7 +988,7 @@ a.screen-item { text-decoration: none; color: inherit; }
 .st-facts dd small { font-size: 12px; font-weight: 400; color: var(--ink-3); margin-left: 6px; letter-spacing: 0; }
 .hitbar { position: relative; display: block; width: 72px; height: 4px; margin: 6px 0 2px auto; border-radius: 2px; background: var(--sunken); }
 .hitbar i { position: absolute; top: 50%; }
-.hitbar .b { width: 2px; height: 10px; margin: -5px 0 0 -1px; background: var(--ink-4); }
+.hitbar .b { width: 2px; height: 12px; margin: -6px 0 0 -1px; background: var(--ink-2); }
 .hitbar .h { width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%; background: var(--ink-3); box-shadow: 0 0 0 2px var(--paper); }
 .hitbar .h.good { background: var(--up); }
 @media (max-width: 860px) {
@@ -1072,3 +1072,20 @@ a.screen-item { text-decoration: none; color: inherit; }
 .st-own { max-width: none; margin-top: 26px; padding-top: 6px; border-top: 1px solid var(--rule-2); }
 .st-own > summary { font-size: 15px; }
 @media (max-width: 860px) { .st-periods > div { grid-template-columns: 84px minmax(60px, 1fr); } .st-periods .val { grid-column: 1 / -1; } }
+
+/* Kurulum grafikleri */
+.sc-vol { fill: var(--ink-4); }
+.sc-vol.high { fill: var(--ink-2); }
+.k.box { width: 10px; height: 10px; border: 0; background: var(--ink-2); border-radius: 2px; }
+.k.dot { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--ink-3); }
+.k.dot.good { background: var(--up); }
+.k.tick { width: 2px; height: 12px; border: 0; background: var(--ink-2); }
+.st-charts.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 0 32px; align-items: start; }
+.st-charts.two .st-periods { margin-top: 44px; max-width: none; }
+.st-periods > div { grid-template-columns: 96px minmax(80px, 1fr); row-gap: 3px; }
+.st-periods .val { grid-column: 2; }
+.st-periods .track { height: 12px; border-radius: 3px; }
+.st-periods .track .f { position: absolute; left: 0; top: 0; bottom: 0; margin: 0; border-radius: 3px 4px 4px 3px; background: var(--up); opacity: 0.85; }
+.st-periods .track .b { width: 2px; height: 20px; margin: -10px 0 0 -1px; background: var(--ink); }
+.st-own-cap { margin: 18px 0 -10px; font-size: 13.5px; font-weight: 650; }
+@media (max-width: 860px) { .st-charts.two { grid-template-columns: minmax(0, 1fr); } .st-charts.two .st-periods { margin-top: 18px; } }

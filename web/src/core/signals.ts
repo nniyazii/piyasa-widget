@@ -11,7 +11,7 @@
  */
 export type Timeframe = 'W' | 'D' | 'H4' | 'H1'
 export type Side = 'dip' | 'top'
-export interface Bars { t: number[]; c: number[] }
+export interface Bars { t: number[]; c: number[]; /** Hacim (yalnızca günlük veride) */ v?: number[] }
 
 export const TIMEFRAMES: { id: Timeframe; label: string; adj: string }[] = [
   { id: 'W', label: 'Haftalık', adj: 'haftalık' },

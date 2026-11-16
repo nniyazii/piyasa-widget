@@ -318,3 +318,139 @@ export function EventChart({ bars, events, side }: { bars: Bars; events: { i: nu
     </figure>
   )
 }
+
+/**
+ * Hissenin durumu: son ~3 yılın günlük fiyatı ve 200 günlük ortalaması; altında göreli hacim ve RSI.
+ * Üç panel aynı zaman eksenini paylaşır, her birinin kendi dikey ekseni vardır.
+ */
+export function StateChart({ c, t, sma200, rsi, vol }: { c: number[]; t: number[]; sma200: number[]; rsi: number[]; vol: number[] }) {
+  const n = c.length
+  const start = Math.max(0, n - 750)
+  const hasVol = vol.slice(start).some((x) => !Number.isNaN(x))
+  const [box, W] = useWidth(720)
+  const P = { l: 8, r: 64, t: 10, b: 22 }
+  const PH = 210, VH = hasVol ? 54 : 0, RH = 70, GAP = 12
+  const H = P.t + PH + (hasVol ? GAP + VH : 0) + GAP + RH + P.b
+  const [hover, setHover] = useState<number | undefined>()
+  const g = useMemo(() => {
+    const x = (i: number) => P.l + ((i - start) / Math.max(1, n - 1 - start)) * (W - P.l - P.r)
+    let lo = Infinity, hi = -Infinity
+    for (let i = start; i < n; i++) { for (const v of [c[i], sma200[i]]) if (!Number.isNaN(v)) { if (v < lo) lo = v; if (v > hi) hi = v } }
+    const log = hi / lo > 4
+    const f = (p: number) => (log ? Math.log(p) : p)
+    const y = (p: number) => P.t + PH - 6 - ((f(p) - f(lo)) / (f(hi) - f(lo) || 1)) * (PH - 12)
+    const vTop = P.t + PH + GAP
+    const vMax = 4 // 4 katından büyük hacimler tavanda kesilir
+    const vy = (q: number) => vTop + VH - (Math.min(vMax, q) / vMax) * VH
+    const rTop = vTop + (hasVol ? VH + GAP : 0)
+    const ry = (q: number) => rTop + RH - 3 - (q / 100) * (RH - 6)
+    const line = (get: (i: number) => number, map: (q: number) => number) => { let d = '', pen = false; for (let i = start; i < n; i++) { const q = get(i); if (Number.isNaN(q)) { pen = false; continue }; d += `${pen ? 'L' : 'M'}${x(i).toFixed(1)} ${map(q).toFixed(1)}`; pen = true }; return d }
+    const ticks = [0, 1, 2, 3].map((k) => { const i = Math.round(start + ((n - 1 - start) * k) / 3); return { x: x(i), label: monthFmt.format(t[i] * 1000) } })
+    return { x, y, vy, ry, vTop, rTop, log, price: line((i) => c[i], y), ma: line((i) => sma200[i], y), rsi: line((i) => rsi[i], ry), ticks }
+  }, [c, t, sma200, rsi, vol, W])
+  const onMove = (e: PointerEvent<SVGSVGElement>) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const px = ((e.clientX - r.left) / r.width) * W
+    setHover(Math.max(start, Math.min(n - 1, Math.round(start + ((px - P.l) / (W - P.l - P.r)) * (n - 1 - start)))))
+  }
+  const bw = Math.max(0.6, ((W - P.l - P.r) / Math.max(1, n - start)) * 0.7)
+  const lastR = rsi[n - 1], lastV = vol[n - 1]
+  return (
+    <figure className="sc">
+      <figcaption>Hissenin durumu<span>Son 3 yıl: günlük fiyat ve 200 günlük ortalama{hasVol ? '; hacim (50 günlük ortalamaya göre)' : ''}; RSI.</span></figcaption>
+      <div className="sc-plot" ref={box}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Fiyat ${price(c[n - 1])}; 200 günlük ortalama ${Number.isNaN(sma200[n - 1]) ? 'yok' : price(sma200[n - 1])}; RSI ${Number.isNaN(lastR) ? 'yok' : Fmt.number(lastR, 1)}`}
+          onPointerMove={onMove} onPointerLeave={() => setHover(undefined)}>
+          <line className="sc-axis" x1={P.l} x2={W - P.r} y1={P.t + PH} y2={P.t + PH} />
+          {g.ticks.map((k, i) => <text key={i} className="sc-tick" x={k.x} y={H - 6} textAnchor={i === 0 ? 'start' : i === 3 ? 'end' : 'middle'}>{k.label}</text>)}
+          <path d={g.ma} className="sc-ma" />
+          <path d={g.price} className="sc-price" />
+          <circle className="sc-now" cx={g.x(n - 1)} cy={g.y(c[n - 1])} r={3.5} />
+          <text className="sc-tag strong" x={W - P.r + 6} y={g.y(c[n - 1]) + 4}>{price(c[n - 1])}</text>
+          {!Number.isNaN(sma200[n - 1]) && Math.abs(g.y(sma200[n - 1]) - g.y(c[n - 1])) > 13 && <text className="sc-tag" x={W - P.r + 6} y={g.y(sma200[n - 1]) + 4}>200 ort.</text>}
+
+          {hasVol && (
+            <>
+              <text className="sc-tick" x={P.l} y={g.vTop + 10}>Hacim</text>
+              {Array.from({ length: n - start }, (_, k) => start + k).filter((i) => !Number.isNaN(vol[i])).map((i) => <rect key={i} className={'sc-vol' + (vol[i] >= 2 ? ' high' : '')} x={g.x(i) - bw / 2} width={bw} y={g.vy(vol[i])} height={Math.max(0, g.vTop + VH - g.vy(vol[i]))} />)}
+              <line className="sc-level" x1={P.l} x2={W - P.r} y1={g.vy(2)} y2={g.vy(2)} />
+              <text className="sc-tag" x={W - P.r + 6} y={g.vy(2) + 4}>2 katı</text>
+              <line className="sc-axis" x1={P.l} x2={W - P.r} y1={g.vTop + VH} y2={g.vTop + VH} />
+            </>
+          )}
+
+          <rect className="sc-zone" x={P.l} width={W - P.l - P.r} y={g.ry(30)} height={g.rTop + RH - g.ry(30)} />
+          <rect className="sc-zone" x={P.l} width={W - P.l - P.r} y={g.rTop} height={g.ry(70) - g.rTop} />
+          <path d={g.rsi} className="sc-ind" />
+          <line className="sc-level" x1={P.l} x2={W - P.r} y1={g.ry(30)} y2={g.ry(30)} />
+          <line className="sc-level" x1={P.l} x2={W - P.r} y1={g.ry(70)} y2={g.ry(70)} />
+          <text className="sc-tag" x={W - P.r + 6} y={g.ry(30) + 4}>30</text>
+          <text className="sc-tag" x={W - P.r + 6} y={g.ry(70) + 4}>70</text>
+          <text className="sc-tick" x={P.l} y={g.rTop + 10}>RSI</text>
+          {!Number.isNaN(lastR) && <circle className="sc-now" cx={g.x(n - 1)} cy={g.ry(lastR)} r={3} />}
+
+          {hover != null && <><line className="sc-cursor" x1={g.x(hover)} x2={g.x(hover)} y1={P.t} y2={g.rTop + RH} /><circle className="sc-now" cx={g.x(hover)} cy={g.y(c[hover])} r={3.5} /></>}
+        </svg>
+        {hover != null && (
+          <div className="sc-tip" style={{ left: `${(g.x(hover) / W) * 100}%` }} data-side={g.x(hover) > W * 0.6 ? 'left' : 'right'}>
+            <span>{dayFmt.format(t[hover] * 1000)}</span>
+            <b className="num">{price(c[hover])}</b>
+            {!Number.isNaN(sma200[hover]) && <span>200 ort. <b className="num">{pct(c[hover] / sma200[hover] - 1, 0)}</b></span>}
+            {!Number.isNaN(rsi[hover]) && <span>RSI <b className="num">{Fmt.number(rsi[hover], 1)}</b></span>}
+            {!Number.isNaN(vol[hover]) && <span>Hacim <b className="num">{Fmt.number(vol[hover], 1)} katı</b></span>}
+          </div>
+        )}
+      </div>
+      <p className="sc-legend">
+        <span><i className="k solid" />fiyat</span>
+        <span><i className="k ma" />200 günlük ortalama</span>
+        {hasVol && <span><i className="k box" />hacim; koyu: olağanın 2 katından fazla{Number.isNaN(lastV) ? '' : ` (bugün ${Fmt.number(lastV, 1)} katı)`}</span>}
+        {g.log && <span>dikey eksen logaritmik</span>}
+      </p>
+    </figure>
+  )
+}
+
+/** Kurulumdan sonraki ortalama seyir (pazardaki tüm hisseler): kurulum kalın, aynı piyasa durumunun olağanı kesikli. */
+export function PathChart({ days, path, base, n }: { days: number[]; path: number[]; base: number[]; n: number }) {
+  const [box, W] = useWidth(520)
+  const H = 190, P = { l: 44, r: 104, t: 12, b: 26 }
+  const [hover, setHover] = useState<number | undefined>()
+  const lo = Math.min(0, ...path, ...base), hi = Math.max(0.01, ...path, ...base)
+  const last = days[days.length - 1]
+  const x = (d: number) => P.l + (d / last) * (W - P.l - P.r)
+  const y = (r: number) => P.t + (H - P.t - P.b) * (1 - (r - lo) / (hi - lo))
+  const d = (p: number[]) => p.map((r, k) => `${k ? 'L' : 'M'}${x(days[k]).toFixed(1)} ${y(r).toFixed(1)}`).join('')
+  const e = path.length - 1
+  let py = y(path[e]) + 4, by = y(base[e]) + 4
+  if (Math.abs(py - by) < 14) { const mid = (py + by) / 2, up = py <= by; py = mid + (up ? -7 : 7); by = mid + (up ? 7 : -7) }
+  return (
+    <figure className="sc path">
+      <figcaption>Kurulumdan sonraki ortalama seyir<span>Pazardaki tüm hisselerde {Fmt.number(n, 0)} örneğin ortalaması; sıfır, kurulumun oluştuğu gün.</span></figcaption>
+      <div className="sc-plot" ref={box}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Kurulumdan 3 ay sonra ortalama ${pct(path[e])}, olağan ${pct(base[e])}`}
+          onPointerMove={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); const px = ((ev.clientX - r.left) / r.width) * W; let best = 0; days.forEach((dd, k) => { if (Math.abs(x(dd) - px) < Math.abs(x(days[best]) - px)) best = k }); setHover(best) }}
+          onPointerLeave={() => setHover(undefined)}>
+          {[lo, 0, hi].filter((r, i, a) => a.indexOf(r) === i).map((r) => <g key={r}><line className={r === 0 ? 'sc-zero' : 'sc-grid'} x1={P.l} x2={W - P.r} y1={y(r)} y2={y(r)} /><text className="sc-tick" x={P.l - 6} y={y(r) + 4} textAnchor="end">{pct(r, 0)}</text></g>)}
+          <text className="sc-tick" x={x(0)} y={H - 7}>kurulum</text>
+          <text className="sc-tick" x={x(21)} y={H - 7} textAnchor="middle">1 ay</text>
+          <text className="sc-tick" x={x(42)} y={H - 7} textAnchor="middle">2 ay</text>
+          <text className="sc-tick" x={x(last)} y={H - 7} textAnchor="end">3 ay</text>
+          <path d={d(base)} className="sc-base" />
+          <path d={d(path)} className="sc-median" />
+          <circle className="sc-now" cx={x(last)} cy={y(path[e])} r={4} />
+          <text className="sc-tag strong" x={W - P.r + 8} y={py}>kurulum {pct(path[e])}</text>
+          <text className="sc-tag" x={W - P.r + 8} y={by}>olağan {pct(base[e])}</text>
+          {hover != null && <line className="sc-cursor" x1={x(days[hover])} x2={x(days[hover])} y1={P.t} y2={H - P.b} />}
+        </svg>
+        {hover != null && (
+          <div className="sc-tip" style={{ left: `${(x(days[hover]) / W) * 100}%` }} data-side={hover > days.length / 2 ? 'left' : 'right'}>
+            <span>{days[hover] === 0 ? 'Kurulum günü' : `${days[hover]} işlem günü sonra`}</span>
+            <span><i className="k solid" />kurulum <b className="num">{pct(path[hover])}</b></span>
+            <span><i className="k dash" />olağan <b className="num">{pct(base[hover])}</b></span>
+          </div>
+        )}
+      </div>
+    </figure>
+  )
+}

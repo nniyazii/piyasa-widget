@@ -128,7 +128,9 @@ try {
   // Hisseler, hazır listedeki semboller ve sık bakılan birkaç gösterge
   const all = [...new Set([...bist, ...us, ...misc, 'BITSTAMP:BTCUSD', 'BITSTAMP:ETHUSD', 'FX:EURUSD', 'TVC:DXY', 'FX:UKOIL', 'NASDAQ:IXIC', 'DJ:DJI'])]
   const prevMeta = BASE ? await fetch(`${BASE}/bars/meta.json`).then((x) => (x.ok ? x.json() : undefined)).catch(() => undefined) : undefined
-  const fresh = prevMeta && Date.now() - prevMeta.generated < 20 * 3600_000 && prevMeta.shards === SHARDS
+  // Sürüm 2: günlük veride hacim var (eski kopya taşınmaz, yeniden çekilir)
+  const VERSION = 2
+  const fresh = prevMeta && Date.now() - prevMeta.generated < 20 * 3600_000 && prevMeta.shards === SHARDS && prevMeta.version === VERSION
   const nn = (i) => String(i).padStart(2, '0')
   const counts = {}
   for (const tf of Object.keys(DEEP)) {
@@ -149,7 +151,7 @@ try {
     shards.forEach((b, i) => writeFileSync(join(OUT, 'bars', tf, `${nn(i)}.json`), JSON.stringify({ bars: b })))
     counts[tf] = Object.keys(data).length
   }
-  writeFileSync(join(OUT, 'bars', 'meta.json'), JSON.stringify({ generated: fresh ? prevMeta.generated : Date.now(), shards: SHARDS, counts }))
+  writeFileSync(join(OUT, 'bars', 'meta.json'), JSON.stringify({ generated: fresh ? prevMeta.generated : Date.now(), shards: SHARDS, version: VERSION, counts }))
   console.log(`bars: ${fresh ? 'önceki kopya taşındı' : 'yeniden çekildi'} (${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', ')})`)
 } catch (e) { console.log(`bars alınamadı (${e.message})`) }
 

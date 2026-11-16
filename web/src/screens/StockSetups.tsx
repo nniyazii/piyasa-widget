@@ -3,11 +3,11 @@
  * seçilen hissenin şu an bunlara göre durumu.
  */
 import * as Fmt from '../core/format'
-import { HORIZON, INDEX_NAME, PERIOD_LABELS, REGIME_LABEL, SETUPS, STRONG, type SetupNow } from '../core/setups'
+import { HORIZON, INDEX_NAME, PATH_DAYS, PERIOD_LABELS, REGIME_LABEL, SETUPS, STRONG, type SetupEvidence, type SetupNow } from '../core/setups'
 import type { SetupData } from '../data/bars'
 import { Icon } from '../ui/Icon'
 import { href } from '../ui/router'
-import { EventChart } from '../ui/SignalChart'
+import { EventChart, PathChart, StateChart } from '../ui/SignalChart'
 
 const pct = (v?: number, d = 1) => (v == null ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), d))
 const p0 = (v: number) => '%' + Fmt.number(v * 100, 0)
@@ -47,7 +47,9 @@ export function SetupsView({ d, symbol }: { d: SetupData; symbol: string }) {
   // Güçlüler: önce açık olanlar, sonra bugünkü piyasa durumuna uyanlar
   const order = (s: SetupNow) => (s.active ? 0 : s.regimeOk ? 1 : 2)
   const shown = [...strong].sort((a, b) => order(a) - order(b) || (b.strength!.hit - b.strength!.base) - (a.strength!.hit - a.strength!.base))
-  const rest = d.list.filter((s) => !s.strength?.strong && s.evidence)
+  // Güçlü olmayanlar: bugünkü piyasa durumuna uyanlar ve en zayıf dönemi en az kötü olanlar önce
+  const weakest = (s: SetupNow) => Math.min(...s.evidence!.periods.map((p) => (p[0] >= STRONG.n ? p[1] - p[2] : -1)))
+  const rest = d.list.filter((s) => !s.strength?.strong && s.evidence).sort((a, b) => Number(b.regimeOk) - Number(a.regimeOk) || weakest(b) - weakest(a))
   const anyActive = strong.some((s) => s.active)
   return (
     <>
@@ -56,6 +58,7 @@ export function SetupsView({ d, symbol }: { d: SetupData; symbol: string }) {
         <a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: symbol })}>Fiyat alarmı kur</a>
       </p>
       {d.regimeNow != null && <p className="st-regime">Piyasa durumu: {INDEX_NAME[d.market]} 200 günlük ortalamasının <b>{d.regimeNow ? 'üstünde' : 'altında'}</b>.</p>}
+      <StateChart c={d.ctx.c} t={d.ctx.t} sma200={d.ctx.s.sma200} rsi={d.ctx.s.rsi} vol={d.ctx.vol} />
 
       {shown.length > 0 && (
         <section className="an-group">
@@ -65,23 +68,37 @@ export function SetupsView({ d, symbol }: { d: SetupData; symbol: string }) {
       )}
 
       {rest.length > 0 && (
-        <details className="an-how st-frame">
+        <details className="an-how st-frame" open={!strong.length || undefined}>
           <summary>{strong.length ? 'Güçlü sayılmayan kurulumlar' : 'Sınanan kurulumlar'} ve dönem dönem sonuçları ({rest.length})</summary>
-          <table className="result-table st-table">
+          <p className="sc-legend"><span><i className="k dot good" />kurulumun isabeti (olağandan en az 5 puan iyi)</span><span><i className="k dot" />kurulumun isabeti (değil)</span><span><i className="k tick" />aynı dönemin olağanı</span></p>
+          <SetupTable rows={rest.slice(0, 10)} />
+          {rest.length > 10 && (
+            <details className="an-how st-frame">
+              <summary>Kalan {rest.length - 10} kurulum</summary>
+              <SetupTable rows={rest.slice(10)} />
+            </details>
+          )}
+        </details>
+      )}
+    </>
+  )
+}
+
+/** Kurulumların dönem dönem sonucu: her hücrede nokta isabet, çentik olağan */
+function SetupTable({ rows }: { rows: SetupNow[] }) {
+  return (
+    <table className="result-table st-table">
             <thead><tr><th>Kurulum</th>{PERIOD_LABELS.map((p) => <th key={p} className="r hide-s">{p}</th>)}<th className="r">Bu hissede şu an</th></tr></thead>
             <tbody>
-              {rest.map((s) => (
+              {rows.map((s) => (
                 <tr key={s.setup.id + s.regime}>
                   <td><span className="n">{s.setup.label}</span><span className="s">{s.setup.side === 'dip' ? 'Dip' : 'Tepe'}; {REGIME_LABEL[s.regime]}. {s.strength?.reason ? 'Güçlü değil: ' + s.strength.reason + '.' : ''}</span></td>
-                  {s.evidence!.periods.map((p, k) => <td key={k} className="r num hide-s">{p[0] ? p0(p[1]) : '—'}<span className="s">olağan {p0(p[2])}, {Fmt.number(p[0], 0)} kez</span></td>)}
+                  {s.evidence!.periods.map((p, k) => <td key={k} className="r num hide-s"><Mini p={p} />{p[0] ? p0(p[1]) : '—'}<span className="s">olağan {p0(p[2])}, {Fmt.number(p[0], 0)} kez</span></td>)}
                   <td className="r"><span className="prem-st">{s.active ? 'Oluştu' : s.stockOk ? 'Piyasa durumu uymuyor' : 'Yok'}</span></td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </details>
-      )}
-    </>
   )
 }
 
@@ -97,7 +114,10 @@ function SetupBlock({ s, d }: { s: SetupNow; d: SetupData }) {
         <div><dt>Bu hissede</dt><dd className="num">{s.ownDone ? `${s.ownHits} / ${s.ownDone}` : s.events.length ? `${s.events.length} kez` : 'hiç oluşmadı'}<small>{s.ownDone > 0 ? 'kez tuttu' : s.events.length ? 'sonucu bekleniyor' : ''}</small></dd></div>
         <div><dt>Şu an</dt><dd className="num">{s.active ? 'Oluştu' : s.distance != null && s.regimeOk ? <>{pct(s.distance)} uzakta</> : 'Uzak'}</dd></div>
       </dl>
-      <Periods s={s} />
+      <div className="st-charts two">
+        <Periods s={s} />
+        {s.evidence?.path && s.evidence.basePath && <PathChart days={PATH_DAYS} path={s.evidence.path} base={s.evidence.basePath} n={st.n} />}
+      </div>
       <ul className="st-checks-list">
         {s.conds.map((c) => (
           <li key={c.label} className={c.ok ? 'ok' : 'no'}>
@@ -112,7 +132,12 @@ function SetupBlock({ s, d }: { s: SetupNow; d: SetupData }) {
           </li>
         )}
       </ul>
-      {s.events.length > 0 && (
+      {s.events.length >= 3 ? (
+        <>
+          <p className="st-own-cap">Bu hissede oluştuğu {s.events.length} gün</p>
+          <EventChart bars={d.bars} events={s.events} side={side} />
+        </>
+      ) : s.events.length > 0 && (
         <details className="an-how st-frame">
           <summary>Bu hissede oluştuğu {s.events.length} gün (grafik)</summary>
           <EventChart bars={d.bars} events={s.events} side={side} />
@@ -122,14 +147,20 @@ function SetupBlock({ s, d }: { s: SetupNow; d: SetupData }) {
   )
 }
 
-/** Üç dönemin sonucu: nokta kurulumun isabeti, çentik aynı dönemin olağanı */
+/** Tablo hücresi için küçük dönem göstergesi: nokta isabet, çentik olağan */
+function Mini({ p }: { p: SetupEvidence['periods'][number] }) {
+  if (!p[0]) return null
+  return <span className="hitbar" aria-hidden><i className="b" style={{ left: `${p[2] * 100}%` }} /><i className={'h' + (p[1] - p[2] >= STRONG.diff ? ' good' : '')} style={{ left: `${p[1] * 100}%` }} /></span>
+}
+
+/** Üç dönemin sonucu: çubuk kurulumun isabeti, çentik aynı dönemin olağanı */
 function Periods({ s }: { s: SetupNow }) {
   return (
     <div className="st-periods" role="img" aria-label={s.evidence!.periods.map((p, k) => `${PERIOD_LABELS[k]}: ${p0(p[1])}, olağan ${p0(p[2])}`).join('; ')}>
       {s.evidence!.periods.map((p, k) => (
         <div key={k}>
           <span className="lab">{PERIOD_LABELS[k]}</span>
-          <span className="track"><i className="b" style={{ left: `${p[2] * 100}%` }} /><i className="h" style={{ left: `${p[1] * 100}%` }} /></span>
+          <span className="track"><i className="f" style={{ width: `${p[1] * 100}%` }} /><i className="b" style={{ left: `${p[2] * 100}%` }} /></span>
           <span className="val num"><b>{p0(p[1])}</b> olağan {p0(p[2])}<em>{Fmt.number(p[0], 0)} kez</em></span>
         </div>
       ))}

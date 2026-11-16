@@ -44,15 +44,12 @@ jobs:
         timeout-minutes: 20
         continue-on-error: true
       - name: Hisse analizi için pazar geneli kanıt (güçlü kurulumlar ve kuralların tüm hisselerdeki sonucu)
-        # Günlük çalışmada yeniden hesaplanır; kod yayınında yayındaki kopya korunur (yoksa depodaki dosya kalır)
+        # Her yayında günlük kopyadan yeniden hesaplanır; olmazsa yayındaki kopya, o da yoksa depodaki dosya kalır
         run: |
-          if [ "${{ github.event_name }}" != "push" ] && [ -d dist/data/bars/D ]; then
-            DATA=dist/data/bars OUT=dist/data/rules.new.json npm run rules && mv dist/data/rules.new.json dist/data/rules.json || rm -f dist/data/rules.new.json
-            DATA=dist/data/bars OUT=dist/data/setups.new.json npm run setups && mv dist/data/setups.new.json dist/data/setups.json || rm -f dist/data/setups.new.json
-          else
-            curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/rules.json" -o dist/data/rules.new.json && mv dist/data/rules.new.json dist/data/rules.json || rm -f dist/data/rules.new.json
-            curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/setups.json" -o dist/data/setups.new.json && mv dist/data/setups.new.json dist/data/setups.json || rm -f dist/data/setups.new.json
-          fi
+          for f in rules setups; do
+            if [ -d dist/data/bars/D ] && DATA=dist/data/bars OUT=dist/data/$f.new.json npm run $f; then mv dist/data/$f.new.json dist/data/$f.json
+            else rm -f dist/data/$f.new.json; curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/$f.json" -o dist/data/$f.new.json && mv dist/data/$f.new.json dist/data/$f.json || rm -f dist/data/$f.new.json; fi
+          done
         timeout-minutes: 6
         continue-on-error: true
       - name: Hazır listelerin güvenilirlik skorları (son 3 yıl)

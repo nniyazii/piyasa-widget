@@ -229,8 +229,10 @@ await step('analiz: hisse seç, güçlü kurulumlar ve hisseye özgü kurallar',
   // BIST: güvenilirliği kanıtlanmış kurulum yok; sınanan kurulumlar dönem dönem listelenir
   const tr = await page.locator('.an-answer').first().textContent()
   if (!/BIST hisselerinde güvenilirliği kanıtlanmış bir kurulum yok/.test(tr)) throw new Error('BIST cevabı: ' + tr)
-  await page.locator('.st-frame summary', { hasText: 'Sınanan kurulumlar' }).click()
-  if (await page.locator('.st-frame[open] tbody tr').count() < 30) throw new Error('kurulum tablosu eksik')
+  // BIST'te kurulum tablosu açık gelir: dönem dönem görsel karşılaştırma; durum grafiği (fiyat, hacim, RSI)
+  if (await page.locator('.st-frame[open] > table tbody tr').first().locator('.hitbar').count() !== 3) throw new Error('dönem göstergeleri eksik')
+  if (await page.locator('.st-frame[open] > table tbody tr').count() !== 10) throw new Error('ilk 10 kurulum bekleniyordu')
+  if (!(await page.locator('.sc-vol').count())) throw new Error('hacim paneli yok')
   // Hisseye özgü kurallar: grafikler, dört kanıt şartı, tüm kurallar
   await page.locator('.st-own > summary').click()
   await page.locator('.st-own .st-table tbody tr').nth(3).waitFor({ timeout: 10000 })
@@ -256,6 +258,7 @@ await step('analiz: hisse seç, güçlü kurulumlar ve hisseye özgü kurallar',
   if (await page.locator('.st-sig .st-periods').first().locator('> div').count() !== 3) throw new Error('üç dönem bekleniyordu')
   if (!(await page.locator('.st-checks-list li').count())) throw new Error('koşullar yok')
   if (!/S&P 500/.test(await page.locator('.st-regime').textContent())) throw new Error('piyasa durumu yok')
+  if (!(await page.locator('.sc.path .sc-median').count())) throw new Error('ortalama seyir grafiği yok')
 })
 
 await step('alarmlar: fiyat, avantajlı fiyat ve hisse sinyali kur; çalan alarm bildirilir', async () => {

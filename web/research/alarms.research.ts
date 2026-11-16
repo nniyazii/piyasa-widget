@@ -34,18 +34,18 @@ function unpackDaily(p: PackedDaily): Series | undefined {
   for (let i = 0; i < n; i++) { if (i > 0) d += p[1][i - 1]; days[i] = d; const c = p[2][i]; close[i] = c == null ? last : c; if (c != null) last = c }
   return { days, close }
 }
-function unpackBars(p: [number, number[], number[]] | undefined): Bars | undefined {
+function unpackBars(p: [number, number[], number[], number[]?] | undefined): Bars | undefined {
   if (!p || !p[2]?.length) return undefined
   const t: number[] = []
   let cur = p[0]
   for (let i = 0; i < p[2].length; i++) { if (i > 0) cur += p[1][i - 1] * 60; t.push(cur) }
-  return { t, c: p[2] }
+  return { t, c: p[2], v: p[3] }
 }
 
 let rules: Promise<{ markets: Record<string, { rules: Universe }> } | undefined> | undefined
 
 let setupFile: Promise<{ markets: Record<string, { setups: SetupTable }> } | undefined> | undefined
-const dailyOf = async (symbol: string) => unpackBars(((await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[]]>> }).bars.D)
+const dailyOf = async (symbol: string) => unpackBars(((await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[], number[]?]>> }).bars.D)
 
 const source: Source = {
   async setups(symbol) {
@@ -68,7 +68,7 @@ const source: Source = {
     return { rows: b.rows, advices: [...b.advices, ...b.money], open: bistOpen() }
   },
   async analysis(symbol) {
-    const r = (await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[]]>> }
+    const r = (await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[], number[]?]>> }
     const frames: Partial<Record<Timeframe, Bars>> = {}
     for (const tf of ['W', 'D', 'H4', 'H1'] as Timeframe[]) { const b = unpackBars(r.bars[tf]); if (b) frames[tf] = b }
     rules ??= json<{ markets: Record<string, { rules: Universe }> }>(`${BASE}/rules.json`).catch(() => undefined)

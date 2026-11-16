@@ -18,6 +18,10 @@ describe('derin geçmiş', () => {
     expect(b.t).toEqual([1_700_000_000, 1_700_003_600, 1_700_176_400]) // sıfır kapanış atılır
     expect(b.c).toEqual([10, 10.5, 11.12346])
     expect(unpackBars(packBars([]))).toBeUndefined()
+    // Hacim yalnızca istenirse paketlenir (günlük veri); 3 anlamlı basamak
+    const withV = unpackBars(packBars([{ t: 1_700_000_000, c: 10, v: 123456 }, { t: 1_700_086_400, c: 11, v: 0 }], true))!
+    expect(withV.v).toEqual([123000, 0])
+    expect(unpackBars(packBars([{ t: 1_700_000_000, c: 10, v: 5 }]))!.v).toBeUndefined()
   })
   it('canlı fiyat: aynı dönemde son çubuğu günceller, yeni dönemde çubuk ekler', () => {
     const mon = Date.UTC(2026, 10, 9, 14, 30) / 1000 // 9 Kas 2026 Pazartesi

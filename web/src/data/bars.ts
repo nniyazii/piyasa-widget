@@ -6,7 +6,7 @@ import { INDEX_OF, stockSetups, type SetupTable, type StockSetups } from '../cor
 import { marketOf, type Bars, type Timeframe, type Universe } from '../core/signals'
 import { historySource } from './history'
 
-type Packed = [number, number[], number[]]
+type Packed = [number, number[], number[], number[]?]
 export const SHARDS = 64
 
 /** Sembolün parçası (server/bars.mjs ile aynı) */
@@ -21,7 +21,7 @@ export function unpackBars(p: Packed | null | undefined): Bars | undefined {
   const t = new Array<number>(p[2].length)
   let cur = p[0]
   for (let i = 0; i < t.length; i++) { if (i > 0) cur += p[1][i - 1] * 60; t[i] = cur }
-  return { t, c: p[2] }
+  return p[3] ? { t, c: p[2], v: p[3] } : { t, c: p[2] }
 }
 
 export interface DeepBars { symbol: string; generated: number; frames: Partial<Record<Timeframe, Bars>>; source: 'proxy' | 'snapshot' }
@@ -68,8 +68,9 @@ export function withLive(frames: DeepBars['frames'], price: number | undefined, 
     if (!b) continue
     const last = b.t[b.t.length - 1]
     out[tf] = period(tf, last) === period(tf, now) || now <= last
-      ? { t: b.t, c: [...b.c.slice(0, -1), price] }
-      : { t: [...b.t, now], c: [...b.c, price] }
+      ? { ...b, c: [...b.c.slice(0, -1), price] }
+      // Yeni günün hacmi bilinmez: hacimli kurulumlar o gün için hesaplanmaz
+      : { t: [...b.t, now], c: [...b.c, price], ...(b.v ? { v: [...b.v, NaN] } : {}) }
   }
   return out
 }

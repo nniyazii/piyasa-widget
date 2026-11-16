@@ -90,7 +90,7 @@ async function tvBatch(symbols, opts) {
       if (!pending.has(cs)) continue
       if (j.m === 'timescale_update') {
         const s = j.p[1]?.s1?.s ?? []
-        pending.get(cs).bars = s.map((x) => ({ t: x.v[0], o: x.v[1], h: x.v[2], l: x.v[3], c: x.v[4] }))
+        pending.get(cs).bars = s.map((x) => ({ t: x.v[0], o: x.v[1], h: x.v[2], l: x.v[3], c: x.v[4], v: x.v[5] }))
       } else if (j.m === 'series_completed') {
         finish(cs, pending.get(cs).bars ?? null)
       } else if (j.m === 'symbol_error' || j.m === 'series_error' || j.m === 'critical_error') {

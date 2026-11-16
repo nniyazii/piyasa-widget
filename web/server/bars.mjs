@@ -2,7 +2,8 @@
  * Hisse analizi için derin geçmiş: dört zaman diliminde kapanışlar.
  *   W  haftalık  (1000 çubuk ≈ 19 yıl)      D  günlük (3000 çubuk ≈ 12 yıl)
  *   H4 4 saatlik (1500 çubuk ≈ 2–3 yıl)     H1 saatlik (2000 çubuk ≈ 1 yıl)
- * Paket: [ilk zaman (sn), dakika cinsinden farklar[], kapanışlar[]]. Statik yayında semboller parçalara
+ * Paket: [ilk zaman (sn), dakika cinsinden farklar[], kapanışlar[], hacimler[]?]. Hacim yalnızca günlük veride
+ * tutulur (kurulumlar günlük veriyle çalışır; 3 anlamlı basamak yeter). Statik yayında semboller parçalara
  * (shard) bölünür: istemci tek sembol için tek küçük dosya indirir.
  */
 import { tvBars } from './tv.mjs'
@@ -18,10 +19,12 @@ export function shardOf(symbol) {
 }
 
 const sig = (v) => Number(v.toPrecision(7))
-export function packBars(bars) {
+export function packBars(bars, withVolume = false) {
   const b = (bars ?? []).filter((x) => x.c > 0)
   if (!b.length) return null
-  return [b[0].t, b.slice(1).map((x, i) => Math.round((x.t - b[i].t) / 60)), b.map((x) => sig(x.c))]
+  const p = [b[0].t, b.slice(1).map((x, i) => Math.round((x.t - b[i].t) / 60)), b.map((x) => sig(x.c))]
+  if (withVolume && b.some((x) => x.v > 0)) p.push(b.map((x) => (x.v > 0 ? Number(x.v.toPrecision(3)) : 0)))
+  return p
 }
 
 /** Bir zaman diliminde tüm semboller → { sembol: paket } */
@@ -29,7 +32,7 @@ export async function deepBars(symbols, tf, onProgress) {
   const { res, count } = DEEP[tf]
   const r = await tvBars(symbols, { resolution: res, count, onProgress })
   const out = {}
-  for (const s of symbols) { const p = packBars(r.get(s)); if (p) out[s] = p }
+  for (const s of symbols) { const p = packBars(r.get(s), tf === 'D'); if (p) out[s] = p }
   return out
 }
 
