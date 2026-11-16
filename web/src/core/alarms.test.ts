@@ -53,14 +53,15 @@ group('alarmlar', () => {
   it('hisse sinyali: teyitli kural açıldığında çalar', async () => {
     // Her dipten sonra yükselen seri; son çubuklarda yeni bir sert düşüş (RSI eşiğin altında)
     const c: number[] = [100]
-    for (let k = 0; k < 12; k++) {
+    for (let k = 0; k < 24; k++) {
       for (let i = 0; i < 6; i++) c.push(c.at(-1)! * 0.97)
       for (let i = 0; i < 16; i++) c.push(c.at(-1)! * 1.012)
       for (let i = 0; i < 40; i++) c.push(c.at(-1)! * (i % 2 ? 1.004 : 0.996))
     }
-    const calm = analyze({ D: { t: c.map((_, i) => i * 86400), c } })
+    const uni = { 'D|rsi:dip:30|any': { n: 5000, stocks: 400, diff: 0.06, z: 8 }, 'D|rsi:dip:25|any': { n: 5000, stocks: 400, diff: 0.06, z: 8 }, 'D|rsi:dip:35|any': { n: 5000, stocks: 400, diff: 0.06, z: 8 } }
+    const calm = analyze({ D: { t: c.map((_, i) => i * 86400), c } }, uni)
     for (let i = 0; i < 6; i++) c.push(c.at(-1)! * 0.97)
-    const dip = analyze({ D: { t: c.map((_, i) => i * 86400), c } })
+    const dip = analyze({ D: { t: c.map((_, i) => i * 86400), c } }, uni)
     const a: Alarm[] = [{ id: 's', created: 1, type: 'signal', symbol: 'BIST:TEST', side: 'dip', level: 'confirmed' }, { id: 't', created: 1, type: 'signal', symbol: 'BIST:TEST', side: 'top', level: 'confirmed' }]
     let r = await checkAlarms(a, {}, src({ analysis: async () => calm }))
     expect(r.fired).toHaveLength(0)

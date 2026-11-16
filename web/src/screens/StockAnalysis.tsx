@@ -6,11 +6,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as Fmt from '../core/format'
 import {
-  analyze, bestOf, durationLabel, indicators, FILTER_LABEL, INDICATOR_LABEL, RULES_PER_FRAME, TIMEFRAMES, triggerLabel, VERDICT_LABEL,
-  type Analysis, type Bars, type Indicator, type Side, type SignalStat, type Timeframe, type TimeframeAnalysis,
+  analyze, bestOf, CONFIRM, durationLabel, indicators, marketOf, FILTER_LABEL, INDICATOR_LABEL, RULES_PER_FRAME, TIMEFRAMES, triggerLabel, VERDICT_LABEL,
+  type Analysis, type Bars, type Evidence, type Indicator, type Side, type SignalStat, type Timeframe, type TimeframeAnalysis,
 } from '../core/signals'
 import { chartUrl } from '../core/tradingview'
-import { loadBars, withLive, type DeepBars } from '../data/bars'
+import { loadBars, loadUniverse, withLive, type DeepBars } from '../data/bars'
 import { useApp } from '../data/store'
 import type { SearchHit } from '../core/catalog'
 import { scan, search } from '../data/tv'
@@ -27,7 +27,8 @@ const rsiFmt = (v: number) => Fmt.number(v, 1)
 const val = (ind: Indicator, v: number) => (Number.isNaN(v) ? '—'
   : ind === 'rsi' ? rsiFmt(v)
     : ind === 'bb' ? (v < 0 ? '−' : '+') + Fmt.number(Math.abs(v), 1) + 'σ'
-      : ind === 'd200' ? pct(v, 0)
+      : ind === 'd200' || ind === 'dd' ? pct(v, 0)
+        : ind === 'roc' ? (v < 0 ? '−' : '+') + Fmt.number(Math.abs(v), 1) + 'σ'
         : v >= 0 ? 'sinyal çizgisinin üstünde' : 'sinyal çizgisinin altında')
 /** Kuralın tam adı: "RSI ≤ 30, fiyat 200 ortalamanın üstündeyken" */
 const rule = (s: SignalStat) => triggerLabel(s.trigger) + (s.filter === 'any' ? '' : ', ' + FILTER_LABEL[s.filter])
@@ -43,7 +44,7 @@ const hourFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short
 const monthFmt = new Intl.DateTimeFormat('tr-TR', { month: 'short', year: 'numeric' })
 const when = (t: number, tf: Timeframe) => (tf === 'W' || tf === 'D' ? dayFmt : hourFmt).format(t * 1000)
 
-interface Loaded { symbol: string; data?: DeepBars; live?: number; error?: string }
+interface Loaded { symbol: string; data?: DeepBars; live?: number; error?: string; universe?: Awaited<ReturnType<typeof loadUniverse>> }
 
 export function StockAnalysis({ symbol }: { symbol?: string }) {
   const sym = symbol?.toUpperCase()
@@ -58,11 +59,12 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
     let alive = true
     setState(undefined)
     void Promise.all([
+      loadUniverse(sym),
       loadBars(sym),
       scan('global', { symbols: { tickers: [sym] }, columns: ['close'] }).then((r) => (typeof r[0]?.d[0] === 'number' ? (r[0].d[0] as number) : undefined)).catch(() => undefined),
-    ]).then(([data, live]) => {
+    ]).then(([universe, data, live]) => {
       if (!alive) return
-      setState({ symbol: sym, data, live })
+      setState({ symbol: sym, data, live, universe })
       if (data) try { localStorage.setItem(LAST_KEY, sym) } catch { /* depolama kapalı */ }
     })
     return () => { alive = false }
@@ -72,7 +74,7 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
     if (!state?.data) return undefined
     // Sunucudan gelen veri zaten taze; kopya saatler önce alınmış olabilir, son çubuk canlı fiyatla güncellenir
     const frames = state.data.source === 'snapshot' ? withLive(state.data.frames, state.live) : state.data.frames
-    return { a: analyze(frames), frames }
+    return { a: analyze(frames, state.universe?.rules), frames }
   }, [state])
 
   return (
@@ -174,19 +176,19 @@ function Result({ symbol, a, frames, data, live }: { symbol: string; a: Analysis
     <>
       <header className="an-head">
         <h2>{code}: geçmişte tutmuş bir dip ya da tepe sinyali var mı, şu an neresinde?</h2>
-        <p className="an-answer" aria-live="polite">{lead ? <Headline now={lead} /> : 'Geçmişte tutmuş bir sinyal yok.'}</p>
+        <p className="an-answer" aria-live="polite">{!lead ? 'Geçmişte tutmuş bir sinyal yok.' : lead.stat.verdict === 'confirmed' ? <Headline now={lead} /> : 'Teyitli bir sinyal yok.'}</p>
       </header>
       <p className="an-sub">
         {lead
-          ? <>{tfOf(lead.stat.tf).label} veride “{rule(lead.stat)}” kuralı <b>{lead.stat.main.n} kez</b> sinyal verdi; {durationLabel(lead.stat.main.bars, lead.frame.spacing)} sonra <b>{inOf(Math.round((lead.stat.main.hit ?? 0) * lead.stat.main.n))}</b> fiyat {expected(lead.stat.side)}. {lead.stat.verdict === 'confirmed' ? 'Sinyal teyitli.' : 'Sinyal umut verici ama teyitli değil; tek başına güvenme.'}</>
+          ? <>{tfOf(lead.stat.tf).label} veride “{rule(lead.stat)}” kuralı <b>{lead.stat.main.n} kez</b> sinyal verdi; {durationLabel(lead.stat.main.bars, lead.frame.spacing)} sonra <b>{inOf(Math.round((lead.stat.main.hit ?? 0) * lead.stat.main.n))}</b> fiyat {expected(lead.stat.side)}. {lead.stat.verdict === 'confirmed' ? 'Sinyal teyitli.' : 'Bu kural teyitli değil, yalnızca en yakın aday: araştırmada bu düzeydeki kurallar sonraki dönemde olağandan ayırt edilemedi.'}</>
           : <>{a.frames.length} zaman diliminde {a.frames.length * RULES_PER_FRAME} kural sınandı; hiçbiri {code} hissesinin olağan seyrinden belirgin biçimde iyi sonuç vermedi. {longest.bars < 150 ? `Geçmiş kısa: ${tfOf(longest.tf).adj} veride yalnızca ${longest.bars} çubuk var.` : 'Bu hissede bu göstergeler güvenilir bir dip ya da tepe işareti vermemiş.'}</>}
       </p>
 
       <p className="st-alarm"><a className="btn small" href={href('alarmlar', { tur: 'sinyal', s: symbol })}><Icon name="bell" />Sinyal gelince haber ver</a><a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: symbol })}>Fiyat alarmı kur</a></p>
 
       <div className="vd-list">
-        <SignalBlock side="dip" now={dip} a={a} bars={dip && frames[dip.stat.tf]} />
-        <SignalBlock side="top" now={top} a={a} bars={top && frames[top.stat.tf]} />
+        <SignalBlock side="dip" now={dip} a={a} bars={dip && frames[dip.stat.tf]} symbol={symbol} />
+        <SignalBlock side="top" now={top} a={a} bars={top && frames[top.stat.tf]} symbol={symbol} />
       </div>
 
       <section className="an-group">
@@ -212,13 +214,18 @@ function Result({ symbol, a, frames, data, live }: { symbol: string; a: Analysis
       <details className="an-how">
         <summary>Nasıl hesaplanıyor, nelere dikkat etmeli</summary>
         <ul>
-          <li><b>Göstergeler</b> (hepsi kapanıştan): RSI (14), Bollinger bantları (20 çubuk, 2 ve 2,5 standart sapma), fiyatın 200 çubukluk ortalamaya uzaklığı, MACD (12, 26, 9) kesişimi.</li>
+          <li><b>Göstergeler</b> (hepsi kapanıştan): RSI (14), Bollinger bantları (20 çubuk, 2 ve 2,5 standart sapma), fiyatın 200 çubukluk ortalamaya uzaklığı, MACD (12, 26, 9) kesişimi, son 250 çubuğun zirvesinden gerileme (%15, %25, %35) ve hissenin kendi oynaklığına göre sert 5 çubukluk hareket (2 ve 3 standart sapma).</li>
           <li><b>Bağlam</b>: her kural tek başına ve dört koşulla birlikte sınanır: fiyat 200 ortalamanın üstünde ya da altında, 50 ortalama 200’ün üstünde ya da altında. “RSI 30’un altında, fiyat 200 ortalamanın üstündeyken” gibi.</li>
           <li><b>Sinyal</b>: gösterge eşiği geçtiği ilk çubuk. Aynı harekette tekrar saymamak için gösterge eşikten uzaklaşmadan (RSI’da 10 puan) yeni sinyal sayılmaz.</li>
           <li><b>Tuttu</b>: sinyalden belirli bir süre sonra fiyat beklenen yöndeyse (dipte yukarıda, tepede aşağıda). Süre zaman dilimine göre: haftalıkta 13 hafta, günlükte 21 gün, 4 saatlikte 20 çubuk, saatlikte 35 çubuk.</li>
           <li><b>Olağan</b>: hissenin herhangi bir andan aynı süre sonraki sonucu. Sürekli yükselen bir hissede her alım “tutar”; bu yüzden sinyal kendi başarısıyla değil, olağanla farkıyla değerlendirilir. Bağlamlı kurallarda olağan sonuç da aynı bağlamdaki çubuklardan hesaplanır.</li>
-          <li><b>Teyitli</b> sayılması için hepsi gerekir: en az 8 sonuçlanmış sinyal, en az %65 isabet, isabetin güven alt sınırı (%95) olağanın üstünde, ortanca getiri olağandan iyi ve sinyaller tarih sırasıyla ikiye bölündüğünde iki yarıda da olağandan iyi. Bağlamlı kurallarda şart daha sıkı: en az 10 sinyal ve %97,5 güven.</li>
-          <li><b>Umut verici</b>: en az 4 sinyal ve %60 isabetle olağandan iyi, ama teyit koşullarını sağlamıyor. <b>Yetersiz örnek</b>: 4’ten az sinyal.</li>
+          <li><b>Bağımsız sinyal</b>: bir sinyalin sonucu ölçülürken gelen yeni sinyal sayılmaz; aynı hareket iki kez sayılmasın diye.</li>
+          <li><b>Rastgele giriş testi</b>: aynı koşullardaki (aynı trend durumu) günlerden, aynı sayıda ve aynı aralıkla binlerce kez rastgele giriş seçilir. Bunların ne kadarı gerçek sinyaller kadar iyi sonuç verdiyse o oran, sonucun şansla açıklanma olasılığıdır.</li>
+          <li><b>Teyitli</b> sayılması için dört şartın hepsi gerekir: (1) hissenin kendi geçmişinde en az {CONFIRM.n} bağımsız sinyal, en az %{CONFIRM.hit * 100} isabet ve rastgele giriş testinde %{CONFIRM.p * 100}’in altı; (2) geçmişin ilk %60’ında (keşif) ve son %40’ında (doğrulama) ayrı ayrı olağandan iyi; (3) en az {CONFIRM.years} yıllık veri; (4) aynı kural, aynı pazardaki yüzlerce hissenin toplamında da olağandan iyi.</li>
+          <li><b>Zayıf kanıt</b>: hissenin kendi geçmişinde iyi görünüyor ama dört şartın hepsini sağlamıyor. Araştırmada bu düzeydeki kurallar sonraki dönemde olağandan yalnızca 1 puan iyi sonuç verdi; yani tek başına bir şey söylemez.</li>
+          <li><b>Bu yöntem ne kadar güvenilir?</b> 341 hissede sınandı: kurallar geçmişin ilk %75’iyle seçildi, yöntemin hiç görmediği son %25’te ölçüldü. Teyitli kurallar o dönemde <b>%54</b> tuttu, aynı dönemin olağanı <b>%47</b> (582 sinyal). Haftalık kurallarda %59’a karşı %49; günlükte %52’ye karşı %46. Dip sinyalleri (olağandan 9 puan iyi) tepe sinyallerinden (5 puan) daha güvenilir çıktı. Ortalama getiri farkı küçük: haftalıkta yaklaşık +%3, günlükte belirsiz.</li>
+          <li><b>Sınırı</b>: öngörülebilirliği yok edilmiş rastgele veride de hisselerin yaklaşık beşte birinde teyitli kural çıkıyor (gerçek veride üçte birinde). Yani teyitli bir kuralın önemli bir kısmı, hisseye özgü bir özellikten değil, kuralın pazar genelinde işe yaramasından ya da şanstan gelir. Teyit kesinlik değildir; “olağandan biraz daha sık tutmuş ve tutmaya devam etmiş” demektir.</li>
+          <li>Saatlik ve 4 saatlik veriler 1–3 yılı kapsadığı için çoğu zaman “zayıf kanıt”ta kalır: araştırmada kısa geçmişe dayanan sinyaller sonraki dönemde tutmadı.</li>
           <li><b>Tetik fiyatı</b>: bir sonraki çubuk bu fiyattan kapanırsa gösterge eşiğe gelir. Her yeni çubukla değişir. MACD kesişiminde tek çubukta ulaşılabiliyorsa gösterilir.</li>
           <li>Her hissede yaklaşık {4 * RULES_PER_FRAME} kural birden sınanır; bu kadar denemede birkaçı şans eseri iyi görünebilir. Aynı bulgu birkaç kuralda birden çıkıyorsa (örneğin RSI ve Bollinger aynı yeri gösteriyorsa) daha güvenilirdir. Teyit koşulları bunu azaltır, yok etmez. Geçmişte tutmuş olması gelecekte tutacağını garanti etmez.</li>
           <li>Veri TradingView’den: haftalık en çok 1000, günlük 3000, 4 saatlik 1500, saatlik 2000 çubuk. Fiyatlar bölünme ve temettüye göre düzeltilmiştir. {live ? `Geçmiş ${Fmt.dateTime(data.generated)} kopyasından; son çubuk canlı fiyatla (BIST’te 15 dakika gecikmeli) güncellendi.` : `Veri ${Fmt.dateTime(data.generated)} itibarıyla.`}</li>
@@ -238,7 +245,7 @@ function Headline({ now }: { now: Now }) {
   return <>{sideName(stat.side)} sinyaline <b>{pct(Math.abs(distance)).replace('+', '')}</b> var: {what}.</>
 }
 
-function SignalBlock({ side, now, a, bars }: { side: Side; now?: Now; a: Analysis; bars?: Bars }) {
+function SignalBlock({ side, now, a, bars, symbol }: { side: Side; now?: Now; a: Analysis; bars?: Bars; symbol: string }) {
   const series = useMemo(() => (bars ? indicators(bars.c) : undefined), [bars])
   if (!now || !bars || !series) {
     // Teyitli ya da umut verici sinyal yok
@@ -275,6 +282,7 @@ function SignalBlock({ side, now, a, bars }: { side: Side; now?: Now; a: Analysi
           </dd>
         </div>
       </dl>
+      <Checks stat={stat} frame={frame} symbol={symbol} />
       <div className="st-charts">
         <SignalChart bars={bars} series={series} stat={stat} trigger={trigger} horizon={horizon} />
         <AfterChart bars={bars} series={series} stat={stat} unit={(b) => durationLabel(b, frame.spacing)} />
@@ -296,6 +304,42 @@ function SignalBlock({ side, now, a, bars }: { side: Side; now?: Now; a: Analysi
         </table>
       </details>
     </article>
+  )
+}
+
+/** Teyidin dört şartı: her biri ne ölçtü, geçti mi */
+function Checks({ stat, frame, symbol }: { stat: SignalStat; frame: TimeframeAnalysis; symbol: string }) {
+  const { all, discovery, confirm, cutTime } = stat.test
+  const year = (t: number) => new Date(t * 1000).getFullYear()
+  const part = (e: Evidence) => (e.n ? `${e.n} sinyalin ${Math.round((e.hit ?? 0) * e.n)} tanesi tuttu (%${Fmt.number((e.hit ?? 0) * 100, 0)}; olağan %${Fmt.number((e.baseHit ?? 0) * 100, 0)})` : 'sinyal yok')
+  const pText = all.p == null ? 'sınanamadı (sinyal az)' : all.p < 0.001 ? 'binde 1’den az' : '%' + Fmt.number(all.p * 100, all.p < 0.01 ? 2 : 1)
+  const market = marketOf(symbol)
+  const u = stat.universe
+  const rows: { ok: boolean; title: string; text: string }[] = [
+    { ok: stat.checks.stock, title: 'Hissenin kendi geçmişi', text: `${part(all)}. Aynı koşullarda rastgele seçilmiş günlerin bu kadar iyi sonuç verme olasılığı: ${pText}.` },
+    { ok: stat.checks.periods, title: 'İki ayrı dönem', text: `Keşif (${year(frame.from)}–${year(cutTime)}): ${part(discovery)}. Doğrulama (${year(cutTime)}–${year(frame.to)}): ${part(confirm)}.` },
+    { ok: stat.checks.depth, title: 'Veri derinliği', text: `${Fmt.number(stat.years, 1)} yıl sınandı; teyit için en az ${CONFIRM.years} yıl gerekir${stat.checks.depth ? '' : '. Kısa geçmişte tutmuş sinyaller sonraki dönemde çoğu zaman tutmadı'}.` },
+    { ok: stat.checks.universe, title: market === 'TR' ? 'BIST geneli' : market === 'US' ? 'ABD hisseleri geneli' : 'Pazar geneli',
+      text: !market ? 'Bu sembol hisse değil; pazar geneli karşılaştırması yalnızca hisselerde yapılır.'
+        : !u ? 'Bu kural pazar genelinde yeterince sinyal vermedi ya da karşılaştırma verisi yüklenemedi.'
+          : `Aynı kural ${u.stocks} hissede ${Fmt.number(u.n, 0)} sinyal verdi; olağandan ${u.diff >= 0 ? '' : '−'}${Fmt.number(Math.abs(u.diff * 100), 1)} puan ${u.diff >= 0 ? 'daha sık' : 'daha seyrek'} tuttu${stat.checks.universe ? '' : `. Teyit için en az ${CONFIRM.diff * 100} puan ve güçlü tutarlılık gerekir`}.` },
+  ]
+  const passed = rows.filter((r) => r.ok).length
+  return (
+    <details className="st-checks" open={stat.verdict === 'confirmed' || undefined}>
+      <summary>Kanıt: 4 şarttan {passed} tanesi sağlanıyor</summary>
+      <ul>
+        {rows.map((r) => (
+          <li key={r.title} className={r.ok ? 'ok' : 'no'}>
+            <Icon name={r.ok ? 'check' : 'close'} label={r.ok ? 'Sağlanıyor' : 'Sağlanmıyor'} />
+            <div><b>{r.title}</b><span>{r.text}</span></div>
+          </li>
+        ))}
+      </ul>
+      {stat.adverse != null && stat.favorable != null && (
+        <p className="st-risk">Sinyalden sonra, sonuç ölçülene kadar fiyat ortanca olarak en çok <b className="num">{pct(stat.adverse)}</b> ters yöne, <b className="num">{pct(stat.favorable)}</b> beklenen yöne gitti.</p>
+      )}
+    </details>
   )
 }
 

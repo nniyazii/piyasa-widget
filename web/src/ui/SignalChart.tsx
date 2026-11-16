@@ -25,7 +25,7 @@ function useWidth(fallback: number) {
 const PAD = { l: 8, r: 64, t: 10, b: 22 }
 const pct = (v: number, d = 1) => (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), d)
 const price = (v: number) => Fmt.number(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4)
-const indVal = (ind: Indicator, v: number) => (Number.isNaN(v) ? '—' : ind === 'rsi' ? Fmt.number(v, 1) : ind === 'bb' ? (v < 0 ? '−' : '+') + Fmt.number(Math.abs(v), 1) + 'σ' : ind === 'd200' ? pct(v, 0) : pct(v, 2))
+const indVal = (ind: Indicator, v: number) => (Number.isNaN(v) ? '—' : ind === 'rsi' ? Fmt.number(v, 1) : ind === 'bb' ? (v < 0 ? '−' : '+') + Fmt.number(Math.abs(v), 1) + 'σ' : ind === 'd200' || ind === 'dd' ? pct(v, 0) : ind === 'roc' ? (v < 0 ? '−' : '+') + Fmt.number(Math.abs(v), 1) + 'σ' : pct(v, 2))
 const dayFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })
 const hourFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' })
 const yearFmt = new Intl.DateTimeFormat('tr-TR', { year: 'numeric' })
@@ -97,7 +97,10 @@ export function SignalChart({ bars, series, stat, trigger, horizon }: Props) {
       const i = Math.round(start + ((n - 1 - start) * k) / 4)
       ticks.push({ x: x(i), label: (years > 3 ? yearFmt : monthFmt).format(t[i] * 1000) })
     }
-    return { start, x, y, vy, top, log, lo, hi, vlo, vhi, price: line((i) => c[i], y), ind: line((i) => v[i], vy), sma200: stat.filter !== 'any' ? line((i) => series.sma200[i], y) : '', sma50: stat.filter === 'up' || stat.filter === 'down' ? line((i) => series.sma50[i], y) : '', ticks }
+    // Keşif ve doğrulama dönemlerini ayıran çubuk
+    let cut = start
+    while (cut < n - 1 && t[cut] < stat.test.cutTime) cut++
+    return { start, cut, x, y, vy, top, log, lo, hi, vlo, vhi, price: line((i) => c[i], y), ind: line((i) => v[i], vy), sma200: stat.filter !== 'any' ? line((i) => series.sma200[i], y) : '', sma50: stat.filter === 'up' || stat.filter === 'down' ? line((i) => series.sma50[i], y) : '', ticks }
   }, [bars, series, stat, trigger, W])
 
   const v = series[ind]
@@ -123,6 +126,13 @@ export function SignalChart({ bars, series, stat, trigger, horizon }: Props) {
           <line className="sc-axis" x1={PAD.l} x2={W - PAD.r} y1={PAD.t + PH} y2={PAD.t + PH} />
           <line className="sc-axis" x1={PAD.l} x2={W - PAD.r} y1={g.top + IH} y2={g.top + IH} />
           {g.ticks.map((k, i) => <text key={i} className="sc-tick" x={k.x} y={H - 6} textAnchor={i === 0 ? 'start' : i === g.ticks.length - 1 ? 'end' : 'middle'}>{k.label}</text>)}
+          {g.cut > g.start && g.cut < n - 1 && (
+            <>
+              <line className="sc-split" x1={g.x(g.cut)} x2={g.x(g.cut)} y1={PAD.t} y2={PAD.t + PH} />
+              <text className="sc-tick" x={g.x(g.cut) - 6} y={PAD.t + 10} textAnchor="end">keşif</text>
+              <text className="sc-tick" x={g.x(g.cut) + 6} y={PAD.t + 10}>doğrulama</text>
+            </>
+          )}
           {g.sma200 && <path d={g.sma200} className="sc-ma" />}
           {g.sma50 && <path d={g.sma50} className="sc-ma fast" />}
           <path d={g.price} className="sc-price" />

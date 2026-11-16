@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyze, crossings, durationLabel, FILTERS, findEvents, indicators, nextValue, RULES_PER_FRAME, rsiSeries, signalStat, triggerClose, triggerLabel, triggerPrice, TRIGGERS, wilsonLower, type Bars } from './signals'
+import { analyze, CONFIRM, crossings, durationLabel, FILTERS, findEvents, indicators, nextValue, RULES_PER_FRAME, rsiSeries, signalStat, triggerClose, triggerLabel, triggerPrice, TRIGGERS, wilsonLower, type Bars } from './signals'
 
 const T = (id: string) => TRIGGERS.find((t) => t.id === id)!
 
@@ -49,25 +49,44 @@ describe('hisse analizi', () => {
   })
 
   it('her dipten sonra yükselen seri: dip sinyali teyitli; rastgele yürüyüşte teyit yok', () => {
-    // 12 döngü: sert düşüş (RSI dibe iner), ardından toparlanma ve yatay seyir
+    // 24 döngü (yaklaşık 4 yıl): sert düşüş (RSI dibe iner), ardından toparlanma ve yatay seyir
     const c: number[] = [100]
-    for (let k = 0; k < 12; k++) {
+    for (let k = 0; k < 24; k++) {
       for (let i = 0; i < 6; i++) c.push(c.at(-1)! * 0.97)
       for (let i = 0; i < 16; i++) c.push(c.at(-1)! * 1.012)
       for (let i = 0; i < 40; i++) c.push(c.at(-1)! * (i % 2 ? 1.004 : 0.996))
     }
     const b = bars(c)
     const s = signalStat(b, indicators(c), 'D', T('rsi:dip:30'))
-    expect(s.events.length).toBeGreaterThanOrEqual(11) // ilk düşüş RSI hesaplanmadan önce başlar
+    expect(s.events.length).toBeGreaterThanOrEqual(22) // ilk düşüş RSI hesaplanmadan önce başlar
     expect(s.main.hit).toBe(1)
     expect(s.main.median!).toBeGreaterThan(s.main.baseMedian!)
-    expect(s.verdict).toBe('confirmed')
     expect(s.events[0].worst!).toBeLessThan(0) // sinyalden sonra bir süre daha düştü
-    expect(analyze({ D: b }).bestDip?.verdict).toBe('confirmed')
+    // Hissenin kendi kanıtı güçlü: rastgele girişler bu kadar iyi sonuç vermez; iki dönemde de tutuyor
+    expect(s.test.all.p!).toBeLessThan(0.01)
+    expect(s.test.discovery.n + s.test.confirm.n).toBe(s.main.n)
+    expect(s.test.confirm.n).toBeGreaterThanOrEqual(6)
+    expect(s.checks).toMatchObject({ stock: true, periods: true, depth: true, universe: false })
+    expect(s.adverse!).toBeLessThan(0)
+    expect(s.favorable!).toBeGreaterThan(0.05)
+    // Evren kanıtı olmadan teyitli sayılmaz
+    expect(s.verdict).toBe('promising')
+    const uni = { 'D|rsi:dip:30|any': { n: 5000, stocks: 400, diff: 0.06, z: 8 } }
+    expect(signalStat(b, indicators(c), 'D', T('rsi:dip:30'), 'any', new Map(), { universe: uni }).verdict).toBe('confirmed')
+    expect(signalStat(b, indicators(c), 'D', T('rsi:dip:30'), 'any', new Map(), { universe: { 'D|rsi:dip:30|any': { n: 5000, stocks: 400, diff: 0.01, z: 8 } } }).verdict).toBe('promising') // etki küçük
+    expect(analyze({ D: b }, uni).bestDip?.verdict).toBe('confirmed')
+    // Kısa geçmiş (3 yıldan az): diğer şartlar sağlansa da teyitli olmaz
+    const short = bars(c.slice(0, 700))
+    const ss = signalStat(short, indicators(short.c), 'D', T('rsi:dip:30'), 'any', new Map(), { universe: uni })
+    expect(ss.years).toBeLessThan(CONFIRM.years)
+    expect(ss.verdict).not.toBe('confirmed')
+    // Bağımsız sinyaller: ardışık iki sinyal arasında en az ölçüm süresi kadar çubuk
+    for (let i = 1; i < s.events.length; i++) expect(s.events[i].i - s.events[i - 1].i).toBeGreaterThanOrEqual(21)
 
     const r = rng(42); const w = [100]
     for (let i = 0; i < 3000; i++) w.push(w[i] * (1 + (r() - 0.5) * 0.03))
-    const a = analyze({ D: bars(w) })
+    const all = Object.fromEntries(TRIGGERS.flatMap((t) => FILTERS.map((f) => [`D|${t.id}|${f}`, { n: 5000, stocks: 400, diff: 0.06, z: 8 }])))
+    const a = analyze({ D: bars(w) }, all)
     expect(a.frames[0].dips.every((x) => x.verdict !== 'confirmed')).toBe(true)
     expect(a.frames[0].tops.every((x) => x.verdict !== 'confirmed')).toBe(true)
   })
@@ -86,7 +105,7 @@ describe('hisse analizi', () => {
     for (let i = 0; i < 400; i++) c.push(c[i] * (1 + (r() - 0.5) * 0.04))
     const s = indicators(c)
     const last = c.at(-1)!
-    for (const id of ['rsi:dip:30', 'bb:dip:-2', 'd200:dip:-0.2', 'bb:top:2', 'd200:top:0.3', 'rsi:top:70']) {
+    for (const id of ['rsi:dip:30', 'bb:dip:-2', 'd200:dip:-0.2', 'bb:top:2', 'd200:top:0.3', 'rsi:top:70', 'dd:dip:-0.25', 'roc:dip:-2', 'roc:top:2']) {
       const t = T(id)
       const x = triggerClose(c, s, t)
       if (x == null) continue

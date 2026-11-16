@@ -1036,3 +1036,17 @@ a.screen-item { text-decoration: none; color: inherit; }
   .al-row .al-act { grid-column: 1 / -1; justify-content: flex-end; }
   .al-ch { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Kanıt şartları */
+.sc-split { stroke: var(--rule); stroke-width: 1; }
+.st-checks { margin: 16px 0 0; max-width: 78ch; }
+.st-checks summary { cursor: pointer; font-size: 14px; font-weight: 650; color: var(--ink); padding: 4px 0; }
+.st-checks ul { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
+.st-checks li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; align-items: start; }
+.st-checks li svg.i { width: 18px; height: 18px; margin-top: 1px; }
+.st-checks li.ok svg.i { color: var(--up); }
+.st-checks li.no svg.i { color: var(--ink-4); }
+.st-checks li b { display: block; font-size: 14px; font-weight: 650; }
+.st-checks li.no b { color: var(--ink-2); }
+.st-checks li span { display: block; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }
+.st-risk { margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ink-2); }

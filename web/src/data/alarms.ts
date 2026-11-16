@@ -8,7 +8,7 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { checkAlarms, newId, sanitizeAlarms, type Alarm, type Fired, type Source, type States } from '../core/alarms'
 import { analyze, type Analysis } from '../core/signals'
-import { loadBars, withLive } from './bars'
+import { loadBars, loadUniverse, withLive } from './bars'
 import { getPremiums, refreshPremiums } from './premium'
 import { scan } from './tv'
 
@@ -160,11 +160,12 @@ const clientSource: Source = {
     // Geçmiş veri ağırdır: sembol başına 10 dakikada bir
     const hit = analysisCache.get(symbol)
     if (hit && Date.now() - hit.t < 10 * 60_000) return hit.a
-    const [data, live] = await Promise.all([
+    const [data, uni, live] = await Promise.all([
       loadBars(symbol),
+      loadUniverse(symbol),
       scan('global', { symbols: { tickers: [symbol] }, columns: ['close'] }).then((r) => (typeof r[0]?.d[0] === 'number' ? (r[0].d[0] as number) : undefined)).catch(() => undefined),
     ])
-    const a = data ? analyze(data.source === 'snapshot' ? withLive(data.frames, live) : data.frames) : undefined
+    const a = data ? analyze(data.source === 'snapshot' ? withLive(data.frames, live) : data.frames, uni?.rules) : undefined
     analysisCache.set(symbol, { t: Date.now(), a })
     return a
   },

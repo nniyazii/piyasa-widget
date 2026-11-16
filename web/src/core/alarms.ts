@@ -60,7 +60,7 @@ const SIDE = { dip: 'dip', top: 'tepe', both: 'dip ya da tepe' }
 /** Alarmın cümlesi: "SNDK 770 altına inerse" */
 export function describe(a: Alarm): string {
   if (a.type === 'price') return `${code(a.symbol)} ${num(a.value)} ${a.op === 'below' ? 'altına inerse' : 'üstüne çıkarsa'}`
-  if (a.type === 'signal') return `${code(a.symbol)} için ${a.level === 'confirmed' ? 'teyitli' : 'teyitli ya da umut verici'} ${SIDE[a.side]} sinyali gelirse`
+  if (a.type === 'signal') return `${code(a.symbol)} için ${a.level === 'confirmed' ? 'teyitli' : 'teyitli ya da zayıf kanıtlı'} ${SIDE[a.side]} sinyali gelirse`
   if (a.target === 'any') return 'Altın ya da gümüş ürünlerinden biri değerinin altına inerse'
   const adv = ADVICE_TARGETS.find((x) => x.id === a.target)
   if (adv) return `${adv.label} güçlü sinyal verirse`
@@ -117,7 +117,7 @@ async function evaluate(a: Alarm, src: Source, cache: { prices?: Map<string, num
   return {
     on: true, now: `${what.toLowerCase()} açık`,
     title: `${code(a.symbol)}: ${what.toLowerCase()} geldi`,
-    text: `${code(a.symbol)}: ${what} (${s.verdict === 'confirmed' ? 'teyitli' : 'umut verici'}). Kural: ${ruleText(s)}. Geçmişte ${s.main.n} sinyalin ${hits} tanesi tuttu.${act.length > 1 ? ` Aynı anda ${act.length - 1} kural daha açık.` : ''}`,
+    text: `${code(a.symbol)}: ${what} (${s.verdict === 'confirmed' ? 'teyitli' : 'zayıf kanıtlı'}). Kural: ${ruleText(s)}. Geçmişte ${s.main.n} sinyalin ${hits} tanesi tuttu.${act.length > 1 ? ` Aynı anda ${act.length - 1} kural daha açık.` : ''}`,
   }
 }
 

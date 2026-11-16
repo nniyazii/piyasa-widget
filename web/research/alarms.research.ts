@@ -11,7 +11,7 @@ import type { RatioData } from '../src/core/advice'
 import { checkAlarms, sanitizeAlarms, type Source, type States } from '../src/core/alarms'
 import { bistOpen, type Series } from '../src/core/premium'
 import { buildPremiums, PREMIUM_QUOTES, PREMIUM_SYMBOLS } from '../src/core/premiums'
-import { analyze, type Bars, type Timeframe } from '../src/core/signals'
+import { analyze, marketOf, type Bars, type Timeframe, type Universe } from '../src/core/signals'
 
 const env = process.env
 const BASE = (env.DATA_BASE ?? 'https://nniyazii.github.io/piyasa-widget/data').replace(/\/$/, '')
@@ -41,6 +41,8 @@ function unpackBars(p: [number, number[], number[]] | undefined): Bars | undefin
   return { t, c: p[2] }
 }
 
+let rules: Promise<{ markets: Record<string, { rules: Universe }> } | undefined> | undefined
+
 const source: Source = {
   prices: quotes,
   async premiums() {
@@ -58,7 +60,9 @@ const source: Source = {
     const r = (await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[]]>> }
     const frames: Partial<Record<Timeframe, Bars>> = {}
     for (const tf of ['W', 'D', 'H4', 'H1'] as Timeframe[]) { const b = unpackBars(r.bars[tf]); if (b) frames[tf] = b }
-    return Object.keys(frames).length ? analyze(frames) : undefined
+    rules ??= json<{ markets: Record<string, { rules: Universe }> }>(`${BASE}/rules.json`).catch(() => undefined)
+    const m = marketOf(symbol)
+    return Object.keys(frames).length ? analyze(frames, m ? (await rules)?.markets[m]?.rules : undefined) : undefined
   },
 }
 

@@ -2,7 +2,7 @@
  * Hisse analizi verisi: dört zaman diliminde kapanışlar. Sunucu varsa her sembol canlı (api/tv/bars),
  * statik yayında günlük kopyadaki parçalardan (data/bars/{W|D|H4|H1}/{nn}.json).
  */
-import type { Bars, Timeframe } from '../core/signals'
+import { marketOf, type Bars, type Timeframe, type Universe } from '../core/signals'
 import { historySource } from './history'
 
 type Packed = [number, number[], number[]]
@@ -71,4 +71,15 @@ export function withLive(frames: DeepBars['frames'], price: number | undefined, 
       : { t: [...b.t, now], c: [...b.c, price] }
   }
   return out
+}
+
+let rules: Promise<{ generated: number; markets: Record<string, { stocks: number; rules: Universe }> } | undefined> | undefined
+/** Evren kanıtı: sembolün pazarındaki kuralların birleşik sonucu (hisse değilse ya da dosya yoksa undefined) */
+export async function loadUniverse(symbol: string): Promise<{ rules: Universe; stocks: number; generated: number } | undefined> {
+  const m = marketOf(symbol)
+  if (!m) return undefined
+  rules ??= json('data/rules.json')
+  const r = await rules
+  if (!r) { rules = undefined; return undefined }
+  return r.markets[m] ? { rules: r.markets[m].rules, stocks: r.markets[m].stocks, generated: r.generated } : undefined
 }

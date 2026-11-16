@@ -234,17 +234,19 @@ await step('analiz: hisse seç, tarihsel teyit ve şu anki uzaklık', async () =
   if (await sig.count()) {
     if (await sig.locator('.sc').count() !== 2) throw new Error('iki grafik bekleniyordu')
     if (!(await sig.locator('.sc-mark').count())) throw new Error('sinyal noktası yok')
+    await sig.locator('.sc-plot svg').first().scrollIntoViewIfNeeded()
     const bb = await sig.locator('.sc-plot svg').first().boundingBox()
     await page.mouse.move(bb.x + bb.width * 0.5, bb.y + bb.height * 0.4)
     await sig.locator('.sc-tip').first().waitFor({ timeout: 3000 })
     if (!(await sig.locator('.sc-median').count())) throw new Error('ortanca çizgisi yok')
+    if (await sig.locator('.st-checks li').count() !== 4) throw new Error('dört kanıt şartı bekleniyordu')
   }
   // Her zaman diliminde 22 bağlamsız kural (RSI, Bollinger, 200 ortalama, MACD); öne çıkan bağlamlı kurallar eklenir
   await page.locator('.st-frame summary').first().click()
   const n = await page.locator('.st-frame').first().locator('tbody tr:not(.st-sep)').count()
-  if (n < 22) throw new Error('kural satırı: ' + n)
+  if (n < 29) throw new Error('kural satırı: ' + n)
   const rules = await page.locator('.st-frame').first().locator('tbody').textContent()
-  for (const w of ['RSI ≤ 30', 'Bollinger alt bandı', '200 ortalamanın %10 altı', 'MACD']) if (!rules.includes(w)) throw new Error('kural yok: ' + w)
+  for (const w of ['RSI ≤ 30', 'Bollinger alt bandı', '200 ortalamanın %10 altı', 'MACD', 'Zirvesinden %25 geriledi', 'Sert düşüş']) if (!rules.includes(w)) throw new Error('kural yok: ' + w)
 })
 
 await step('alarmlar: fiyat, avantajlı fiyat ve hisse sinyali kur; çalan alarm bildirilir', async () => {

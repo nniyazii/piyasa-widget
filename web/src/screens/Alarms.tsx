@@ -136,7 +136,7 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
         {kind === 'signal' && (
           <>
             <b>{symbol ? Fmt.ticker(symbol) : 'Seçtiğim hisse'}</b> için{' '}
-            <select value={level} onChange={(e) => setLevel(e.target.value as 'confirmed' | 'promising')} aria-label="Sinyal düzeyi"><option value="confirmed">teyitli</option><option value="promising">teyitli ya da umut verici</option></select>{' '}
+            <select value={level} onChange={(e) => setLevel(e.target.value as 'confirmed' | 'promising')} aria-label="Sinyal düzeyi"><option value="confirmed">teyitli</option><option value="promising">teyitli ya da zayıf kanıtlı</option></select>{' '}
             <select value={side} onChange={(e) => setSide(e.target.value as 'dip' | 'top' | 'both')} aria-label="Yön"><option value="both">dip ya da tepe</option><option value="dip">dip</option><option value="top">tepe</option></select> sinyali gelirse haber ver.
           </>
         )}
