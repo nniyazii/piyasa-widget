@@ -2,7 +2,7 @@
  * Hisse analizi verisi: dört zaman diliminde kapanışlar. Sunucu varsa her sembol canlı (api/tv/bars),
  * statik yayında günlük kopyadaki parçalardan (data/bars/{W|D|H4|H1}/{nn}.json).
  */
-import { INDEX_OF, stockSetups, type SetupTable, type StockSetups } from '../core/setups'
+import { INDEX_OF, stockSetups, tableKey, toUsd, USDTRY, type Basis, type SetupTable, type StockSetups } from '../core/setups'
 import { marketOf, type Bars, type Timeframe, type Universe } from '../core/signals'
 import { historySource } from './history'
 
@@ -87,16 +87,20 @@ export async function loadUniverse(symbol: string): Promise<{ rules: Universe; s
 }
 
 let setupFile: Promise<{ generated: number; markets: Record<string, { stocks: number; setups: SetupTable }> } | undefined> | undefined
-export interface SetupData extends StockSetups { market: 'TR' | 'US'; stocks: number; generated: number; bars: Bars }
+export interface SetupData extends StockSetups { market: 'TR' | 'US'; basis: Basis; /** Dolar bazında ise son Dolar/TL kuru (tetik fiyatını TL'ye çevirmek için) */ fx?: number; stocks: number; generated: number; bars: Bars }
 /** Güçlü kurulumlar: hissenin günlük verisi, pazar endeksi ve pazar geneli kanıt tablosuyla (hisse değilse undefined) */
-export async function loadSetups(symbol: string, daily: Bars | undefined, live?: number): Promise<SetupData | undefined> {
+export async function loadSetups(symbol: string, daily: Bars | undefined, basis: Basis = 'usd'): Promise<SetupData | undefined> {
   const m = marketOf(symbol)
   if (!m || !daily) return undefined
   setupFile ??= json('data/setups.json')
-  const [file, index] = await Promise.all([setupFile, loadBars(INDEX_OF[m])])
+  const usd = m === 'TR' && basis === 'usd'
+  const [file, index, fx] = await Promise.all([setupFile, loadBars(INDEX_OF[m]), usd ? loadBars(USDTRY) : undefined])
   if (!file) setupFile = undefined
-  const table = file?.markets[m]
-  // Endeksin son çubuğu da canlı fiyatla güncellenmez; piyasa durumu günlük kapanışa göredir
-  void live
-  return { ...stockSetups(daily, index?.frames.D, table?.setups), market: m, stocks: table?.stocks ?? 0, generated: file?.generated ?? 0, bars: daily }
+  // Kur verisi yoksa TL bazına düşülür
+  const rate = usd ? fx?.frames.D : undefined
+  const b: Basis = rate ? 'usd' : 'try'
+  const table = file?.markets[tableKey(m, b)]
+  const stock = rate ? toUsd(daily, rate) : daily
+  const idx = rate && index?.frames.D ? toUsd(index.frames.D, rate) : index?.frames.D
+  return { ...stockSetups(stock, idx, table?.setups), market: m, basis: m === 'TR' ? b : 'try', fx: rate ? rate.c[rate.c.length - 1] : undefined, stocks: table?.stocks ?? 0, generated: file?.generated ?? 0, bars: stock }
 }

@@ -5,7 +5,7 @@
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { it } from 'vitest'
-import { HORIZON, INDEX_OF, inRegime, PATH_DAYS, periodOf, prepare, regimeMap, REGIMES, setupDays, setupKey, SETUPS, SHORT, strength, type PeriodStat, type Regime, type SetupEvidence } from '../src/core/setups'
+import { HORIZON, INDEX_OF, inRegime, PATH_DAYS, periodOf, toUsd, USDTRY, prepare, regimeMap, REGIMES, setupDays, setupKey, SETUPS, SHORT, strength, type PeriodStat, type Regime, type SetupEvidence } from '../src/core/setups'
 import { marketOf, type Bars } from '../src/core/signals'
 
 const DIR = process.env.DATA ?? 'research/out/full'
@@ -17,16 +17,15 @@ it('güçlü kurulumlar', () => {
   if (!existsSync(`${DIR}/D`)) throw new Error('günlük veri yok: ' + DIR)
   const daily = new Map<string, Bars>()
   for (const f of readdirSync(`${DIR}/D`)) for (const [s, p] of Object.entries(JSON.parse(readFileSync(`${DIR}/D/${f}`, 'utf8')).bars as Record<string, [number, number[], number[], number[]?]>)) daily.set(s, unpack(p))
-  // Deneme: BIST fiyatlarını dolara çevir (USD=1)
-  if (process.env.USD) {
-    const fx = daily.get('FX:USDTRY')!; const m = new Map(fx.t.map((t, i) => [Math.floor(t / 86400), fx.c[i]]))
-    for (const [sym, b] of daily) if (sym.startsWith('BIST:')) { const t: number[] = [], c: number[] = []; b.t.forEach((x, i) => { const r = m.get(Math.floor(x / 86400)); if (r) { t.push(x); c.push(b.c[i] / r) } }); daily.set(sym, { t, c, v: b.v }) }
-  }
   type A = { n: number; hit: number; hit21: number; ret: number }
   const zero = (): A => ({ n: 0, hit: 0, hit21: 0, ret: 0 })
   const markets: Record<string, unknown> = {}
-  for (const m of ['TR', 'US'] as const) {
-    const index = daily.get(INDEX_OF[m])
+  // BIST dolar bazında: hisseler ve endeks, o günün kuruyla dolara çevrilir
+  const fx = daily.get(USDTRY)
+  const usd = new Map<string, Bars>()
+  if (fx) for (const [sym, b] of daily) if (sym.startsWith('BIST:')) usd.set(sym, toUsd(b, fx))
+  for (const [key, m, data] of [['TR', 'TR', daily], ['TR_USD', 'TR', usd], ['US', 'US', daily]] as const) {
+    const index = data.get(INDEX_OF[m])
     if (!index) continue
     const reg = regimeMap(index)
     const sig = new Map<string, A[]>(), stocksOf = new Map<string, Set<string>>()
@@ -36,7 +35,7 @@ it('güçlü kurulumlar', () => {
     const basePaths: Record<Regime, { n: number; sum: number[] }> = { any: { n: 0, sum: PATH_DAYS.map(() => 0) }, bear: { n: 0, sum: PATH_DAYS.map(() => 0) }, bull: { n: 0, sum: PATH_DAYS.map(() => 0) } }
     const base: Record<Regime, A[]> = { any: [zero(), zero(), zero()], bear: [zero(), zero(), zero()], bull: [zero(), zero(), zero()] }
     let stocks = 0
-    for (const [sym, b] of daily) {
+    for (const [sym, b] of data) {
       if (marketOf(sym) !== m || NOT_STOCK.test(sym) || b.c.length < 400) continue
       stocks++
       const x = prepare(b), c = x.c, n = c.length
@@ -72,8 +71,8 @@ it('güçlü kurulumlar', () => {
       const pp = paths.get(setupKey(s.id, g))!, bp = basePaths[g]
       table[setupKey(s.id, g)] = { periods, stocks: stocksOf.get(setupKey(s.id, g))!.size, path: pp.sum.map((x) => Number((x / pp.n).toFixed(4))), basePath: bp.sum.map((x) => Number((x / Math.max(1, bp.n)).toFixed(4))) }
     }
-    markets[m] = { stocks, setups: table }
-    console.log(`\n${m}: ${stocks} hisse`)
+    markets[key] = { stocks, setups: table }
+    console.log(`\n${key}: ${stocks} hisse`)
     for (const s of SETUPS) for (const g of REGIMES) {
       const e = table[setupKey(s.id, g)]; if (!e) continue
       const st = strength(e, s.side)!

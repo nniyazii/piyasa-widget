@@ -1089,3 +1089,6 @@ a.screen-item { text-decoration: none; color: inherit; }
 .st-periods .track .b { width: 2px; height: 20px; margin: -10px 0 0 -1px; background: var(--ink); }
 .st-own-cap { margin: 18px 0 -10px; font-size: 13.5px; font-weight: 650; }
 @media (max-width: 860px) { .st-charts.two { grid-template-columns: minmax(0, 1fr); } .st-charts.two .st-periods { margin-top: 18px; } }
+
+.st-basis { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 16px 0 0; }
+.st-basis .note { margin: 0; max-width: 62ch; }

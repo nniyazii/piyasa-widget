@@ -23,6 +23,22 @@ export type Regime = 'any' | 'bear' | 'bull'
 export const REGIMES: Regime[] = ['bear', 'bull', 'any']
 export const REGIME_LABEL: Record<Regime, string> = { any: 'piyasa hangi durumda olursa olsun', bear: 'endeks 200 günlük ortalamasının altındayken', bull: 'endeks 200 günlük ortalamasının üstündeyken' }
 export const INDEX_OF = { TR: 'BIST:XU100', US: 'SP:SPX' } as const
+export const USDTRY = 'FX:USDTRY'
+/** BIST hisseleri iki bazda sınanır: TL (nominal) ve dolar (enflasyonun etkisinden arınmış). Tablo anahtarı: TR, TR_USD, US */
+export type Basis = 'try' | 'usd'
+export const tableKey = (market: 'TR' | 'US', basis: Basis) => (market === 'TR' && basis === 'usd' ? 'TR_USD' : market)
+/** TL fiyatlarını dolara çevirir: her günün kapanışı o günün (yoksa önceki son günün) Dolar/TL kuruna bölünür */
+export function toUsd(b: Bars, fx: Bars): Bars {
+  const t: number[] = [], c: number[] = [], v: number[] = []
+  let k = 0
+  for (let i = 0; i < b.t.length; i++) {
+    const day = Math.floor(b.t[i] / 86400)
+    while (k + 1 < fx.t.length && Math.floor(fx.t[k + 1] / 86400) <= day) k++
+    if (Math.floor(fx.t[k] / 86400) > day) continue // kurun bilinmediği ilk günler
+    t.push(b.t[i]); c.push(b.c[i] / fx.c[k]); if (b.v) v.push(b.v[i])
+  }
+  return b.v ? { t, c, v } : { t, c }
+}
 export const INDEX_NAME = { TR: 'BIST 100', US: 'S&P 500' } as const
 
 /**

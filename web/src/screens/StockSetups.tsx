@@ -3,9 +3,10 @@
  * seçilen hissenin şu an bunlara göre durumu.
  */
 import * as Fmt from '../core/format'
-import { HORIZON, INDEX_NAME, PATH_DAYS, PERIOD_LABELS, REGIME_LABEL, SETUPS, STRONG, type SetupEvidence, type SetupNow } from '../core/setups'
+import { HORIZON, INDEX_NAME, PATH_DAYS, PERIOD_LABELS, REGIME_LABEL, SETUPS, STRONG, type Basis, type SetupEvidence, type SetupNow } from '../core/setups'
 import type { SetupData } from '../data/bars'
 import { Icon } from '../ui/Icon'
+import { Segmented } from '../ui/overlay'
 import { href } from '../ui/router'
 import { EventChart, PathChart, StateChart } from '../ui/SignalChart'
 
@@ -19,9 +20,10 @@ const moved = (s: SetupNow) => (s.setup.side === 'dip' ? 'yukarıdaydı' : 'aşa
 export function setupHeadline(d: SetupData): { answer: string; sub: string } {
   const strong = d.list.filter((s) => s.strength?.strong)
   const market = MARKET[d.market]
+  const usd = d.basis === 'usd'
   if (!strong.length) return {
-    answer: `${market} hisselerinde güvenilirliği kanıtlanmış bir kurulum yok.`,
-    sub: `${SETUPS.length} dip ve tepe kurulumu ${Fmt.number(d.stocks, 0)} ${market} hissesinde üç ayrı dönemde sınandı; hiçbiri üç dönemin üçünde de olağandan belirgin biçimde iyi sonuç vermedi. Aşağıda her kurulumun dönem dönem sonucu ve bu hissenin şu anki durumu var; bunlar güvenilir sinyal değildir.`,
+    answer: `${market} hisselerinde${usd ? ', dolar bazında da' : ''} güvenilirliği kanıtlanmış bir kurulum yok.`,
+    sub: `${SETUPS.length} dip ve tepe kurulumu ${Fmt.number(d.stocks, 0)} ${market} hissesinde${usd ? ' dolar bazlı fiyatlarla' : ''} üç ayrı dönemde sınandı; hiçbiri üç dönemin üçünde de olağandan belirgin biçimde iyi sonuç vermedi. Aşağıda her kurulumun dönem dönem sonucu ve bu hissenin şu anki durumu var; bunlar güvenilir sinyal değildir.`,
   }
   const lead = d.lead
   if (lead?.active) {
@@ -42,7 +44,7 @@ export function setupHeadline(d: SetupData): { answer: string; sub: string } {
   }
 }
 
-export function SetupsView({ d, symbol }: { d: SetupData; symbol: string }) {
+export function SetupsView({ d, symbol, onBasis }: { d: SetupData; symbol: string; onBasis: (b: Basis) => void }) {
   const strong = d.list.filter((s) => s.strength?.strong)
   // Güçlüler: önce açık olanlar, sonra bugünkü piyasa durumuna uyanlar
   const order = (s: SetupNow) => (s.active ? 0 : s.regimeOk ? 1 : 2)
@@ -57,8 +59,14 @@ export function SetupsView({ d, symbol }: { d: SetupData; symbol: string }) {
         {strong.length > 0 && <a className="btn small" href={href('alarmlar', { tur: 'sinyal', s: symbol })}><Icon name="bell" />{anyActive ? 'Yeni kurulum oluşunca haber ver' : 'Güçlü kurulum oluşunca haber ver'}</a>}
         <a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: symbol })}>Fiyat alarmı kur</a>
       </p>
-      {d.regimeNow != null && <p className="st-regime">Piyasa durumu: {INDEX_NAME[d.market]} 200 günlük ortalamasının <b>{d.regimeNow ? 'üstünde' : 'altında'}</b>.</p>}
-      <StateChart c={d.ctx.c} t={d.ctx.t} sma200={d.ctx.s.sma200} rsi={d.ctx.s.rsi} vol={d.ctx.vol} />
+      {d.market === 'TR' && (
+        <div className="st-basis">
+          <Segmented value={d.basis} onChange={onBasis} label="Fiyat bazı" options={[{ value: 'usd', label: 'Dolar bazında' }, { value: 'try', label: 'TL bazında' }]} />
+          <BasisNote d={d} />
+        </div>
+      )}
+      {d.regimeNow != null && <p className="st-regime">Piyasa durumu: {INDEX_NAME[d.market]}{d.basis === 'usd' ? ' (dolar bazında)' : ''} 200 günlük ortalamasının <b>{d.regimeNow ? 'üstünde' : 'altında'}</b>.</p>}
+      <StateChart c={d.ctx.c} t={d.ctx.t} sma200={d.ctx.s.sma200} rsi={d.ctx.s.rsi} vol={d.ctx.vol} unit={d.basis === 'usd' ? 'dolar bazında' : undefined} />
 
       {shown.length > 0 && (
         <section className="an-group">
@@ -102,6 +110,18 @@ function SetupTable({ rows }: { rows: SetupNow[] }) {
   )
 }
 
+/** BIST: seçilen bazda hisselerin olağan sonucu (enflasyonun etkisini görünür kılar) */
+function BasisNote({ d }: { d: SetupData }) {
+  const base = d.list.find((s) => s.regime === 'any' && s.setup.side === 'dip' && s.evidence)?.evidence?.periods
+  if (!base) return null
+  return (
+    <p className="note">
+      {d.basis === 'usd' ? 'Fiyatlar her günün Dolar/TL kuruyla dolara çevrildi; göstergeler ve sonuçlar dolar üzerinden.' : 'Fiyatlar TL; yüksek enflasyon dönemlerinde nominal yükseliş sonuçları olduğundan iyi gösterir.'}
+      {' '}BIST hisselerinin herhangi bir günden 3 ay sonra {d.basis === 'usd' ? 'dolar bazında' : 'TL bazında'} yukarıda olma oranı: {base.map((p, k) => `${PERIOD_LABELS[k]} ${p0(p[2])}`).join(', ')}.
+    </p>
+  )
+}
+
 function SetupBlock({ s, d }: { s: SetupNow; d: SetupData }) {
   const st = s.strength!
   const side = s.setup.side
@@ -122,7 +142,7 @@ function SetupBlock({ s, d }: { s: SetupNow; d: SetupData }) {
         {s.conds.map((c) => (
           <li key={c.label} className={c.ok ? 'ok' : 'no'}>
             <Icon name={c.ok ? 'check' : 'close'} label={c.ok ? 'Sağlanıyor' : 'Sağlanmıyor'} />
-            <div><b>{c.label}</b><span>{c.now}{c.trigger != null ? `; sıradaki gün ${price(c.trigger)} ${side === 'dip' ? 'altında' : 'üstünde'} kapanırsa sağlanır (${pct(c.trigger / d.bars.c[d.bars.c.length - 1] - 1)})` : ''}.</span></div>
+            <div><b>{c.label}</b><span>{c.now}{c.trigger != null ? `; sıradaki gün ${d.basis === 'usd' && d.fx ? `${price(c.trigger * d.fx)} TL (kur değişmezse)` : price(c.trigger)} ${side === 'dip' ? 'altında' : 'üstünde'} kapanırsa sağlanır (${pct(c.trigger / d.bars.c[d.bars.c.length - 1] - 1)})` : ''}.</span></div>
           </li>
         ))}
         {s.regime !== 'any' && (
@@ -176,7 +196,8 @@ export function SetupsHow({ d }: { d: SetupData }) {
       <li><b>Güçlü</b> sayılması için üç ayrı dönemin ({PERIOD_LABELS.join('; ')}) üçünde de: en az {STRONG.n} örnek, isabet aynı dönemin olağanından en az {STRONG.diff * 100} puan yüksek ve dipte en az %{STRONG.dipHit * 100}. Gösterilen isabet, üç dönemin en kötüsüdür.</li>
       <li><b>Olağan</b>: aynı piyasa durumundaki herhangi bir günden 3 ay sonra fiyatın yukarıda olma oranı. Piyasa düşüşteyken hisselerin çoğu zaten toparlanır; kurulumun değeri bu orana eklediği kadardır.</li>
       <li><b>Sınırları</b>: kurulumlar hisseye özgü bir üstünlük göstermez; sinyalden sonra hissenin endeksi geçme oranı yaklaşık yarı yarıyadır. Yakaladıkları şey, sert düşüşlerden sonra piyasanın toparlanmasıdır. Evren bugün işlem gören hisselerden oluşur (borsadan çıkanlar yok), bu oranları bir miktar iyimser gösterir.</li>
-      <li>BIST’te hiçbir kurulum üç dönemin üçünde de tutmadı: 2020–2023’te çok iyi görünen dip kurulumları 2024’ten sonra olağanın altında kaldı. Tepe (satım) tarafında iki pazarda da güvenilir kurulum bulunamadı.</li>
+      <li><b>Dolar bazı</b> (BIST): TL fiyatları her günün Dolar/TL kuruyla dolara çevrilir; göstergeler, piyasa durumu ve sonuçlar dolar üzerinden hesaplanır. Böylece enflasyondan gelen nominal yükseliş “sinyal tuttu” diye sayılmaz. Tetik fiyatı, bugünkü kur sabit kalırsa geçerli olan TL karşılığıdır.</li>
+      <li>BIST’te hiçbir kurulum, TL ya da dolar bazında, üç dönemin üçünde de tutmadı. Dolar bazında dip kurulumları son iki dönemde olağandan 3–6 puan iyi, ama 3 ay sonra yukarıda olma oranları %45–58 arasında; güvenilir sayılacak düzeyde değil. TL bazında: 2020–2023’te çok iyi görünen dip kurulumları 2024’ten sonra olağanın altında kaldı. Tepe (satım) tarafında iki pazarda da güvenilir kurulum bulunamadı.</li>
     </>
   )
 }

@@ -11,6 +11,7 @@ import {
 } from '../core/signals'
 import { chartUrl } from '../core/tradingview'
 import { loadBars, loadSetups, loadUniverse, withLive, type DeepBars, type SetupData } from '../data/bars'
+import type { Basis } from '../core/setups'
 import { setupHeadline, SetupsHow, SetupsView } from './StockSetups'
 import { useApp } from '../data/store'
 import type { SearchHit } from '../core/catalog'
@@ -20,6 +21,8 @@ import { href, navigate } from '../ui/router'
 import { AfterChart, HitBar, SignalChart } from '../ui/SignalChart'
 
 const LAST_KEY = 'piyasa.hisse'
+const BASIS_KEY = 'piyasa.hisse.baz'
+const savedBasis = (): Basis => { try { return localStorage.getItem(BASIS_KEY) === 'try' ? 'try' : 'usd' } catch { return 'usd' } }
 const EXAMPLES = ['NASDAQ:SNDK', 'BIST:THYAO', 'NASDAQ:NVDA', 'BIST:ASELS']
 const pct = (v?: number, d = 1) => (v == null ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), d))
 const price = (v?: number) => (v == null ? '—' : Fmt.number(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4))
@@ -50,6 +53,9 @@ interface Loaded { symbol: string; data?: DeepBars; live?: number; error?: strin
 export function StockAnalysis({ symbol }: { symbol?: string }) {
   const sym = symbol?.toUpperCase()
   const [state, setState] = useState<Loaded | undefined>()
+  // BIST hisseleri varsayılan olarak dolar bazında değerlendirilir (TL'deki enflasyon yanıltmasın diye)
+  const [basis, setBasisState] = useState<Basis>(savedBasis)
+  const setBasis = (b: Basis) => { setBasisState(b); try { localStorage.setItem(BASIS_KEY, b) } catch { /* depolama kapalı */ } }
   useEffect(() => {
     if (!sym) {
       let last: string | null = null
@@ -66,13 +72,13 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
     ]).then(async ([universe, data, live]) => {
       // Kurulumlar günlük veriden; kopya eskiyse son gün canlı fiyatla güncellenir
       const daily = data ? (data.source === 'snapshot' ? withLive(data.frames, live) : data.frames).D : undefined
-      const setups = await loadSetups(sym, daily).catch(() => undefined)
+      const setups = await loadSetups(sym, daily, basis).catch(() => undefined)
       if (!alive) return
       setState({ symbol: sym, data, live, universe, setups })
       if (data) try { localStorage.setItem(LAST_KEY, sym) } catch { /* depolama kapalı */ }
     })
     return () => { alive = false }
-  }, [sym])
+  }, [sym, basis])
 
   const result = useMemo(() => {
     if (!state?.data) return undefined
@@ -87,7 +93,7 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
       {!sym ? <Empty />
         : !state || state.symbol !== sym ? <p className="an-answer" aria-live="polite">Geçmiş veriler alınıyor…</p>
           : !result || !result.a.frames.length ? <Missing symbol={sym} />
-            : <Result symbol={sym} a={result.a} frames={result.frames} setups={state.setups} data={state.data!} live={state.data!.source === 'snapshot' && state.live != null} />}
+            : <Result symbol={sym} a={result.a} frames={result.frames} setups={state.setups} onBasis={setBasis} data={state.data!} live={state.data!.source === 'snapshot' && state.live != null} />}
     </>
   )
 }
@@ -169,7 +175,7 @@ function nowOf(a: Analysis, stat?: SignalStat): Now | undefined {
 const sideName = (side: Side) => (side === 'dip' ? 'Dip' : 'Tepe')
 const expected = (side: Side) => (side === 'dip' ? 'yukarıdaydı' : 'aşağıdaydı')
 
-function Result({ symbol, a, frames, data, live, setups }: { symbol: string; a: Analysis; frames: DeepBars['frames']; data: DeepBars; live: boolean; setups?: SetupData }) {
+function Result({ symbol, a, frames, data, live, setups, onBasis }: { symbol: string; a: Analysis; frames: DeepBars['frames']; data: DeepBars; live: boolean; setups?: SetupData; onBasis: (b: Basis) => void }) {
   const code = Fmt.ticker(symbol)
   const dip = nowOf(a, a.bestDip), top = nowOf(a, a.bestTop)
   // Başlıkta teyitli sinyal önce gelir; ikisi de aynı düzeydeyse şu an açık olan ya da fiyata yakın olan
@@ -216,10 +222,10 @@ function Result({ symbol, a, frames, data, live, setups }: { symbol: string; a: 
             <p className="an-answer" aria-live="polite">{head.answer}</p>
           </header>
           <p className="an-sub">{head.sub}</p>
-          <SetupsView d={setups!} symbol={symbol} />
+          <SetupsView d={setups!} symbol={symbol} onBasis={onBasis} />
           <details className="an-how st-own">
             <summary>Bu hisseye özgü kurallar (daha zayıf kanıt): {a.bestDip?.verdict === 'confirmed' || a.bestTop?.verdict === 'confirmed' ? 'teyitli kural var' : 'teyitli kural yok'}</summary>
-            <p className="an-sub">Bu bölüm yalnızca {code} hissesinin kendi geçmişine bakar: yaklaşık {a.frames.length * RULES_PER_FRAME} kural sınanır. Örnek az olduğu için kanıt zayıftır: araştırmada teyitli kurallar sonraki dönemde %54 tuttu (olağan %47).</p>
+            <p className="an-sub">{setups!.basis === 'usd' ? 'Bu bölüm TL fiyatlarıyla hesaplanır. ' : ''}Bu bölüm yalnızca {code} hissesinin kendi geçmişine bakar: yaklaşık {a.frames.length * RULES_PER_FRAME} kural sınanır. Örnek az olduğu için kanıt zayıftır: araştırmada teyitli kurallar sonraki dönemde %54 tuttu (olağan %47).</p>
             {own}
           </details>
         </>

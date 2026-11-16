@@ -11,7 +11,7 @@ import type { RatioData } from '../src/core/advice'
 import { checkAlarms, sanitizeAlarms, type Source, type States } from '../src/core/alarms'
 import { bistOpen, type Series } from '../src/core/premium'
 import { buildPremiums, PREMIUM_QUOTES, PREMIUM_SYMBOLS } from '../src/core/premiums'
-import { INDEX_OF, stockSetups, type SetupTable } from '../src/core/setups'
+import { INDEX_OF, stockSetups, tableKey, toUsd, USDTRY, type SetupTable } from '../src/core/setups'
 import { analyze, marketOf, type Bars, type Timeframe, type Universe } from '../src/core/signals'
 
 const env = process.env
@@ -52,8 +52,10 @@ const source: Source = {
     const m = marketOf(symbol)
     if (!m) return undefined
     setupFile ??= json<{ markets: Record<string, { setups: SetupTable }> }>(`${BASE}/setups.json`).catch(() => undefined)
-    const [daily, index, file] = await Promise.all([dailyOf(symbol), dailyOf(INDEX_OF[m]), setupFile])
-    return daily ? stockSetups(daily, index, file?.markets[m]?.setups) : undefined
+    // BIST hisseleri dolar bazında değerlendirilir (uygulamadaki varsayılanla aynı)
+    const [daily, index, file, fx] = await Promise.all([dailyOf(symbol), dailyOf(INDEX_OF[m]), setupFile, m === 'TR' ? dailyOf(USDTRY) : undefined])
+    if (!daily) return undefined
+    return fx ? stockSetups(toUsd(daily, fx), index && toUsd(index, fx), file?.markets[tableKey(m, 'usd')]?.setups) : stockSetups(daily, index, file?.markets[m]?.setups)
   },
   prices: quotes,
   async premiums() {

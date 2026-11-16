@@ -323,7 +323,7 @@ export function EventChart({ bars, events, side }: { bars: Bars; events: { i: nu
  * Hissenin durumu: son ~3 yılın günlük fiyatı ve 200 günlük ortalaması; altında göreli hacim ve RSI.
  * Üç panel aynı zaman eksenini paylaşır, her birinin kendi dikey ekseni vardır.
  */
-export function StateChart({ c, t, sma200, rsi, vol }: { c: number[]; t: number[]; sma200: number[]; rsi: number[]; vol: number[] }) {
+export function StateChart({ c, t, sma200, rsi, vol, unit }: { c: number[]; t: number[]; sma200: number[]; rsi: number[]; vol: number[]; unit?: string }) {
   const n = c.length
   const start = Math.max(0, n - 750)
   const hasVol = vol.slice(start).some((x) => !Number.isNaN(x))
@@ -357,7 +357,7 @@ export function StateChart({ c, t, sma200, rsi, vol }: { c: number[]; t: number[
   const lastR = rsi[n - 1], lastV = vol[n - 1]
   return (
     <figure className="sc">
-      <figcaption>Hissenin durumu<span>Son 3 yıl: günlük fiyat ve 200 günlük ortalama{hasVol ? '; hacim (50 günlük ortalamaya göre)' : ''}; RSI.</span></figcaption>
+      <figcaption>Hissenin durumu{unit ? ` (${unit})` : ''}<span>Son 3 yıl: günlük fiyat{unit ? ` (${unit})` : ''} ve 200 günlük ortalama{hasVol ? '; hacim (50 günlük ortalamaya göre)' : ''}; RSI.</span></figcaption>
       <div className="sc-plot" ref={box}>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Fiyat ${price(c[n - 1])}; 200 günlük ortalama ${Number.isNaN(sma200[n - 1]) ? 'yok' : price(sma200[n - 1])}; RSI ${Number.isNaN(lastR) ? 'yok' : Fmt.number(lastR, 1)}`}
           onPointerMove={onMove} onPointerLeave={() => setHover(undefined)}>

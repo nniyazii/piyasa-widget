@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { condLabel, DIP_FLAGS, periodOf, prepare, regimeMap, setupDays, setupHolds, setupKey, SETUPS, stockSetups, strength, type SetupEvidence, type SetupTable } from './setups'
+import { condLabel, DIP_FLAGS, periodOf, prepare, regimeMap, setupDays, setupHolds, setupKey, SETUPS, stockSetups, strength, tableKey, toUsd, type SetupEvidence, type SetupTable } from './setups'
 import type { Bars } from './signals'
 
 const DAY = 86400
@@ -49,6 +49,24 @@ describe('güçlü kurulumlar', () => {
     expect(periodOf(Date.UTC(2019, 5, 1) / 1000)).toBe(0)
     expect(periodOf(Date.UTC(2022, 5, 1) / 1000)).toBe(1)
     expect(periodOf(Date.UTC(2025, 5, 1) / 1000)).toBe(2)
+  })
+
+  it('dolar bazı: her gün o günün kuruna bölünür; kur yoksa önceki son kur; hacim korunur', () => {
+    const stock: Bars = { t: [T0, T0 + DAY, T0 + 2 * DAY, T0 + 3 * DAY], c: [100, 110, 120, 130], v: [1, 2, 3, 4] }
+    const fx: Bars = { t: [T0 + DAY, T0 + 3 * DAY], c: [10, 13] }
+    const u = toUsd(stock, fx)
+    expect(u.t).toEqual([T0 + DAY, T0 + 2 * DAY, T0 + 3 * DAY]) // kurun bilinmediği ilk gün atlanır
+    expect(u.c).toEqual([11, 12, 10]) // 3. günde önceki kur (10), 4. günde yeni kur (13)
+    expect(u.v).toEqual([2, 3, 4])
+    expect(tableKey('TR', 'usd')).toBe('TR_USD')
+    expect(tableKey('TR', 'try')).toBe('TR')
+    expect(tableKey('US', 'usd')).toBe('US')
+    // TL'de yatay, kur yükselirken: dolar bazında düşüş, RSI dipte
+    const flat = Array.from({ length: 400 }, (_, i) => 100 * (i % 2 ? 1.003 : 0.998))
+    const rate = Array.from({ length: 400 }, (_, i) => 10 * 1.01 ** Math.max(0, i - 370))
+    const x = prepare(toUsd(bars(flat), bars(rate)))
+    expect(x.s.rsi.at(-1)!).toBeLessThan(30)
+    expect(prepare(bars(flat)).s.rsi.at(-1)!).toBeGreaterThan(40)
   })
 
   it('hissenin durumu: açık kurulum öne çıkar; piyasa durumu uymuyorsa açık sayılmaz; uzaklık hesaplanır', () => {

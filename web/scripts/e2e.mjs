@@ -228,7 +228,13 @@ await step('analiz: hisse seç, güçlü kurulumlar ve hisseye özgü kurallar',
   if (!/analiz\/hisse\/BIST(:|%3A)THYAO/.test(page.url())) throw new Error('adres: ' + page.url())
   // BIST: güvenilirliği kanıtlanmış kurulum yok; sınanan kurulumlar dönem dönem listelenir
   const tr = await page.locator('.an-answer').first().textContent()
-  if (!/BIST hisselerinde güvenilirliği kanıtlanmış bir kurulum yok/.test(tr)) throw new Error('BIST cevabı: ' + tr)
+  // BIST varsayılan olarak dolar bazında; TL bazına geçilebilir
+  if (!/BIST hisselerinde, dolar bazında da güvenilirliği kanıtlanmış bir kurulum yok/.test(tr)) throw new Error('BIST cevabı: ' + tr)
+  if (!/dolar bazında/.test(await page.locator('.sc figcaption').first().textContent())) throw new Error('grafik dolar bazında değil')
+  await page.locator('.st-basis button', { hasText: 'TL bazında' }).click()
+  await page.locator('.an-answer', { hasText: /^BIST hisselerinde güvenilirliği/ }).waitFor({ timeout: 20000 })
+  await page.locator('.st-basis button', { hasText: 'Dolar bazında' }).click()
+  await page.locator('.an-answer', { hasText: 'dolar bazında da' }).waitFor({ timeout: 20000 })
   // BIST'te kurulum tablosu açık gelir: dönem dönem görsel karşılaştırma; durum grafiği (fiyat, hacim, RSI)
   if (await page.locator('.st-frame[open] > table tbody tr').first().locator('.hitbar').count() !== 3) throw new Error('dönem göstergeleri eksik')
   if (await page.locator('.st-frame[open] > table tbody tr').count() !== 10) throw new Error('ilk 10 kurulum bekleniyordu')
