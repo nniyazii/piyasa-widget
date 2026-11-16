@@ -228,7 +228,17 @@ await step('analiz: hisse seç, tarihsel teyit ve şu anki uzaklık', async () =
   if (!/analiz\/hisse\/BIST(:|%3A)THYAO/.test(page.url())) throw new Error('adres: ' + page.url())
   const head = await page.locator('.an-answer').textContent()
   if (!/sinyali|sinyaline|sinyal yok/.test(head)) throw new Error('cevap: ' + head)
-  if (await page.locator('.vd').count() !== 2) throw new Error('dip ve tepe bloğu bekleniyordu')
+  if (await page.locator('.st-sig').count() !== 2) throw new Error('dip ve tepe bloğu bekleniyordu')
+  // Grafikler: fiyat üzerinde sinyal noktaları, imleçle ayrıntı, sinyalden sonraki seyir
+  const sig = page.locator('.st-sig', { has: page.locator('.sc') }).first()
+  if (await sig.count()) {
+    if (await sig.locator('.sc').count() !== 2) throw new Error('iki grafik bekleniyordu')
+    if (!(await sig.locator('.sc-mark').count())) throw new Error('sinyal noktası yok')
+    const bb = await sig.locator('.sc-plot svg').first().boundingBox()
+    await page.mouse.move(bb.x + bb.width * 0.5, bb.y + bb.height * 0.4)
+    await sig.locator('.sc-tip').first().waitFor({ timeout: 3000 })
+    if (!(await sig.locator('.sc-median').count())) throw new Error('ortanca çizgisi yok')
+  }
   // Her zaman diliminde 22 bağlamsız kural (RSI, Bollinger, 200 ortalama, MACD); öne çıkan bağlamlı kurallar eklenir
   await page.locator('.st-frame summary').first().click()
   const n = await page.locator('.st-frame').first().locator('tbody tr:not(.st-sep)').count()

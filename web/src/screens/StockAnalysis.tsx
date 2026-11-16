@@ -6,8 +6,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as Fmt from '../core/format'
 import {
-  analyze, bestOf, durationLabel, FILTER_LABEL, INDICATOR_LABEL, RULES_PER_FRAME, TIMEFRAMES, triggerLabel, VERDICT_LABEL,
-  type Analysis, type Indicator, type Side, type SignalStat, type Timeframe, type TimeframeAnalysis,
+  analyze, bestOf, durationLabel, indicators, FILTER_LABEL, INDICATOR_LABEL, RULES_PER_FRAME, TIMEFRAMES, triggerLabel, VERDICT_LABEL,
+  type Analysis, type Bars, type Indicator, type Side, type SignalStat, type Timeframe, type TimeframeAnalysis,
 } from '../core/signals'
 import { chartUrl } from '../core/tradingview'
 import { loadBars, withLive, type DeepBars } from '../data/bars'
@@ -15,6 +15,7 @@ import { useApp } from '../data/store'
 import type { SearchHit } from '../core/catalog'
 import { scan, search } from '../data/tv'
 import { href, navigate } from '../ui/router'
+import { AfterChart, HitBar, SignalChart } from '../ui/SignalChart'
 
 const LAST_KEY = 'piyasa.hisse'
 const EXAMPLES = ['NASDAQ:SNDK', 'BIST:THYAO', 'NASDAQ:NVDA', 'BIST:ASELS']
@@ -70,7 +71,7 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
     if (!state?.data) return undefined
     // Sunucudan gelen veri zaten taze; kopya saatler önce alınmış olabilir, son çubuk canlı fiyatla güncellenir
     const frames = state.data.source === 'snapshot' ? withLive(state.data.frames, state.live) : state.data.frames
-    return analyze(frames)
+    return { a: analyze(frames), frames }
   }, [state])
 
   return (
@@ -78,8 +79,8 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
       <Picker current={sym} />
       {!sym ? <Empty />
         : !state || state.symbol !== sym ? <p className="an-answer" aria-live="polite">Geçmiş veriler alınıyor…</p>
-          : !result || !result.frames.length ? <Missing symbol={sym} />
-            : <Result symbol={sym} a={result} data={state.data!} live={state.data!.source === 'snapshot' && state.live != null} />}
+          : !result || !result.a.frames.length ? <Missing symbol={sym} />
+            : <Result symbol={sym} a={result.a} frames={result.frames} data={state.data!} live={state.data!.source === 'snapshot' && state.live != null} />}
     </>
   )
 }
@@ -161,7 +162,7 @@ function nowOf(a: Analysis, stat?: SignalStat): Now | undefined {
 const sideName = (side: Side) => (side === 'dip' ? 'Dip' : 'Tepe')
 const expected = (side: Side) => (side === 'dip' ? 'yukarıdaydı' : 'aşağıdaydı')
 
-function Result({ symbol, a, data, live }: { symbol: string; a: Analysis; data: DeepBars; live: boolean }) {
+function Result({ symbol, a, frames, data, live }: { symbol: string; a: Analysis; frames: DeepBars['frames']; data: DeepBars; live: boolean }) {
   const code = Fmt.ticker(symbol)
   const dip = nowOf(a, a.bestDip), top = nowOf(a, a.bestTop)
   // Başlıkta teyitli sinyal önce gelir; ikisi de aynı düzeydeyse şu an açık olan ya da fiyata yakın olan
@@ -181,8 +182,8 @@ function Result({ symbol, a, data, live }: { symbol: string; a: Analysis; data: 
       </p>
 
       <div className="vd-list">
-        <SignalBlock side="dip" now={dip} a={a} />
-        <SignalBlock side="top" now={top} a={a} />
+        <SignalBlock side="dip" now={dip} a={a} bars={dip && frames[dip.stat.tf]} />
+        <SignalBlock side="top" now={top} a={a} bars={top && frames[top.stat.tf]} />
       </div>
 
       <section className="an-group">
@@ -234,18 +235,17 @@ function Headline({ now }: { now: Now }) {
   return <>{sideName(stat.side)} sinyaline <b>{pct(Math.abs(distance)).replace('+', '')}</b> var: {what}.</>
 }
 
-function SignalBlock({ side, now, a }: { side: Side; now?: Now; a: Analysis }) {
-  if (!now) {
-    // Teyitli ya da umut verici sinyal yok: en çok tekrar etmiş eşiğin neden elendiğini göster
+function SignalBlock({ side, now, a, bars }: { side: Side; now?: Now; a: Analysis; bars?: Bars }) {
+  const series = useMemo(() => (bars ? indicators(bars.c) : undefined), [bars])
+  if (!now || !bars || !series) {
+    // Teyitli ya da umut verici sinyal yok
     const all = a.frames.flatMap((f) => (side === 'dip' ? f.dips : f.tops))
     const tried = all.filter((s) => s.main.n >= 4).length
     return (
-      <article className="vd">
-        <div>
-          <h3>{sideName(side)} sinyali</h3>
-          <p className="vd-act">Yok</p>
-          <p className="vd-why">{tried ? `Yeterince tekrar etmiş ${tried} kuralın hiçbiri olağandan iyi sonuç vermedi.` : 'Hiçbir kural en az 4 kez tekrar etmedi; geçmiş bu sınama için kısa.'}</p>
-        </div>
+      <article className="st-sig">
+        <h3>{sideName(side)} sinyali</h3>
+        <p className="vd-act">Yok</p>
+        <p className="vd-why">{tried ? `Yeterince tekrar etmiş ${tried} kuralın hiçbiri olağandan iyi sonuç vermedi.` : 'Hiçbir kural en az 4 kez tekrar etmedi; geçmiş bu sınama için kısa.'}</p>
       </article>
     )
   }
@@ -253,62 +253,46 @@ function SignalBlock({ side, now, a }: { side: Side; now?: Now; a: Analysis }) {
   const tf = tfOf(stat.tf)
   const m = stat.main
   const hits = Math.round((m.hit ?? 0) * m.n)
-  const recent = [...stat.events].reverse().slice(0, 6)
+  const horizon = durationLabel(m.bars, frame.spacing)
+  const ind = stat.trigger.ind
   return (
-    <article className={'vd' + (stat.verdict === 'confirmed' ? ' strong' : '')}>
-      <div>
-        <h3>{sideName(side)} sinyali</h3>
-        <p className="vd-act">{tf.label}: {triggerLabel(stat.trigger)}<span className="vd-str">{VERDICT_LABEL[stat.verdict]}</span></p>
-        {stat.filter !== 'any' && <p className="vd-why"><b>Koşul:</b> {FILTER_LABEL[stat.filter]} ({stat.filterNow ? 'şu an sağlanıyor' : 'şu an sağlanmıyor'}).</p>}
-        <p className="vd-why">
-          <b>{m.n} sinyalin {inOf(hits)}</b> {durationLabel(m.bars, frame.spacing)} sonra fiyat {expected(side)} (<b className="num">%{Fmt.number((m.hit ?? 0) * 100, 0)}</b>; olağan %{Fmt.number((m.baseHit ?? 0) * 100, 0)}).
-          Ortanca getiri <b className="num">{pct(m.median)}</b>, olağan {pct(m.baseMedian)}.
-          {stat.span > 0 && <> İlk ve son sinyal arası {durationLabel(1, stat.span)}.</>}
-        </p>
-        <p className="vd-why">
-          <b>Şu an:</b>{' '}
-          {stat.active
-            ? <>sinyal açık. {stat.sinceBars != null && <>Son sinyal {stat.sinceBars === 0 ? 'bu çubukta' : `${durationLabel(stat.sinceBars, frame.spacing)} önce`} geldi{stat.sinceBars ? <>; o günden beri <span className="num">{pct(stat.sinceReturn)}</span></> : null}.</>}</>
-            : trigger != null && distance != null
-              ? <>{INDICATOR_LABEL[stat.trigger.ind]} <span className="num">{val(stat.trigger.ind, frame.values[stat.trigger.ind].now)}</span>. Sıradaki {tf.adj} çubuk <b className="num">{price(trigger)}</b> {side === 'dip' && stat.trigger.ind !== 'macd' ? 'altında' : side === 'top' && stat.trigger.ind !== 'macd' ? 'üstünde' : trigger < frame.close ? 'altında' : 'üstünde'} kapanırsa {stat.filterNow ? 'sinyal gelir' : 'gösterge eşiğe gelir, ama koşul sağlanmadığı için sinyal sayılmaz'}; bugünkü fiyata (<span className="num">{price(frame.close)}</span>) uzaklık <b className="num">{pct(distance)}</b>.</>
-              : <>{INDICATOR_LABEL[stat.trigger.ind]} <span className="num">{val(stat.trigger.ind, frame.values[stat.trigger.ind].now)}</span>; tek çubukta sinyal gelmesi beklenmez.</>}
-        </p>
+    <article className={'st-sig' + (stat.verdict === 'confirmed' ? ' strong' : '')}>
+      <h3>{sideName(side)} sinyali</h3>
+      <p className="vd-act">{tf.label}: {triggerLabel(stat.trigger)}<span className="vd-str">{VERDICT_LABEL[stat.verdict]}</span></p>
+      {stat.filter !== 'any' && <p className="vd-why"><b>Koşul:</b> {FILTER_LABEL[stat.filter]} ({stat.filterNow ? 'şu an sağlanıyor' : 'şu an sağlanmıyor'}).</p>}
+      <dl className="st-facts">
+        <div><dt>Tuttu ({horizon} sonra)</dt><dd className="num">{hits} / {m.n}<small>%{Fmt.number((m.hit ?? 0) * 100, 0)}, olağan %{Fmt.number((m.baseHit ?? 0) * 100, 0)}</small></dd></div>
+        <div><dt>Ortanca getiri</dt><dd className="num">{pct(m.median)}<small>olağan {pct(m.baseMedian)}</small></dd></div>
+        <div>
+          <dt>Şu an</dt>
+          <dd className="num">
+            {stat.active ? <>Sinyal açık{stat.sinceBars ? <small>{durationLabel(stat.sinceBars, frame.spacing)} önce geldi, o günden beri {pct(stat.sinceReturn)}</small> : null}</>
+              : trigger != null && distance != null ? <>{pct(distance)} uzakta<small>tetik {price(trigger)}, fiyat {price(frame.close)}{stat.filterNow ? '' : '; koşul sağlanmıyor'}</small></>
+                : <>{val(ind, frame.values[ind].now)}<small>{INDICATOR_LABEL[ind]}; tek çubukta sinyal beklenmez</small></>}
+          </dd>
+        </div>
+      </dl>
+      <div className="st-charts">
+        <SignalChart bars={bars} series={series} stat={stat} trigger={trigger} horizon={horizon} />
+        <AfterChart bars={bars} series={series} stat={stat} unit={(b) => durationLabel(b, frame.spacing)} />
       </div>
-      <div className="vd-range">
-        {stat.trigger.ind !== 'macd' && <LevelBar frame={frame} ind={stat.trigger.ind} level={stat.level} />}
-        {recent.length > 0 && (
-          <table className="st-events">
-            <caption>Son sinyaller ve {durationLabel(m.bars, frame.spacing)} sonrası</caption>
-            <tbody>
-              {recent.map((e) => (
-                <tr key={e.t}>
-                  <td>{when(e.t, stat.tf)}</td>
-                  <td className="r num">{price(e.price)}</td>
-                  <td className={'r num ' + (e.ret[1] == null ? '' : (e.ret[1]! > 0) === (side === 'dip') ? 'pos' : 'neg')}>{e.ret[1] == null ? 'sürüyor' : pct(e.ret[1])}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+      <details className="an-how">
+        <summary>Sinyallerin listesi ({stat.events.length})</summary>
+        <table className="st-events">
+          <thead><tr><th>Tarih</th><th className="r">Fiyat</th><th className="r">{horizon} sonra</th><th className="r">Arada en kötü</th></tr></thead>
+          <tbody>
+            {[...stat.events].reverse().map((e) => (
+              <tr key={e.t}>
+                <td>{when(e.t, stat.tf)}</td>
+                <td className="r num">{price(e.price)}</td>
+                <td className={'r num ' + (e.ret[1] == null ? '' : (e.ret[1]! > 0) === (side === 'dip') ? 'pos' : 'neg')}>{e.ret[1] == null ? 'sürüyor' : pct(e.ret[1])}</td>
+                <td className="r num">{pct(side === 'dip' ? e.worst : e.best)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
     </article>
-  )
-}
-
-/** Göstergenin bu zaman diliminde gördüğü aralık, eşik ve şu anki yeri */
-function LevelBar({ frame, ind, level }: { frame: TimeframeAnalysis; ind: Indicator; level: number }) {
-  const v = frame.values[ind]
-  const pad = (v.max - v.min) * 0.03
-  const lo = Math.min(v.min, level) - pad, hi = Math.max(v.max, level) + pad
-  const x = (n: number) => `${Math.max(0, Math.min(100, ((n - lo) / (hi - lo)) * 100))}%`
-  return (
-    <>
-      <div className="vd-bar" role="img" aria-label={`${INDICATOR_LABEL[ind]} ${val(ind, v.now)}, eşik ${val(ind, level)}; görülen aralık ${val(ind, v.min)} – ${val(ind, v.max)}`}>
-        <span className="med" style={{ left: x(level) }} />
-        <span className="now" style={{ left: x(v.now) }} />
-      </div>
-      <div className="vd-ends"><span>en düşük {val(ind, v.min)}</span><span>eşik {val(ind, level)}, şimdi {val(ind, v.now)}</span><span>en yüksek {val(ind, v.max)}</span></div>
-    </>
   )
 }
 
@@ -326,7 +310,7 @@ function FrameDetail({ f }: { f: TimeframeAnalysis }) {
       <tr key={s.trigger.id + s.filter} className={s.verdict === 'confirmed' ? 'is-buy' : undefined}>
         <td><span className="n">{triggerLabel(s.trigger)}</span>{s.filter !== 'any' && <span className="s">{FILTER_LABEL[s.filter]}{s.filterNow ? '' : ' (şu an sağlanmıyor)'}</span>}</td>
         <td className="r num">{s.main.n}</td>
-        <td className="r num">{s.main.hit == null ? '—' : '%' + Fmt.number(s.main.hit * 100, 0)}<span className="s">olağan %{Fmt.number((s.main.baseHit ?? 0) * 100, 0)}</span></td>
+        <td className="r num">{s.main.hit == null ? '—' : '%' + Fmt.number(s.main.hit * 100, 0)}<HitBar hit={s.main.hit} base={s.main.baseHit} /><span className="s">olağan %{Fmt.number((s.main.baseHit ?? 0) * 100, 0)}</span></td>
         <td className="r num hide-s">{pct(s.main.median)}<span className="s">olağan {pct(s.main.baseMedian)}</span></td>
         <td className="r num">{s.active ? 'açık' : trig != null && trig > 0 ? <>{price(trig)}<span className="s">{pct(trig / f.close - 1)}</span></> : '—'}</td>
         <td className="r"><span className={'prem-st' + (s.verdict === 'confirmed' ? ' buy' : '')}>{VERDICT_LABEL[s.verdict]}</span></td>
