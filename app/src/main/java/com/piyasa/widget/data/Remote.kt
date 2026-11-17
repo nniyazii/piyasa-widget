@@ -45,12 +45,13 @@ data class OutlookItem(val id: String, val label: String, val short: String, val
     val clear: Boolean get() = tone != 0 && (conviction != "düşük" || layers.filter { it.counts }.sumOf { it.vote }.let { kotlin.math.abs(it) >= 2 })
 }
 /** Bir vadede yön olasılığı: geçmiş örneklerde yukarıda olma oranı ve tüm ayların olağanı */
-data class EventOdds(val months: Int, val n: Int, val up: Double?, val base: Double, val median: Double?) {
-    /** +1 belirgin yüksek, −1 belirgin düşük */
-    val tone: Int get() = if (up == null || n < 8) 0 else if (up - base >= 0.12) 1 else if (up - base <= -0.12) -1 else 0
+data class EventOdds(val label: String, val n: Int, val up: Double?, val base: Double, val median: Double?, val clear: Boolean) {
+    /** +1 belirgin yüksek, −1 belirgin düşük (belirginlik web'deki ölçütle hesaplanır) */
+    val tone: Int get() = if (up == null || !clear) 0 else if (up > base) 1 else -1
 }
 /** Son dönemde olmuş bir olay ve bugünden sonrası için geçmişe dayalı yön olasılıkları */
-data class OutlookEvent(val month: String, val elapsed: Int, val asset: String, val macro: Boolean, val text: String, val times: Int, val odds: List<EventOdds>)
+/** id: varlık kodu, event: olay kimliği, tf: zaman dilimi (M, W, D): web'deki grafik bağlantısı için */
+data class OutlookEvent(val date: String, val ago: String, val frame: String, val asset: String, val id: String, val event: String, val tf: String, val macro: Boolean, val text: String, val times: Int, val odds: List<EventOdds>)
 data class OutlookData(val generated: Long, val month: String, val regimeTitle: String, val regimeLines: List<String>, val analogs: List<String>, val list: List<OutlookItem>, val events: List<OutlookEvent> = emptyList())
 
 data class AdvantageData(
@@ -224,9 +225,10 @@ object Remote {
             analogs = strs(o["analogs"]),
             events = (o["events"] as? JsonArray).orEmpty().mapNotNull { e ->
                 val x = e as? JsonObject ?: return@mapNotNull null
-                OutlookEvent(x["month"]?.jsonPrimitive?.content ?: "", x["elapsed"]?.jsonPrimitive?.intOrNull ?: 0, x["asset"]?.jsonPrimitive?.content ?: "", x["macro"]?.jsonPrimitive?.content == "true",
+                val str = { k: String -> x[k]?.jsonPrimitive?.content ?: "" }
+                OutlookEvent(str("date"), str("ago"), str("frame"), str("asset"), str("id"), str("event"), str("tf"), str("macro") == "true",
                     x["text"]?.jsonPrimitive?.content ?: return@mapNotNull null, x["times"]?.jsonPrimitive?.intOrNull ?: 0,
-                    (x["odds"] as? JsonArray).orEmpty().mapNotNull { oe -> val q = oe as? JsonObject ?: return@mapNotNull null; EventOdds(q["months"]?.jsonPrimitive?.intOrNull ?: 0, q["n"]?.jsonPrimitive?.intOrNull ?: 0, q["up"].num(), q["base"].num() ?: 0.5, q["median"].num()) })
+                    (x["odds"] as? JsonArray).orEmpty().mapNotNull { oe -> val q = oe as? JsonObject ?: return@mapNotNull null; EventOdds(q["label"]?.jsonPrimitive?.content ?: return@mapNotNull null, q["n"]?.jsonPrimitive?.intOrNull ?: 0, q["up"].num(), q["base"].num() ?: 0.5, q["median"].num(), q["clear"]?.jsonPrimitive?.content == "true") })
             },
             list = (o["list"] as? JsonArray).orEmpty().mapNotNull { e ->
                 val x = e as? JsonObject ?: return@mapNotNull null

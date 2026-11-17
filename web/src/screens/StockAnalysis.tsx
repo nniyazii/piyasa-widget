@@ -66,7 +66,7 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
       {!sym ? <Empty />
         : !state ? <p className="an-answer" aria-live="polite">{Fmt.ticker(sym)} geçmişi yükleniyor…</p>
           : !state.subject ? <Missing symbol={sym} />
-            : <Result key={sym} s={state} basis={basis} onBasis={setBasis} initialEvent={query.get('e') ?? undefined} />}
+            : <Result key={sym} s={state} basis={basis} onBasis={setBasis} initialEvent={query.get('e') ?? undefined} initialTf={((t) => (t === 'M' || t === 'W' || t === 'D' ? t : undefined))(query.get('tf'))} />}
     </>
   )
 }
@@ -136,7 +136,7 @@ function Missing({ symbol }: { symbol: string }) {
 
 // ------------------------------------------------------------------ sonuç
 
-function Result({ s, basis, onBasis, initialEvent }: { s: Loaded; basis: Basis; onBasis: (b: Basis) => void; initialEvent?: string }) {
+function Result({ s, basis, onBasis, initialEvent, initialTf }: { s: Loaded; basis: Basis; onBasis: (b: Basis) => void; initialEvent?: string; initialTf?: Tf }) {
   const subject = s.subject!
   const code = subject.short
   const custom = useCustomEvents()
@@ -172,7 +172,7 @@ function Result({ s, basis, onBasis, initialEvent }: { s: Loaded; basis: Basis; 
         </div>
       )}
 
-      <Workbench subject={subject} world={s.world} defaultTf="W" initialEvent={initialEvent} lead={lead} market={s.market} />
+      <Workbench subject={subject} world={s.world} defaultTf="W" initialEvent={initialEvent} initialTf={initialTf} lead={lead} market={s.market} />
 
       <p className="st-alarm"><a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: s.symbol })}><Icon name="bell" />Fiyat alarmı kur</a><a className="btn ghost small" href={chartUrl(s.symbol)} target="_blank" rel="noreferrer"><Icon name="external" />TradingView’de aç</a></p>
 

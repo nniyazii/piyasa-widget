@@ -129,8 +129,9 @@ internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossa
                 when (tab) {
                     0 -> if (outlook == null) item { Hint("Görünüm alınıyor… İnternet bağlantısı gerekir.") } else {
                         item { OutlookHead(outlook) }
+                        item { FullAnalysisLinks() }
                         if (outlook.events.isNotEmpty()) {
-                            item { SectionTitle("Son 6 ayda ne oldu; geçmişte aynı şeyden sonra ne olmuştu", "Bugünden sonraki 1, 3, 6, 12 ayda yukarıda olma oranı (parantezde olağan oran).") }
+                            item { SectionTitle("Yakın zamanda ne oldu; geçmişte aynı şeyden sonra ne olmuştu", "Aylık, haftalık ve günlük veride yakın zamanda gerçekleşen ve sonrasında yönü olağandan belirgin biçimde ayrıştırmış olaylar. Rakamlar bugünden sonra yukarıda olma oranı (parantezde olağan oran). Olaya dokun: mum grafikte bütün geçmiş örnekleri.") }
                             items(outlook.events.size) { i -> EventCard(outlook.events[i]) }
                             item { SectionTitle("Bugünkü durumun özeti (12 ay için)", null) }
                         }
@@ -189,14 +190,15 @@ private fun OutlookHead(o: OutlookData) {
 @Composable
 private fun EventCard(e: OutlookEvent) {
     val up = Color(0xFF0B7A4B); val down = Color(0xFFC2362F)
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-        Text(e.month + (if (e.elapsed == 0) ", bu ay" else ", ${e.elapsed} ay önce") + "; geçmişte ${e.times} kez", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Column(Modifier.fillMaxWidth().clickable(enabled = e.id.isNotEmpty()) { WebActivity.open(context, "analiz?v=${e.id}&e=${android.net.Uri.encode(e.event)}&tf=${e.tf}") }.padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Text("${e.date} (${e.ago}); ${e.frame.lowercase()} veri; önceden ${e.times} kez", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(if (e.macro) "${e.text} → ${e.asset}" else e.text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
             e.odds.forEach { o ->
                 Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("${o.months} ay", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(o.up?.let { pctAbs(it) } ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                    Text(o.label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(if (o.n < 5) "—" else o.up?.let { pctAbs(it) } ?: "—", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                         color = when (o.tone) { 1 -> up; -1 -> down; else -> MaterialTheme.colorScheme.onSurface })
                     Text("(${pctAbs(o.base)})", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                 }
@@ -204,6 +206,20 @@ private fun EventCard(e: OutlookEvent) {
         }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+/** Tam analiz: mum grafik tezgâhı, hisse, makro ve alarmlar (web uygulaması, uygulama içinde açılır) */
+@Composable
+private fun FullAnalysisLinks() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
+        androidx.compose.material3.Button(onClick = { WebActivity.open(context, "analiz") }, modifier = Modifier.fillMaxWidth()) { Text("Mum grafikte incele: olaylar ve yön olasılıkları") }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            listOf("Hisse" to "analiz/hisse", "Makro" to "analiz/makro", "Alarmlar" to "alarmlar").forEach { (label, path) ->
+                androidx.compose.material3.OutlinedButton(onClick = { WebActivity.open(context, path) }, modifier = Modifier.weight(1f)) { Text(label, maxLines = 1) }
+            }
+        }
+    }
 }
 
 private fun voteMark(v: Int) = when { v >= 2 -> "▲▲"; v == 1 -> "▲"; v <= -2 -> "▼▼"; v == -1 -> "▼"; else -> "–" }

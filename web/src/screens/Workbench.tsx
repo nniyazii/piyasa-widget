@@ -124,25 +124,27 @@ export function recentOf(subject: Subject, tf: Tf, world?: World, custom: EventD
 }
 export const nameOf = (subject: Subject, def: EventDef) => (def.standalone ? def.label : `${subject.short} ${def.label}`)
 
-export function Workbench({ subject, world, defaultTf = 'W', initialEvent, focus, lead, market, heading }: {
+export function Workbench({ subject, world, defaultTf = 'W', initialEvent, initialTf, focus, lead, market, heading }: {
   subject: Subject; world?: World; defaultTf?: Tf; initialEvent?: string
   /** Dışarıdan seçim (varlıklar arası listeden): n değiştiğinde zaman dilimi ve olay buna geçer */
   focus?: { tf: Tf; event: string; n: number }
   /** Sayfa başlığındaki olay: başka bir seçim yoksa tezgâh bununla açılır */
   lead?: { tf: Tf; event: string }
+  /** Adresten gelen zaman dilimi (olay bağlantıları) */
+  initialTf?: Tf
   /** Pazar geneli kanıt: olay kimliği ve zaman dilimine göre */
   market?: (tf: Tf, eventId: string) => MarketEvidence | undefined
   heading?: string
 }) {
   const custom = useCustomEvents()
   const available = (['M', 'W', 'D'] as Tf[]).filter((t) => (subject.frames[t]?.t.length ?? 0) > 120)
-  const [tf, setTfState] = useState<Tf>(() => { const s = !initialEvent && lead ? lead.tf : savedTf(defaultTf); return available.includes(s) ? s : available.includes(defaultTf) ? defaultTf : available[0] ?? 'W' })
+  const [tf, setTfState] = useState<Tf>(() => { const s = initialTf ?? (!initialEvent && lead ? lead.tf : savedTf(defaultTf)); return available.includes(s) ? s : available.includes(defaultTf) ? defaultTf : available[0] ?? 'W' })
   const setTf = (t: Tf) => { setTfState(t); setPicked(undefined); try { localStorage.setItem(TF_KEY, t) } catch { /* depolama kapalı */ } }
   const [eventId, setEventId] = useState<string | undefined>(initialEvent ?? lead?.event)
   const [hz, setHz] = useState(2)
   const [picked, setPicked] = useState<number | undefined>()
   const [composing, setComposing] = useState(false)
-  useEffect(() => { if (initialEvent) { setEventId(initialEvent); setPicked(undefined) } }, [initialEvent])
+  useEffect(() => { if (initialEvent) { setEventId(initialEvent); if (initialTf && available.includes(initialTf)) setTfState(initialTf); setPicked(undefined) } }, [initialEvent, initialTf])
   useEffect(() => { if (focus) { setTfState(focus.tf); setEventId(focus.event); setPicked(undefined) } }, [focus?.n])
   const bars = subject.frames[tf]
 

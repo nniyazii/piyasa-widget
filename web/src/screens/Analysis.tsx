@@ -5,7 +5,7 @@
  *   #/analiz/maliyet     Nereden almalı? (banka, fiziki, fon)
  *   #/analiz/birikim     Birikimimi neye çevirmeliyim? (ev, altın, dolar, gümüş)
  *   #/analiz/para-arzi   Para arzına göre ne ucuz, ne pahalı?
- *   #/analiz/hisse/:sembol  Hissede geçmişte tutmuş dip ya da tepe sinyali var mı?
+ *   #/analiz/hisse/:sembol  Hissede yakın zamanda ne oldu, benzer olaylardan sonra geçmişte ne oldu?
  *   #/analiz/makro       Makro tablo geçmişte hangi dönemlere benziyor, sonrasında ne oldu?
  */
 import { useEffect, type ReactNode } from 'react'
@@ -118,7 +118,7 @@ function Overview({ s }: { s: PremiumState }) {
 
       <section className="an-group">
         <h3>Hisse</h3>
-        <Row q="Bir hissede geçmişte tutmuş dip ya da tepe sinyali var mı?" to="hisse">Hisse seç, geçmişi taransın</Row>
+        <Row q="Bir hissede yakın zamanda ne oldu, sonrası için geçmiş ne söylüyor?" to="hisse">Hisse seç, mum grafikte incele</Row>
       </section>
 
       {s.advices.length > 0 && (

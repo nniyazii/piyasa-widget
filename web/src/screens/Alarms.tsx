@@ -190,7 +190,7 @@ function Composer({ initialKind, initialSymbol, initialEvent, initialTf, initial
         <span className="note">
           {kind === 'price' && symbol && now != null && <>Şu an {price(now)}. {already ? 'Fiyat zaten bu düzeyin ötesinde; alarm hemen çalar.' : ''}</>}
           {kind === 'signal' && symbol && <a href={href('analiz/hisse/' + symbol)}>{Fmt.ticker(symbol)} için kurulumları gör</a>}
-          {kind === 'event' && subject && def && <a href={isStock(subject) ? href('analiz/hisse/' + subject, { e: def.id }) : href('analiz', { v: subject, e: def.id })}>Bu olayın geçmişini grafikte gör</a>}
+          {kind === 'event' && subject && def && <a href={isStock(subject) ? href('analiz/hisse/' + subject, { e: def.id, tf }) : href('analiz', { v: subject, e: def.id, tf })}>Bu olayın geçmişini grafikte gör</a>}
           {kind === 'event' && <> Kendi olayını grafik tezgâhında “Kendi olayını tanımla” ile ekleyebilirsin.</>}
           {kind === 'premium' && <a href={href('analiz/urunler')}>Şu anki durumu gör</a>}
           {kind === 'outlook' && <a href={href('analiz')}>Şu anki görünümü gör</a>}

@@ -130,7 +130,7 @@ function Page({ v, world, loading, generated, practical }: { v?: OutlookView; wo
             {across.subjects.map((a) => <button key={a.id} type="button" className="chip" aria-pressed={a.id === subject.id} onClick={() => pick(a.id)}>{a.short}</button>)}
             <a className="chip link" href={href('analiz/hisse')}>Hisse…</a>
           </div>
-          <Workbench key={subject.id} subject={subject} world={world} defaultTf="W" initialEvent={query.get('e') ?? undefined} focus={focus} lead={top && top.subject.id === subject.id ? { tf: top.tf, event: top.study.def.id } : undefined} heading={`${subject.label}: olay geçmişte ne zaman oldu, sonrasında ne oldu`} />
+          <Workbench key={subject.id} subject={subject} world={world} defaultTf="W" initialEvent={query.get('e') ?? undefined} initialTf={((t) => (t === 'M' || t === 'W' || t === 'D' ? t : undefined))(query.get('tf'))} focus={focus} lead={top && top.subject.id === subject.id ? { tf: top.tf, event: top.study.def.id } : undefined} heading={`${subject.label}: olay geçmişte ne zaman oldu, sonrasında ne oldu`} />
         </div>
       )}
 
