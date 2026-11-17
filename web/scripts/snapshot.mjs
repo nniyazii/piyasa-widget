@@ -131,6 +131,14 @@ try {
   console.log(`macro alınamadı (${e.message}); önceki kopya denenecek`)
   try { const r = BASE ? await fetch(`${BASE}/macro.json`) : null; if (r?.ok) writeFileSync(join(OUT, 'macro.json'), await r.text()) } catch { /* önceki kopya da yok */ }
 }
+// Mum grafikler: makro varlıkların aylık, haftalık, günlük açılış/yüksek/düşük/kapanışı; olmazsa derlemedeki (depodaki) kopya kalır
+try {
+  const { macroCandles } = await import('../server/macro.mjs')
+  const candles = await macroCandles()
+  mkdirSync(join(OUT, 'candles'), { recursive: true })
+  for (const [k, v] of Object.entries(candles)) writeFileSync(join(OUT, 'candles', `${k}.json`), JSON.stringify(v))
+  console.log(`candles: ${Object.keys(candles).length} varlık`)
+} catch (e) { console.log(`candles alınamadı (${e.message}); önceki kopya kalır`) }
 // Hisse analizi için derin geçmiş (haftalık, günlük, 4 saatlik, saatlik), parçalara bölünmüş.
 // Yayındaki kopya 20 saatten yeniyse yeniden çekilmez, olduğu gibi taşınır (her yayında TradingView'a yüklenmemek için).
 try {

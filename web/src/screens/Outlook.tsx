@@ -94,7 +94,7 @@ function Page({ v, ev, generated, practical }: { v: OutlookView; ev?: ReturnType
         </section>
       )}
 
-      {ev && <EventsSection v={ev} />}
+      {ev && <EventsSection v={ev} initial={top?.o} />}
 
       <section className="an-group ov-state">
         <h3>Bugünkü durumun özeti: görüş tablosu (12 ay için)</h3>

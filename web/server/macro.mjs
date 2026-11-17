@@ -31,3 +31,22 @@ export async function macroSeries() {
   if (!series.GOLD || !series.DXY || !series.US10Y) throw new Error('temel makro seriler alınamadı')
   return { generated: Date.now(), series }
 }
+
+/** Mum grafikler için açılış/yüksek/düşük/kapanış: aylık (1968'den), haftalık (~19 yıl), günlük (~6 yıl) */
+export const CANDLE_ASSETS = ['GOLD', 'SILVER', 'OIL', 'COPPER', 'SPX', 'XU100', 'USDTRY', 'DXY', 'GAS', 'NDX', 'BTC']
+const CANDLE_TF = { M: { res: '1M', count: 720 }, W: { res: '1W', count: 1000 }, D: { res: '1D', count: 1500 } }
+/** { KOD: { M|W|D: [[zaman (sn), açılış, yüksek, düşük, kapanış], …] } } */
+export async function macroCandles() {
+  const out = {}
+  const sig = (v) => Number(v.toPrecision(6))
+  for (const [tf, { res, count }] of Object.entries(CANDLE_TF)) {
+    const r = await tvBars(CANDLE_ASSETS.map((k) => MACRO_SYMBOLS[k]), { resolution: res, count })
+    for (const k of CANDLE_ASSETS) {
+      const bars = r.get(MACRO_SYMBOLS[k])
+      if (!bars?.length) continue
+      ;(out[k] ??= {})[tf] = bars.filter((b) => b.c > 0 && b.o > 0).map((b) => [b.t, sig(b.o), sig(b.h), sig(b.l), sig(b.c)])
+    }
+  }
+  if (!out.GOLD?.M) throw new Error('mum verisi alınamadı')
+  return out
+}

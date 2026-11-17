@@ -183,3 +183,35 @@ export function eventsView(d: MacroData): EventsView {
 export function sentence(o: Occurrence): string {
   return o.def.kind === 'asset' ? `${o.asset.short} ${o.def.label}${o.detail ? ` (${o.detail})` : ''}` : o.def.label
 }
+
+// ------------------------------------------------------------------ olay incelemesi (grafik için)
+
+export interface Study {
+  def: EventDef
+  asset: Asset
+  /** Olayın bu varlıktaki tüm başlangıç ayları */
+  onsets: number[]
+  /** Olay ayından sonraki 1, 3, 6, 12 ay (tüm örnekler) */
+  stats: HorizonStat[]
+  /** Her başlangıç için vadelerdeki getiri (henüz dolmadıysa undefined) */
+  outcomes: Map<number, (number | undefined)[]>
+  /** Son 6 ayda gerçekleştiyse: bugünden sonrası için olasılıklar */
+  recent?: Occurrence
+}
+
+/** Bir olayın bir varlıktaki tüm geçmişi: her gerçekleşme ve sonrası */
+export function study(w: World, def: EventDef, asset: Asset): Study {
+  const s = w.s[asset.id]
+  const all = def.kind === 'macro'
+    ? (() => { const o: number[] = []; for (let k = w.first + 40; k <= w.now; k++) if (def.on(w, k) === true && (!o.length || k - o[o.length - 1] >= GAP)) o.push(k); return o.filter((k) => k >= startOf(w, asset.id)) })()
+    : onsets(w, def, asset.id)
+  const outcomes = new Map<number, (number | undefined)[]>()
+  for (const k of all) outcomes.set(k, HORIZONS.map((h) => { const a = s.at(k), b = s.at(k + h); return a != null && b != null && a > 0 ? b / a - 1 : undefined }))
+  const stats: HorizonStat[] = HORIZONS.map((h, i) => {
+    const r = all.map((k) => outcomes.get(k)![i]).filter((x): x is number => x != null).sort((x, y) => x - y)
+    const hits = r.filter((x) => x > 0).length; const [lo, hi] = wilson(hits, r.length); const b = base(w, asset.id, h)
+    return { months: h, n: r.length, up: r.length ? hits / r.length : NaN, lo, hi, median: quant(r, 0.5), q25: quant(r, 0.25), q75: quant(r, 0.75), base: b.up, baseMedian: b.median }
+  })
+  return { def, asset, onsets: all, stats, outcomes, recent: occurrence(w, def, asset, all) }
+}
+export const ALL_EVENTS = [...ASSET_EVENTS, ...MACRO_EVENTS]
