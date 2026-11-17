@@ -46,7 +46,7 @@ it('görünüm dışa aktarımı', () => {
     generated: Date.now(), month: v.month, regime: v.regime,
     conditions: v.macro.activeConditions.map((c) => c.label),
     analogs: v.macro.analogs.list.slice(0, 5).map((x) => monthLabel(x.month)),
-    // Yakın zamanda gerçekleşen ve sonrasında yönü olağandan belirgin biçimde ayrıştırmış olaylar (bugünden sonraki dört vade)
+    // Yakın zamanda gerçekleşen ve sonrasında yönü her zamankinden belirgin biçimde ayrıştırmış olaylar (bugünden sonraki dört vade)
     tested, recent,
     events: top.map((h) => ({
       asset: h.a.short, id: h.a.id, event: h.s.def.id, tf: h.tf, frame: TF_LABEL[h.tf],

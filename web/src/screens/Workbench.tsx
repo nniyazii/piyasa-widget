@@ -24,31 +24,31 @@ const pct = (v: number | undefined, d = 0) => (v == null || Number.isNaN(v) ? '�
 export const savedTf = (fallback: Tf): Tf => { try { const v = localStorage.getItem(TF_KEY); return v === 'M' || v === 'W' || v === 'D' ? v : fallback } catch { return fallback } }
 
 export type Tone = 'up' | 'down' | 'flat' | 'thin'
-/** Düz sözle sonuç: olağandan belirgin iyi / kötü / farksız / örnek az */
+/** Düz sözle sonuç: her zamankinden belirgin iyi / kötü / farksız / örnek az */
 export function verdict(s: HorizonStat): { tone: Tone; text: string } {
   if (s.n < 5) return { tone: 'thin', text: 'örnek az' }
-  if (!s.clear) return { tone: 'flat', text: 'olağandan farksız' }
-  return s.up > s.base ? { tone: 'up', text: 'olağandan belirgin iyi' } : { tone: 'down', text: 'olağandan belirgin kötü' }
+  if (!s.clear) return { tone: 'flat', text: 'her zamankinden farksız' }
+  return s.up > s.base ? { tone: 'up', text: 'her zamankinden belirgin iyi' } : { tone: 'down', text: 'her zamankinden belirgin kötü' }
 }
 const hits = (s: HorizonStat) => Math.round(s.up * s.n)
-/** Liste satırlarında tek sonuç: "3 ay sonra 9'da 3; olağandan belirgin kötü" */
+/** Liste satırlarında tek sonuç: "3 ay sonra 9'da 3; her zamankinden belirgin kötü" */
 export function Verdict({ stats }: { stats: HorizonStat[] }) {
   const s = stats.find((x) => x.clear) ?? stats[1] ?? stats[0]
   const v = verdict(s)
-  return <span className={'vc ' + v.tone}><b className="num">{s.n < 5 ? '—' : `${s.n}’de ${hits(s)}`}</b><em>{s.label} sonra; {v.text.replace('olağandan ', '')}</em></span>
+  return <span className={'vc ' + v.tone}><b className="num">{s.n < 5 ? '—' : `${s.n}’de ${hits(s)}`}</b><em>{s.label} sonra; {v.text.replace('her zamankinden ', '')}</em></span>
 }
 
-/** Bir vadenin olasılık hücresi: yukarıda olma oranı, olağan oran çentiği, güven aralığı ve ortalama hareketler */
+/** Bir vadenin olasılık hücresi: yukarıda olma oranı, her zamanki oran çentiği, güven aralığı ve ortalama hareketler */
 export function Odds({ s, compact }: { s: HorizonStat; compact?: boolean }) {
   if (s.n < 5) return <td className="c ev-odds thin"><span className="s">örnek az ({s.n})</span></td>
   const tone = s.clear ? (s.up > s.base ? 'up' : 'down') : ''
   return (
-    <td className={'c ev-odds ' + tone} title={`${s.n} örnek; %80 güven aralığı ${p0(s.lo)}–${p0(s.hi)}; ortanca ${pct(s.median, 1)} (olağan ${pct(s.baseMedian, 1)}); yukarıda bitenler ortalama ${pct(s.avgUp, 1)}, aşağıda bitenler ${pct(s.avgDown, 1)}`}>
+    <td className={'c ev-odds ' + tone} title={`${s.n} örnek; %80 güven aralığı ${p0(s.lo)}–${p0(s.hi)}; ortanca ${pct(s.median, 1)} (her zaman ${pct(s.baseMedian, 1)}); yukarıda bitenler ortalama ${pct(s.avgUp, 1)}, aşağıda bitenler ${pct(s.avgDown, 1)}`}>
       <b className="num">{p0(s.up)}</b>
       <span className="track" aria-hidden><i className="r" style={{ left: `${s.lo * 100}%`, width: `${(s.hi - s.lo) * 100}%` }} /><i className="f" style={{ left: `${s.up * 100}%` }} /><i className="b" style={{ left: `${s.base * 100}%` }} /></span>
-      {compact ? <span className="s num">olağan {p0(s.base)}</span> : (
+      {compact ? <span className="s num">her zaman {p0(s.base)}</span> : (
         <>
-          <span className="s num">olağan {p0(s.base)}</span>
+          <span className="s num">her zaman {p0(s.base)}</span>
           <span className="s num">{s.n} örnek</span>
           <span className="s num">aralık {Fmt.number(s.lo * 100, 0)}–{Fmt.number(s.hi * 100, 0)}</span>
           <span className="s num" title="Yukarıda biten örneklerin ortalama kazancı ve aşağıda bitenlerin ortalama kaybı">↑ {pct(s.avgUp)} ↓ {pct(s.avgDown)}</span>
@@ -211,7 +211,8 @@ export function Workbench({ subject, world, defaultTf = 'W', initialEvent, initi
               {st.recent
                 ? <>{agoLabel(tf, st.recent.elapsed).replace(/^./, (c) => c.toLocaleUpperCase('tr'))} oldu{st.recent.detail ? ` (${st.recent.detail})` : ''}. Önceki <b className="num">{sel.n}</b> seferin </>
                 : <>Geçmişte <b className="num">{st.onsets.length}</b> kez oldu (son: {dates(last!)}). Bunların </>}
-              {sel.n < 5 ? <>sayısı sonuç çıkarmak için az.</> : <><b className="num">{hits(sel)}</b> tanesinde fiyat{st.recent && st.recent.elapsed > 0 ? ', bugünkü aşamadan' : ''} {sel.label} sonra daha yukarıdaydı. Olağan: 10’da {Fmt.number(sel.base * 10, 0)}.</>}
+              {sel.n < 5 ? <>sayısı sonuç çıkarmak için az.</> : <><b className="num">{hits(sel)}</b> tanesinde fiyat{st.recent && st.recent.elapsed > 0 ? ', bugünkü aşamadan' : ''} {sel.label} sonra daha yukarıdaydı.</>}
+              {sel.n >= 5 && <span className="wb-base"> Karşılaştırma: {subject.short} herhangi bir {tf === 'M' ? 'ayda' : tf === 'W' ? 'haftada' : 'günde'} alınsaydı, {sel.label} sonra 10 seferin {Fmt.number(sel.base * 10, 0)} tanesinde yukarıda olurdu.</span>}
             </p>
             <p className={'wb-verdict ' + v.tone}>{v.tone === 'thin' ? 'Örnek az' : v.text.replace(/^./, (c) => c.toLocaleUpperCase('tr'))}</p>
             <div className="wb-hzs" role="group" aria-label="Ne kadar sonra">
@@ -244,13 +245,13 @@ export function Workbench({ subject, world, defaultTf = 'W', initialEvent, initi
       {st.onsets.length > 0 && (
         <details className="an-how st-frame wb-more">
           <summary>Ayrıntı: yüzdeler, her seferin sonucu{ev ? ', bütün hisselerde aynı olay' : ''}</summary>
-          <OddsTable stats={st.view} caption={st.recent ? 'Bugünden sonra yukarıda olma oranı (yüzde), olağan oran, olası aralık ve ortalama kazanç/kayıp' : 'Olaydan sonra yukarıda olma oranı (yüzde), olağan oran, olası aralık ve ortalama kazanç/kayıp'} />
+          <OddsTable stats={st.view} caption={st.recent ? 'Bugünden sonra yukarıda olma oranı (yüzde), her zamanki oran, olası aralık ve ortalama kazanç/kayıp' : 'Olaydan sonra yukarıda olma oranı (yüzde), her zamanki oran, olası aralık ve ortalama kazanç/kayıp'} />
           <Strip st={st} hz={hz} picked={picked} onPick={setPicked} dates={dates} />
           {ev && (
             <div className="wb-market">
               <b>{subject.market === 'TR' ? 'BIST' : 'ABD'} hisselerinin tamamında aynı olay ({Fmt.number(ev.stocks, 0)} hisse)</b>
               <OddsTable compact stats={ev.n.map((n, i) => ({ bars: i, label: HORIZON_LABEL[tf][i], n, up: ev.up[i], lo: ev.up[i], hi: ev.up[i], median: NaN, q25: NaN, q75: NaN, avgUp: NaN, avgDown: NaN, base: ev.base[i], baseMedian: NaN, consistent: true, clear: n >= 200 && Math.abs(ev.up[i] - ev.base[i]) >= 0.05 && ev.periods.every((p) => p[0] < 100 || Math.sign(p[1] - p[2]) === Math.sign(ev.up[i] - ev.base[i])) }))} />
-              <p className="note">Tek hissedeki birkaç örnek şansa açıktır; pazar genelindeki sonuç aynı yöndeyse bulgu daha güvenilirdir. Üç dönemde ({HORIZON_LABEL[tf][2]} sonrası): {ev.periods.map((p, i) => `${['2019’a kadar', '2020–2023', '2024’ten beri'][i]} ${p[0] ? `${p0(p[1])} (olağan ${p0(p[2])})` : 'veri yok'}`).join('; ')}.</p>
+              <p className="note">Tek hissedeki birkaç örnek şansa açıktır; pazar genelindeki sonuç aynı yöndeyse bulgu daha güvenilirdir. Üç dönemde ({HORIZON_LABEL[tf][2]} sonrası): {ev.periods.map((p, i) => `${['2019’a kadar', '2020–2023', '2024’ten beri'][i]} ${p[0] ? `${p0(p[1])} (her zaman ${p0(p[2])})` : 'veri yok'}`).join('; ')}.</p>
             </div>
           )}
           {st.recent && st.recent.paths.length >= 3 && <div className="ev-more"><EventFan paths={st.recent.paths.map((p) => ({ name: dates(p.index), path: p.path }))} current={st.recent.current} elapsed={st.recent.elapsed} span={st.stats[st.stats.length - 1].bars} label={subject.short} tf={tf} /></div>}

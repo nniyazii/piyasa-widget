@@ -1,12 +1,12 @@
 /**
  * Güçlü kurulumlar: tek hissenin kendi geçmişi bir sinyali güvenle sınamaya yetmediği için, az sayıda ve
  * önceden tanımlı dip/tepe kurulumu pazardaki TÜM hisselerde, üç ayrı takvim döneminde sınanır.
- * Bir kurulum ancak üç dönemin üçünde de olağandan belirgin biçimde iyi sonuç verdiyse "güçlü" sayılır ve
+ * Bir kurulum ancak üç dönemin üçünde de her zamankinden belirgin biçimde iyi sonuç verdiyse "güçlü" sayılır ve
  * gösterilen isabet, üç dönemin EN KÖTÜSÜDÜR.
  *
  * Kurulum = hissenin durumu (günlük göstergeler) + piyasanın durumu (endeks 200 günlük ortalamasının neresinde).
  * Sonuç 63 işlem günü (yaklaşık 3 ay) sonra ölçülür: dipte fiyat yukarıda mı, tepede aşağıda mı.
- * Olağan: aynı piyasa durumundaki herhangi bir günden 63 gün sonraki sonuç.
+ * Her zaman: aynı piyasa durumundaki herhangi bir günden 63 gün sonraki sonuç.
  */
 import { indicators, nextValue, rsiSeries, type Bars, type Indicator, type Series, type Side } from './signals'
 
@@ -44,8 +44,8 @@ export const INDEX_NAME = { TR: 'BIST 100', US: 'S&P 500' } as const
 /**
  * Günlük göstergelere ek olarak:
  *   rsiW  haftalık ölçekte RSI
- *   vol   günün hacmi ÷ önceki 50 günün ortalama hacmi (2 = olağanın iki katı)
- *   day   günün getirisi, hissenin olağan günlük oynaklığına göre (kaç standart sapma)
+ *   vol   günün hacmi ÷ önceki 50 günün ortalama hacmi (2 = her zamankinin iki katı)
+ *   day   günün getirisi, hissenin her zaman günlük oynaklığına göre (kaç standart sapma)
  */
 export type Ind = Indicator | 'rsiW' | 'vol' | 'day'
 /** Koşul: bir göstergenin eşiği ya da birlikte dip/tepe gösteren gösterge sayısı */
@@ -65,19 +65,19 @@ export const SETUPS: Setup[] = [
   { id: 'crash', side: 'dip', label: 'Olağandışı sert düşüş (3σ)', conds: [le('roc', -3)] },
   { id: 'ma20', side: 'dip', label: '200 ortalamanın %20 altında, RSI 30’un altında', conds: [le('d200', -0.2), le('rsi', 30)] },
   // Hacimli kurulumlar: satışın ya da alımın olağandışı yoğunlaştığı günler
-  { id: 'v-rsi30', side: 'dip', label: 'RSI 30’un altında, hacim olağanın 2 katı', conds: [le('rsi', 30), ge('vol', 2)] },
-  { id: 'v3-rsi30', side: 'dip', label: 'RSI 30’un altında, hacim olağanın 3 katı', conds: [le('rsi', 30), ge('vol', 3)] },
+  { id: 'v-rsi30', side: 'dip', label: 'RSI 30’un altında, hacim her zamankinin 2 katı', conds: [le('rsi', 30), ge('vol', 2)] },
+  { id: 'v3-rsi30', side: 'dip', label: 'RSI 30’un altında, hacim her zamankinin 3 katı', conds: [le('rsi', 30), ge('vol', 3)] },
   { id: 'v-crash', side: 'dip', label: 'Yüksek hacimli sert düşüş (2σ, hacim 2 katı)', conds: [le('roc', -2), ge('vol', 2)] },
-  { id: 'v-dip4', side: 'dip', label: 'Dört gösterge dipte, hacim olağanın 2 katı', conds: [{ kind: 'count', side: 'dip', min: 4 }, ge('vol', 2)] },
+  { id: 'v-dip4', side: 'dip', label: 'Dört gösterge dipte, hacim her zamankinin 2 katı', conds: [{ kind: 'count', side: 'dip', min: 4 }, ge('vol', 2)] },
   { id: 'v-turn', side: 'dip', label: 'Dipte yüksek hacimli güçlü yükseliş günü', conds: [le('dd', -0.25), ge('day', 1.5), ge('vol', 2)] },
   { id: 'v-turn-rsi', side: 'dip', label: 'RSI 40’ın altında, yüksek hacimli güçlü yükseliş günü', conds: [le('rsi', 40), ge('day', 1.5), ge('vol', 2)] },
-  { id: 'v-quiet', side: 'dip', label: 'RSI 35’in altında, hacim olağanın yarısı (satış kurumuş)', conds: [le('rsi', 35), le('vol', 0.5)] },
+  { id: 'v-quiet', side: 'dip', label: 'RSI 35’in altında, hacim her zamankinin yarısı (satış kurumuş)', conds: [le('rsi', 35), le('vol', 0.5)] },
   { id: 'rsi75', side: 'top', label: 'RSI 75’in üstünde', conds: [ge('rsi', 75)] },
   { id: 'rsiw75', side: 'top', label: 'Haftalık RSI 75’in üstünde', conds: [ge('rsiW', 75)] },
   { id: 'top3', side: 'top', label: 'Üç gösterge birlikte tepede', conds: [{ kind: 'count', side: 'top', min: 3 }] },
   { id: 'ma50', side: 'top', label: '200 ortalamanın %50 üstünde', conds: [ge('d200', 0.5)] },
   { id: 'spike', side: 'top', label: 'Olağandışı sert yükseliş (3σ)', conds: [ge('roc', 3)] },
-  { id: 'v-rsi70', side: 'top', label: 'RSI 70’in üstünde, hacim olağanın 3 katı', conds: [ge('rsi', 70), ge('vol', 3)] },
+  { id: 'v-rsi70', side: 'top', label: 'RSI 70’in üstünde, hacim her zamankinin 3 katı', conds: [ge('rsi', 70), ge('vol', 3)] },
   { id: 'v-dist', side: 'top', label: 'Zirveye yakınken yüksek hacimli sert düşüş günü', conds: [ge('dd', -0.07), le('day', -1.5), ge('vol', 2)] },
   { id: 'v-spike', side: 'top', label: 'Yüksek hacimli sert yükseliş (2σ, hacim 3 katı)', conds: [ge('roc', 2), ge('vol', 3)] },
 ]
@@ -130,9 +130,9 @@ export const inRegime = (r: Regime, bull: boolean | undefined) => r === 'any' ||
 
 // ------------------------------------------------------------------ pazar geneli kanıt (setups.json)
 
-/** Bir dönemdeki birleşik sonuç: [sinyal sayısı, 63 gün isabet, olağan 63, 21 gün isabet, olağan 21, ortalama 63 gün getiri, olağan getiri] */
+/** Bir dönemdeki birleşik sonuç: [sinyal sayısı, 63 gün isabet, her zaman 63, 21 gün isabet, her zaman 21, ortalama 63 gün getiri, her zaman getiri] */
 export type PeriodStat = [n: number, hit: number, base: number, hit21: number, base21: number, ret: number, baseRet: number]
-/** Kurulumdan sonraki ortalama seyir: PATH_DAYS günlerindeki ortalama getiri (kurulum ve aynı piyasa durumunun olağanı) */
+/** Kurulumdan sonraki ortalama seyir: PATH_DAYS günlerindeki ortalama getiri (kurulum ve aynı piyasa durumunun her zamanki oranı) */
 export const PATH_DAYS = [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 63]
 export interface SetupEvidence { periods: PeriodStat[]; stocks: number; path?: number[]; basePath?: number[] }
 export type SetupTable = Record<string, SetupEvidence>
@@ -140,7 +140,7 @@ export const setupKey = (id: string, regime: Regime) => `${id}|${regime}`
 export const STRONG = { n: 100, diff: 0.05, dipHit: 0.65, topHit: 0.55 }
 
 export interface Strength { strong: boolean; /** Üç dönemin en kötüsü */ hit: number; base: number; n: number; worst: number; reason?: string }
-/** Güçlü mü: üç dönemin üçünde de yeterli sinyal, olağandan en az 5 puan iyi ve isabet tabanının üstünde */
+/** Güçlü mü: üç dönemin üçünde de yeterli sinyal, her zamankinden en az 5 puan iyi ve isabet tabanının üstünde */
 export function strength(e: SetupEvidence | undefined, side: Side): Strength | undefined {
   if (!e || e.periods.length < 3) return undefined
   // En zayıf dönem: farkın en küçük olduğu (neden elendiğini söylemek için); gösterilen isabet ise en düşük isabetli dönemden
@@ -151,7 +151,7 @@ export function strength(e: SetupEvidence | undefined, side: Side): Strength | u
   const n = e.periods.reduce((a, p) => a + p[0], 0)
   const floor = side === 'dip' ? STRONG.dipHit : STRONG.topHit
   const reason = e.periods.some((p) => p[0] < STRONG.n) ? 'bazı dönemlerde yeterli sinyal yok'
-    : e.periods.some((p) => p[1] - p[2] < STRONG.diff) ? `${PERIOD_LABELS[worst]} döneminde olağandan iyi değildi`
+    : e.periods.some((p) => p[1] - p[2] < STRONG.diff) ? `${PERIOD_LABELS[worst]} döneminde her zamankinden iyi değildi`
       : minHit < floor ? 'isabeti yeterince yüksek değil' : undefined
   return { strong: !reason, hit: minHit, base: w[2], n, worst, reason }
 }

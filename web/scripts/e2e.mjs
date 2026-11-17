@@ -182,7 +182,7 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   if (!/0,01 gr altın/.test(await cell('ALTIN.S1', 2))) throw new Error('sertifika içeriği: ' + (await cell('ALTIN.S1', 2)))
   if (!/[+−]?%\d/.test(await cell('ALTIN.S1', 3))) throw new Error('sertifika farkı yok')
   if (!/gr gümüş/.test(await cell('GMSTR.F', 2))) throw new Error('GMSTR içeriği: ' + (await cell('GMSTR.F', 2)))
-  if (!/Al sinyali|Olağan|Pahalı|Primli|BIST kapalı/.test(await cell('GMSTR.F', 4))) throw new Error('durum yok')
+  if (!/Al sinyali|Her zaman|Pahalı|Primli|BIST kapalı/.test(await cell('GMSTR.F', 4))) throw new Error('durum yok')
   // Nereden almalı: cümle biçiminde senaryo, çubuklu liste; gümüşe geçince fon satırı değişir
   const go = (t) => page.locator('.an-tabs a', { hasText: t }).click()
   await go('Nereden almalı')
@@ -225,12 +225,12 @@ await step('görünüm: tek cümlelik sonuç, vade kutuları, mum grafik, ayrın
   await page.goto(BASE + '/#/analiz?v=GOLD')
   await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
   if ((await page.locator('.wb-assets .chip[aria-pressed=true]').textContent()) !== 'Altın') throw new Error('seçili varlık Altın değil')
-  // Olay seç: düz cümle (kaç seferin kaçında yukarıda, olağan), sonuç etiketi ve dört vade kutusu
+  // Olay seç: düz cümle (kaç seferin kaçında yukarıda, her zaman), sonuç etiketi ve dört vade kutusu
   await tfBtn('Haftalık').click()
   await page.locator('.wb-pick select').selectOption('trend-down')
   const say = await page.locator('.wb-say').textContent()
-  if (!/tanesinde fiyat.*sonra daha yukarıdaydı\. Olağan: 10’da \d+/.test(say)) throw new Error('sonuç cümlesi: ' + say)
-  if (!/Olağandan (farksız|belirgin iyi|belirgin kötü)|Örnek az/.test(await page.locator('.wb-verdict').textContent())) throw new Error('sonuç etiketi yok')
+  if (!/tanesinde fiyat.*sonra daha yukarıdaydı\. Karşılaştırma: .* 10 seferin \d+ tanesinde/.test(say)) throw new Error('sonuç cümlesi: ' + say)
+  if (!/Her zamankinden (farksız|belirgin iyi|belirgin kötü)|Örnek az/.test(await page.locator('.wb-verdict').textContent())) throw new Error('sonuç etiketi yok')
   if (await page.locator('.wb-hzs button').count() !== 4) throw new Error('dört vade kutusu bekleniyordu')
   // Vade kutusuna dokun: cümle o vadeye geçer
   await page.locator('.wb-hzs button').nth(3).click()

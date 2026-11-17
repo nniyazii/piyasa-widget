@@ -62,7 +62,7 @@ group('alarmlar', () => {
     expect(r.fired.map((f) => f.alarm.id)).toEqual(['s'])
     expect(r.fired[0].title).toBe('TEST: güçlü dip kurulumu')
     expect(r.fired[0].text).toContain('RSI 30’un altında')
-    expect(r.fired[0].text).toContain('%75 yukarıdaydı (olağan %60)')
+    expect(r.fired[0].text).toContain('%75 yukarıdaydı (her zaman %60)')
     // Hisse dışı sembolde kurulum yok: hata olarak işaretlenir, çalmaz
     r = await checkAlarms([a[0]], {}, src({ setups: async () => undefined }))
     expect(r.states.s.error).toContain('kurulum verisi alınamadı')

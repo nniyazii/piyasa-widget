@@ -59,7 +59,7 @@ function valuationRatio(w: World, id: string): ((k: number) => number | undefine
 }
 const BASIS: Record<string, string> = { USDTRY: 'iki ülkenin para arzına göre', GAUTRY: 'TL arzına göre', XU100USD: 'TL arzına göre', XU100: 'TL arzına göre' }
 
-/** [on] aylarında varlığın 12 ay sonra yukarıda olma oranı ve tüm ayların olağanı */
+/** [on] aylarında varlığın 12 ay sonra yukarıda olma oranı ve tüm ayların her zamanki oranı */
 function record(w: World, a: S, on: (k: number) => boolean | undefined): Record12 | undefined {
   let n = 0, hit = 0, bn = 0, bhit = 0
   for (let k = a.first + 12; k + HORIZON <= w.now; k++) {
@@ -70,7 +70,7 @@ function record(w: World, a: S, on: (k: number) => boolean | undefined): Record1
   }
   return n >= 24 && bn >= 60 ? { n, hit: hit / n, base: bhit / bn } : undefined
 }
-/** Sicil, oyun yönünü destekliyor mu: lehine oyda olağandan en az 5 puan iyi, aleyhine oyda en az 5 puan kötü */
+/** Sicil, oyun yönünü destekliyor mu: lehine oyda her zamankinden en az 5 puan iyi, aleyhine oyda en az 5 puan kötü */
 const supports = (vote: number, r?: Record12) => !!r && (vote > 0 ? r.hit - r.base >= 0.05 : vote < 0 ? r.hit - r.base <= -0.05 : false)
 
 function valuation(w: World, asset: Asset): Layer | undefined {
@@ -137,7 +137,7 @@ function analogLayer(m: MacroView, asset: Asset): Layer | undefined {
   const vote = hit - base.hit >= 0.2 ? 1 : hit - base.hit <= -0.2 ? -1 : 0
   return {
     id: 'benzer', vote, counts: vote !== 0, record: { n: an.n, hit, base: base.hit }, link: 'analiz/makro',
-    text: `Bugüne en çok benzeyen ${an.n} dönemin ${an.up} tanesinde 12 ay sonra yukarıdaydı (ortanca ${an.median >= 0 ? '+' : '−'}${p0(Math.abs(an.median))}); olağan oran ${p0(base.hit)}.`,
+    text: `Bugüne en çok benzeyen ${an.n} dönemin ${an.up} tanesinde 12 ay sonra yukarıdaydı (ortanca ${an.median >= 0 ? '+' : '−'}${p0(Math.abs(an.median))}); her zamanki oran ${p0(base.hit)}.`,
   }
 }
 
@@ -156,7 +156,7 @@ export function outlookFor(m: MacroView, asset: Asset): Outlook {
   const tr = layers.find((l) => l.id === 'trend'), a = w.s[asset.id]
   if (tr && a) { let s = 0, n = 0; for (let j = 0; j < 10; j++) { const v = a.at(w.now - j); if (v != null) { s += v; n++ } }; if (n >= 8) flips.push(`Fiyat ${price(s / n)} düzeyinin ${tr.vote > 0 ? 'altına inerse' : 'üstüne çıkarsa'} trend ${tr.vote > 0 ? 'aşağı' : 'yukarı'} döner.`) }
   const waiting: Pattern[] = m.patterns.filter((p) => p.asset.id === asset.id && p.consistent && !p.activeNow && (dir === 0 || p.sign !== dir)).sort((x, y) => Math.abs(y.hit - y.base) - Math.abs(x.hit - x.base)).slice(0, 2)
-  for (const p of waiting) flips.push(`“${p.cond.label}” gerçekleşirse: geçmişte ${p.episodes} dönemde 12 ay sonra ${p0(p.hit)} yukarıdaydı (olağan ${p0(p.base)}); ${p.sign > 0 ? 'lehine' : 'aleyhine'}.`)
+  for (const p of waiting) flips.push(`“${p.cond.label}” gerçekleşirse: geçmişte ${p.episodes} dönemde 12 ay sonra ${p0(p.hit)} yukarıdaydı (her zaman ${p0(p.base)}); ${p.sign > 0 ? 'lehine' : 'aleyhine'}.`)
   const names = (ls: Layer[]) => ls.map((l) => LAYER_LABEL[l.id].toLocaleLowerCase('tr')).join(', ')
   const pro = counted.filter((l) => l.vote > 0), con = counted.filter((l) => l.vote < 0)
   const why = !counted.length ? 'Kanıtların hiçbiri bu varlıkta geçmişte ayırt edici olmamış ya da şu an bir yön göstermiyor.'
@@ -180,9 +180,9 @@ export function regime(m: MacroView): Regime {
   const n1 = (v: number) => fmt(v, 1)
   const lines: string[] = []
   if (real != null) lines.push(`Para politikası ${real > 2 ? 'sıkı' : real < 0 ? 'gevşek' : 'ılımlı'}: ABD reel faizi ${real >= 0 ? '+' : '−'}${n1(Math.abs(real))} puan${fed != null ? `, Fed son 12 ayda ${fed <= -0.75 ? 'faiz indirdi' : fed >= 0.75 ? 'faiz artırdı' : 'faizi sabit tuttu'}` : ''}.`)
-  if (m2 != null) lines.push(`Likidite ${m2 > 8 ? 'bol' : m2 < 3 ? 'kıt' : 'olağan'}: ABD para arzı yılda %${n1(m2)} büyüyor${m2d != null ? (m2d >= 1 ? ' ve hızlanıyor' : m2d <= -1 ? ' ama yavaşlıyor' : '') : ''}.`)
+  if (m2 != null) lines.push(`Likidite ${m2 > 8 ? 'bol' : m2 < 3 ? 'kıt' : 'her zaman'}: ABD para arzı yılda %${n1(m2)} büyüyor${m2d != null ? (m2d >= 1 ? ' ve hızlanıyor' : m2d <= -1 ? ' ama yavaşlıyor' : '') : ''}.`)
   if (cpi != null) lines.push(`ABD enflasyonu %${n1(cpi)}${cpid != null ? (cpid >= 0.5 ? ', yükseliyor' : cpid <= -0.5 ? ', düşüyor' : ', yatay') : ''}${oil != null && Math.abs(oil) >= 0.3 ? `; petrol 12 ayda ${oil > 0 ? '+' : '−'}${p0(Math.abs(oil))}` : ''}.`)
-  if (curve != null || vix != null) lines.push(`Risk iştahı: ${curve != null ? (curve < 0 ? 'getiri eğrisi ters (yavaşlama beklentisi)' : 'getiri eğrisi normal') : ''}${vix != null ? `${curve != null ? ', ' : ''}VIX ${n1(vix)} (${vix > 30 ? 'panik' : vix < 14 ? 'rehavet' : 'olağan'})` : ''}${hy != null && hy > 6 ? ', kredi piyasasında stres var' : ''}.`)
+  if (curve != null || vix != null) lines.push(`Risk iştahı: ${curve != null ? (curve < 0 ? 'getiri eğrisi ters (yavaşlama beklentisi)' : 'getiri eğrisi normal') : ''}${vix != null ? `${curve != null ? ', ' : ''}VIX ${n1(vix)} (${vix > 30 ? 'panik' : vix < 14 ? 'rehavet' : 'her zaman'})` : ''}${hy != null && hy > 6 ? ', kredi piyasasında stres var' : ''}.`)
   if (dxy != null) lines.push(`Dolar ${dxy >= 0.07 ? 'güçleniyor' : dxy <= -0.07 ? 'zayıflıyor' : 'yatay'}: dolar endeksi 12 ayda ${dxy >= 0 ? '+' : '−'}${p0(Math.abs(dxy))}.`)
   if (trcpi != null) lines.push(`Türkiye: enflasyon %${fmt(trcpi)}${trcpid != null ? (trcpid <= -2 ? ', düşüyor' : trcpid >= 2 ? ', yükseliyor' : ', yatay') : ''}${trreal != null ? `; politika faizi enflasyonun ${fmt(Math.abs(trreal))} puan ${trreal >= 0 ? 'üstünde' : 'altında'}` : ''}${fx != null ? `; Dolar/TL 12 ayda +${p0(fx)}` : ''}.`)
   const title = vix != null && vix > 30 ? 'Panik dönemi'

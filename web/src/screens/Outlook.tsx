@@ -128,8 +128,8 @@ function Page({ v, world, loading, generated, practical }: { v?: OutlookView; wo
 
       {across && (
         <section className="an-group">
-          <h3>Bütün varlıklarda: yakın zamanda olan ve geçmişte sonrası olağandan farklı çıkmış olaylar</h3>
-          {!across.list.length && <p className="note">Hiçbir varlıkta, sonrasını olağandan belirgin biçimde ayrıştırmış bir olay yok.</p>}
+          <h3>Bütün varlıklarda: yakın zamanda olan ve geçmişte sonrası her zamankinden farklı çıkmış olaylar</h3>
+          {!across.list.length && <p className="note">Hiçbir varlıkta, sonrasını her zamankinden belirgin biçimde ayrıştırmış bir olay yok.</p>}
           {shown.map((h) => (
             <button key={h.subject.id + h.tf + h.study.def.id} type="button" className="ev-row btn-row" onClick={() => pick(h.subject.id, { tf: h.tf, event: h.study.def.id })}>
               <span className="what"><b>{nameOf(h.subject, h.study.def)}</b><em>{barDate(h.tf, h.subject.frames[h.tf]!.t[h.study.recent!.index])}, {agoLabel(h.tf, h.study.recent!.elapsed)}; {TF_LABEL[h.tf].toLocaleLowerCase('tr')} veri</em></span>
@@ -150,11 +150,11 @@ function Page({ v, world, loading, generated, practical }: { v?: OutlookView; wo
       <details className="an-how">
         <summary>Olasılıklar nasıl hesaplanıyor, nelere dikkat etmeli</summary>
         <ul>
-          <li><b>Kutudaki sayı</b>: “9’da 3”, olayın önceki 9 seferinin 3’ünde fiyatın seçilen süre sonra daha yukarıda olduğunu söyler. “Olağan: 10’da 7”, varlığın herhangi bir andan aynı süre sonra 10 seferin 7’sinde yukarıda olduğunu. Kutulara dokunarak süreyi değiştirirsin; grafikteki okların rengi de o süreye göre boyanır.</li>
+          <li><b>Kutudaki sayı</b>: “9’da 3”, olayın önceki 9 seferinin 3’ünde fiyatın seçilen süre sonra daha yukarıda olduğunu söyler. “Karşılaştırma” cümlesi, olay olsun olmasın varlığın herhangi bir andan aynı süre sonra 10 seferin kaçında yukarıda olduğunu söyler; olayın bir şey söyleyip söylemediği bu ikisinin farkından anlaşılır. Kutulara dokunarak süreyi değiştirirsin; grafikteki okların rengi de o süreye göre boyanır.</li>
           <li><b>Olay</b>: bir durumun başladığı mumdur: sert düşüş ya da yükseliş (varlığın kendi oynaklığına göre), uzun ortalamanın kırılması, 1 ve 3 yılın zirvesi ya da dibi, art arda aynı yönde mumlar, zirveden %10, %20, %35 gerileme, RSI’ın 30’un altına inmesi ya da 70’in üstüne çıkması, Bollinger bandının dışına taşma, MACD kesişimi, hacimli satış ve alış. Aylık veride makro durumların başlaması da olaydır (reel faizin eksiye dönmesi, doların güçlenmesi gibi). Kendi olayını da tanımlayabilirsin.</li>
           <li><b>Yukarıda olma oranı</b>: olayın geçmişteki her örneğinden sonra, seçilen vadede fiyatın daha yukarıda olduğu örneklerin payı. Olay yakın zamanda gerçekleştiyse ölçüm, olaydan bugüne geçen süre kadar ilerlenip oradan yapılır; tablo “bugünden sonrası” içindir. Olay yakın zamanda gerçekleşmediyse tablo olay mumundan sonrası içindir: tekrar gerçekleştiğinde ne beklenebileceğini gösterir.</li>
-          <li><b>Olağan</b>: varlığın herhangi bir mumundan aynı süre sonraki yukarıda olma oranı. Asıl bilgi olağanla farktır.</li>
-          <li><b>“Olağandan belirgin iyi / kötü”</b>: en az 8 örnek, olağandan en az 12 puan fark, %95 güven aralığı olağan oranı dışarıda bırakıyor ve geçmişin iki yarısında da aynı yönde. Rastgele yürüyüş verisinde olayların %5’inden azı bu şartları sağlar.</li>
+          <li><b>Her zaman</b>: varlığın herhangi bir mumundan aynı süre sonraki yukarıda olma oranı. Asıl bilgi olağanla farktır.</li>
+          <li><b>“Her zamankinden belirgin iyi / kötü”</b>: en az 8 örnek, her zamankinden en az 12 puan fark, %95 güven aralığı her zamanki oranı dışarıda bırakıyor ve geçmişin iki yarısında da aynı yönde. Rastgele yürüyüş verisinde olayların %5’inden azı bu şartları sağlar.</li>
           <li><b>Çoklu sınama</b>: onlarca olay birden sınandığı için birkaç renkli hücre şans eseri çıkar. Listenin üstündeki sayı bunu söyler. Aynı yönü gösteren birkaç olay, farklı zaman dilimlerinde tekrar eden bulgu ve çok örnek, tek bir renkli hücreden daha güvenilirdir.</li>
           <li><b>Hücredeki ayrıntı</b>: aralık, gerçek oranın %80 olasılıkla içinde bulunduğu yerdir. “Yukarı / aşağı” satırı, yukarıda biten örneklerin ortalama kazancı ile aşağıda bitenlerin ortalama kaybıdır: oran %60 olsa bile kayıplar kazançlardan büyükse beklenti olumsuz olabilir.</li>
           <li>Veri TradingView’den: aylık mumlar 1960’lara, haftalık 1990’lara, günlük yaklaşık 12 yıl geriye gider (varlığa göre değişir). Günde bir yenilenir; son mum kapanmamış olabilir.</li>
@@ -208,7 +208,7 @@ function Stance12({ v, generated }: { v: OutlookView; generated?: number }) {
           <div className="vd-list">{v.list.map((o) => <Card key={o.asset.id} o={o} open={false} />)}</div>
           <ul className="ov-method">
             <li><b>Dört kanıt</b> ayrı ayrı hesaplanır. <b>Değerleme</b>: fiyatın ilgili para arzına oranı kendi geçmişinin neresinde. <b>Makro örüntü</b>: şu an geçerli olan ve geçmişte en az 8 ayrı dönemde, üç çağda aynı yönde sonuç vermiş durumlar. <b>Benzer dönemler</b>: bugünkü makro tabloya en yakın 8 dönemden 12 ay sonra olanlar. <b>Trend</b>: fiyat 10 aylık ortalamasının üstünde mi.</li>
-            <li><b>Sicil şartı</b>: bir kanıt, o varlıkta geçmişte gerçekten ayırt edici olmuşsa görüşe katılır (12 ay sonraki yukarıda olma oranı olağandan en az 5 puan farklı). Olmamışsa soluk görünür.</li>
+            <li><b>Sicil şartı</b>: bir kanıt, o varlıkta geçmişte gerçekten ayırt edici olmuşsa görüşe katılır (12 ay sonraki yukarıda olma oranı her zamankinden en az 5 puan farklı). Olmamışsa soluk görünür.</li>
             <li><b>Görüş</b> katılan kanıtların oylarının toplamıdır; <b>güven</b> üç kanıt aynı yönde ve karşı çıkan yoksa yüksek, iki kanıt aynı yöndeyse orta, aksi hâlde düşük. Süre 12 aydır.</li>
             {generated && <li>Aylık seriler {Fmt.dateTime(generated)} itibarıyla; günde bir yenilenir.</li>}
           </ul>
@@ -237,7 +237,7 @@ function Card({ o, open }: { o: View; open: boolean }) {
               {l.record && l.vote !== 0 && (
                 <span className="rec">
                   <span className="hitbar" aria-hidden><i className="b" style={{ left: `${l.record.base * 100}%` }} /><i className={'h' + (l.counts ? ' good' : '')} style={{ left: `${l.record.hit * 100}%` }} /></span>
-                  Sicil: bu durumdayken 12 ay sonra {p0(l.record.hit)} yukarıdaydı, olağan {p0(l.record.base)} ({l.record.n} {l.id === 'benzer' ? 'dönem' : 'ay'}){l.counts ? '' : '; ayırt edici değil, görüşe katılmıyor'}.
+                  Sicil: bu durumdayken 12 ay sonra {p0(l.record.hit)} yukarıdaydı, her zaman {p0(l.record.base)} ({l.record.n} {l.id === 'benzer' ? 'dönem' : 'ay'}){l.counts ? '' : '; ayırt edici değil, görüşe katılmıyor'}.
                 </span>
               )}
             </div>

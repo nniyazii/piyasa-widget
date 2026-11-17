@@ -131,7 +131,7 @@ internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossa
                         item { OutlookHead(outlook) }
                         item { FullAnalysisLinks() }
                         if (outlook.events.isNotEmpty()) {
-                            item { SectionTitle("Yakın zamanda ne oldu; geçmişte aynı şeyden sonra ne olmuştu", "Aylık, haftalık ve günlük veride yakın zamanda gerçekleşen ve sonrasında yönü olağandan belirgin biçimde ayrıştırmış olaylar. Rakamlar bugünden sonra yukarıda olma oranı (parantezde olağan oran). Olaya dokun: mum grafikte bütün geçmiş örnekleri.") }
+                            item { SectionTitle("Yakın zamanda ne oldu; geçmişte aynı şeyden sonra ne olmuştu", "Aylık, haftalık ve günlük veride yakın zamanda gerçekleşen ve sonrasında yönü her zamankinden belirgin biçimde ayrıştırmış olaylar. Rakamlar bugünden sonra yukarıda olma oranı (parantezde her zamanki oran). Olaya dokun: mum grafikte bütün geçmiş örnekleri.") }
                             items(outlook.events.size) { i -> EventCard(outlook.events[i]) }
                             item { SectionTitle("Bugünkü durumun özeti (12 ay için)", null) }
                         }
@@ -148,7 +148,7 @@ internal fun AdvantageContent(data: AdvantageData, onClose: () -> Unit, onGlossa
                     4 -> {
                         item {
                             val strong = data.advices.filter { it.strong }
-                            Answer("Birikimimi neye çevirmeliyim?", if (strong.isEmpty()) "Şu an güçlü bir sinyal yok; oranlar olağan aralıkta." else strong.joinToString(". ") { it.action } + ".",
+                            Answer("Birikimimi neye çevirmeliyim?", if (strong.isEmpty()) "Şu an güçlü bir sinyal yok; oranlar her zamanki aralıkta." else strong.joinToString(". ") { it.action } + ".",
                                 "Her oran kendi geçmiş ortancasıyla karşılaştırılır. Ortancadan uzaklaştıkça sinyal güçlenir.")
                         }
                         items(data.advices, key = { it.id.name }) { a -> AdviceCard(a, onGlossary) }
@@ -250,7 +250,7 @@ private fun OutlookCard(o: OutlookItem) {
                     Column(Modifier.weight(1f)) {
                         Text(l.label + if (l.counts || l.vote == 0) "" else " (görüşe katılmıyor)", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
                         Text(l.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (l.hit != null && l.base != null && l.vote != 0) Text("Sicil: bu durumdayken 12 ay sonra ${pctAbs(l.hit)} yukarıdaydı, olağan ${pctAbs(l.base)}${l.n?.let { " ($it örnek)" } ?: ""}.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        if (l.hit != null && l.base != null && l.vote != 0) Text("Sicil: bu durumdayken 12 ay sonra ${pctAbs(l.hit)} yukarıdaydı, her zaman ${pctAbs(l.base)}${l.n?.let { " ($it örnek)" } ?: ""}.", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
                     }
                 }
             }
@@ -382,7 +382,7 @@ private fun StatusChip(r: Premiums.Row, open: Boolean) {
         !open -> "BIST kapalı" to 0
         r.signal == Premiums.Signal.BUY -> "Al sinyali" to 1
         r.signal == Premiums.Signal.HIGH -> "Pahalı" to -1
-        else -> (if (r.fixed) "Primli" else "Olağan") to 0
+        else -> (if (r.fixed) "Primli" else "Her zaman") to 0
     }
     Pill(text, dir)
 }
@@ -601,7 +601,7 @@ private fun HowItWorks(onGlossary: (String) -> Unit) {
             listOf(
                 "Gram fiyatı = ons fiyatı ($) × Dolar/TL ÷ 31,1035. Ons ve kur anlıktır; BIST fiyatları 15 dakika gecikmelidir.",
                 "ALTIN.S1 her zaman 0,01 gram altındır; fark doğrudan gram altına göredir. Sertifika çoğu zaman primlidir; gram altının altına indiği günler seyrektir ve al sinyali bu durumda verilir.",
-                "Fonlarda (GLDTR, ZGOLD, ISGLK, GMSTR) bir payın karşılığı olan maden miktarı sabit değildir: GMSTR’nin bir payı yaklaşık 6 gram gümüşe denktir ve bu miktar yılda yaklaşık %2 azalır. “Olağan” miktar son 20 işlem gününün ortancasıdır; fon bunun en az %2 altına indiğinde al sinyali, %2 üstüne çıktığında “pahalı” yazar.",
+                "Fonlarda (GLDTR, ZGOLD, ISGLK, GMSTR) bir payın karşılığı olan maden miktarı sabit değildir: GMSTR’nin bir payı yaklaşık 6 gram gümüşe denktir ve bu miktar yılda yaklaşık %2 azalır. “Her zaman” miktar son 20 işlem gününün ortancasıdır; fon bunun en az %2 altına indiğinde al sinyali, %2 üstüne çıktığında “pahalı” yazar.",
                 "Sinyal, ürünün madene göre ucuzladığını söyler; madenin kendisinin yükseleceğini söylemez.",
                 "BIST kapalıyken sinyal verilmez. Resmî tatiller bilinmediği için tatil günlerinde fark yanıltıcı olabilir.",
                 "Konut endeksi Türkiye ortalamasıdır ve yaklaşık iki ay gecikmeyle açıklanır; şehir, semt ve tek tek evler çok farklı olabilir. Öneriler alım masraflarını, kirayı ve kredi faizini hesaba katmaz.",

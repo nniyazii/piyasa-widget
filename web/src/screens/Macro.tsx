@@ -44,7 +44,7 @@ function View({ m, generated }: { m: MacroView; generated: number }) {
       </p>
 
       <section className="an-group">
-        <h3>Makro durum (gölge bant: tarihsel olağan aralık)</h3>
+        <h3>Makro durum (gölge bant: tarihsel her zamanki aralık)</h3>
         <div className="mc-tiles">{TILES.map((t) => <Tile key={t.id} m={m} t={t} />)}</div>
       </section>
 
@@ -100,10 +100,10 @@ function View({ m, generated }: { m: MacroView; generated: number }) {
         <ul>
           <li><b>Veri</b>: TradingView’in aylık serileri; çoğu 1968’den, VIX 1990’dan, Türkiye serileri 1986–2005’ten başlar. Enflasyon, para arzı ve işsizlik bir-iki ay gecikmeli açıklanır; son bilinen değer kullanılır. Veri {Fmt.dateTime(generated)} itibarıyla.</li>
           <li><b>Makro durumlar</b> önceden tanımlıdır ve her birinin ekonomik bir gerekçesi vardır (reel faiz, getiri eğrisi, para arzı, dolar, enflasyon, risk iştahı, enerji). Veriden kural türetilmez; yalnızca bu durumların geçmişte neyle sonuçlandığı ölçülür.</li>
-          <li><b>Örüntü</b>: bir durum geçerliyken varlığın 12 ay sonraki getirisi, tüm ayların olağan getirisiyle karşılaştırılır. <b>Tutarlı</b> sayılması için: en az {MIN.episodes} ayrı dönem, yukarıda olma oranında olağandan en az {MIN.hitDiff * 100} puan fark ve üç çağın (1990 öncesi, 1990–2007, 2008’den beri) örneği yeterli olanlarının hepsinde aynı yön.</li>
+          <li><b>Örüntü</b>: bir durum geçerliyken varlığın 12 ay sonraki getirisi, tüm ayların her zaman getirisiyle karşılaştırılır. <b>Tutarlı</b> sayılması için: en az {MIN.episodes} ayrı dönem, yukarıda olma oranında her zamankinden en az {MIN.hitDiff * 100} puan fark ve üç çağın (1990 öncesi, 1990–2007, 2008’den beri) örneği yeterli olanlarının hepsinde aynı yön.</li>
           <li><b>Ay sayısı yanıltır</b>: 12 aylık getiriler üst üste biner; “120 ay” çoğu zaman 8–15 bağımsız dönem demektir. Bu yüzden dönem sayısı ayrıca yazılır. Onlarca durum ve 11 varlık sınandığı için bazı örüntüler şans eseri tutarlı görünebilir.</li>
           <li><b>Benzer dönemler</b> en yakın {m.analogs.list.length} aydır (birbirinden en az 18 ay uzak). Sekiz örnek bir yön gösterebilir, olasılık vermez; hiçbir dönem bugünün aynısı değildir.</li>
-          <li>Türkiye’ye özgü durumlar yalnızca Dolar/TL, gram altın ve BIST ile eşleştirilir. TL bazlı varlıklarda olağan oran enflasyon yüzünden zaten çok yüksektir; BIST için dolar bazındaki satıra bak.</li>
+          <li>Türkiye’ye özgü durumlar yalnızca Dolar/TL, gram altın ve BIST ile eşleştirilir. TL bazlı varlıklarda her zamanki oran enflasyon yüzünden zaten çok yüksektir; BIST için dolar bazındaki satıra bak.</li>
           <li>Bunlar yatırım tavsiyesi değildir; geçmişte ne olduğunun özeti ve bugünün o geçmişe ne kadar benzediğidir.</li>
         </ul>
         <p><a href={href('sozluk/makro-oruntu')}>Sözlükte ayrıntısı</a></p>
@@ -121,10 +121,10 @@ const TILES: TileDef[] = [
   { id: 'real', label: 'ABD reel faizi', series: 'REAL', unit: 'puan', note: (v) => (v < 0 ? 'negatif: nakit eriyor' : v > 2 ? 'yüksek: sıkı para' : 'ılımlı') },
   { id: 'curve', label: 'Getiri eğrisi (10Y − 3A)', series: 'CURVE', unit: 'puan', note: (v) => (v < 0 ? 'ters: yavaşlama beklentisi' : 'normal') },
   { id: 'fed', label: 'Fed faizi', series: 'FED', unit: '%', digits: 2 },
-  { id: 'm2', label: 'ABD para arzı (yıllık)', series: 'M2G', unit: '%', note: (v) => (v > 8 ? 'hızlı büyüme' : v < 3 ? 'zayıf likidite' : 'olağan') },
+  { id: 'm2', label: 'ABD para arzı (yıllık)', series: 'M2G', unit: '%', note: (v) => (v > 8 ? 'hızlı büyüme' : v < 3 ? 'zayıf likidite' : 'her zaman') },
   { id: 'cpi', label: 'ABD enflasyonu', series: 'USCPI', unit: '%', note: (v) => (v > 5 ? 'yüksek' : v < 2 ? 'düşük' : 'hedefe yakın') },
   { id: 'dxy', label: 'Dolar endeksi', series: 'DXY', unit: '', digits: 1 },
-  { id: 'vix', label: 'VIX', series: 'VIX', unit: '', digits: 1, note: (v) => (v > 30 ? 'panik' : v < 14 ? 'rehavet' : 'olağan') },
+  { id: 'vix', label: 'VIX', series: 'VIX', unit: '', digits: 1, note: (v) => (v > 30 ? 'panik' : v < 14 ? 'rehavet' : 'her zaman') },
   { id: 'oil', label: 'Brent petrol', series: 'OIL', unit: '$', digits: 0 },
   { id: 'hy', label: 'Kredi riski farkı', series: 'HY', unit: 'puan', note: (v) => (v > 6 ? 'stres' : 'sakin') },
   { id: 'trcpi', label: 'Türkiye enflasyonu', series: 'TRCPI', unit: '%', digits: 0 },
@@ -170,7 +170,7 @@ function AssetRow({ a, m }: { a: AssetView; m: MacroView }) {
       <dl className="st-facts">
         <div><dt>Geçerli tutarlı örüntü</dt><dd className="num">{a.active.length ? `${a.active.filter((p) => p.sign > 0).length} lehine, ${a.active.filter((p) => p.sign < 0).length} aleyhine` : 'yok'}</dd></div>
         <div><dt>Benzer dönemlerden 12 ay sonra</dt><dd className="num">{an ? <>{an.up} / {an.n} yukarıda<small>ortanca {pct(an.median)}</small></> : '—'}</dd></div>
-        <div><dt>Olağan (tüm aylar)</dt><dd className="num">{p0(a.base?.hit)}<small>ortanca {pct(a.base?.median)}</small></dd></div>
+        <div><dt>Her zaman (tüm aylar)</dt><dd className="num">{p0(a.base?.hit)}<small>ortanca {pct(a.base?.median)}</small></dd></div>
       </dl>
       {a.active.length > 0 && <ul className="mc-patterns">{a.active.map((p) => <PatternItem key={p.cond.id} p={p} />)}</ul>}
       {paths.length >= 3 && (
@@ -188,9 +188,9 @@ function PatternItem({ p, withAsset }: { p: Pattern; withAsset?: boolean }) {
     <li className={p.sign > 0 ? 'pro' : 'con'}>
       <div>
         <b>{withAsset ? `${p.asset.short}: ` : ''}{p.cond.label}</b>
-        <span>{p.cond.why} Geçmişte {p.episodes} ayrı dönemde ({p.n} ay) görüldü: 12 ay sonra {p.asset.short.toLocaleLowerCase('tr')} <b className="num">{p0(p.hit)}</b> yukarıdaydı (olağan {p0(p.base)}), ortanca getiri <b className="num">{pct(p.median)}</b> (olağan {pct(p.baseMedian)}).</span>
+        <span>{p.cond.why} Geçmişte {p.episodes} ayrı dönemde ({p.n} ay) görüldü: 12 ay sonra {p.asset.short.toLocaleLowerCase('tr')} <b className="num">{p0(p.hit)}</b> yukarıdaydı (her zaman {p0(p.base)}), ortanca getiri <b className="num">{pct(p.median)}</b> (her zaman {pct(p.baseMedian)}).</span>
       </div>
-      <div className="mc-eras" role="img" aria-label={p.eras.filter((e) => e.n).map((e) => `${e.label}: ${p0(e.hit)}, olağan ${p0(e.base)}`).join('; ')}>
+      <div className="mc-eras" role="img" aria-label={p.eras.filter((e) => e.n).map((e) => `${e.label}: ${p0(e.hit)}, her zaman ${p0(e.base)}`).join('; ')}>
         {p.eras.map((e) => (
           <span key={e.label} className={e.n ? '' : 'none'}>
             <em>{e.label}</em>

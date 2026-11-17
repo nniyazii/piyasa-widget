@@ -126,7 +126,7 @@ function Empty() {
       </header>
       <p className="an-sub">
         Aylık, haftalık ve günlük mum grafikte fiyat, trend, gösterge ve hacim olayları aranır: sert düşüş, ortalamanın kırılması, RSI’ın 30’un altına inmesi, hacimli satış gibi.
-        Her olayın hissedeki tüm geçmiş örnekleri grafikte işaretlenir; sonraki dört vadede fiyatın yukarıda olma oranı, hissenin olağan oranıyla ve aynı olayın pazardaki tüm hisselerdeki sonucuyla yan yana gösterilir.
+        Her olayın hissedeki tüm geçmiş örnekleri grafikte işaretlenir; sonraki dört vadede fiyatın yukarıda olma oranı, hissenin her zamanki oranıyla ve aynı olayın pazardaki tüm hisselerdeki sonucuyla yan yana gösterilir.
       </p>
     </>
   )
@@ -198,16 +198,16 @@ function Result({ s, basis, onBasis, initialEvent, initialTf }: { s: Loaded; bas
       <details className="an-how">
         <summary>Nasıl hesaplanıyor, nelere dikkat etmeli</summary>
         <ul>
-          <li><b>Kutudaki sayı</b>: “9’da 3”, olayın önceki 9 seferinin 3’ünde fiyatın seçilen süre sonra daha yukarıda olduğunu söyler. “Olağan: 10’da 7”, hissenin herhangi bir andan aynı süre sonra 10 seferin 7’sinde yukarıda olduğunu. Kutulara dokunarak süreyi değiştirirsin; grafikteki okların rengi de o süreye göre boyanır.</li>
+          <li><b>Kutudaki sayı</b>: “9’da 3”, olayın önceki 9 seferinin 3’ünde fiyatın seçilen süre sonra daha yukarıda olduğunu söyler. “Karşılaştırma” cümlesi, olay olsun olmasın hissenin herhangi bir andan aynı süre sonra 10 seferin kaçında yukarıda olduğunu söyler; olayın bir şey söyleyip söylemediği bu ikisinin farkından anlaşılır. Kutulara dokunarak süreyi değiştirirsin; grafikteki okların rengi de o süreye göre boyanır.</li>
           {subject.market === 'TR' && <li><b>Dolar bazında</b>: fiyatlar Dolar/TL kuruna bölünür; TL’deki enflasyon yükselişi olduğundan büyük göstermesin diye. TL’ye geçebilirsin.</li>}
           <li><b>Olay</b>: bir durumun başladığı mumdur (RSI’ın 30’un altına indiği ilk mum gibi). Aynı olayın iki başlangıcı arasında bir süre aranır; böylece tek bir hareket birkaç kez sayılmaz.</li>
           <li><b>Yukarıda olma oranı</b>: olayın geçmişteki her örneğinden sonra, seçilen vadede fiyatın daha yukarıda olduğu örneklerin payı. Olay yakın zamanda gerçekleştiyse ölçüm, olaydan bugüne geçen süre kadar ilerlenip oradan yapılır; yani tablo “bugünden sonrası” içindir.</li>
-          <li><b>Olağan</b>: hissenin herhangi bir mumundan aynı süre sonraki yukarıda olma oranı. Sürekli yükselen bir hissede her olaydan sonra fiyat yukarıdadır; asıl bilgi olağanla farktır.</li>
-          <li><b>“Olağandan belirgin iyi / kötü”</b>: en az 8 örnek, olağandan en az 12 puan fark, %95 güven aralığı olağan oranı dışarıda bırakıyor ve geçmişin iki yarısında da aynı yönde. Rastgele yürüyüş verisinde bu şartları olayların %5’inden azı sağlar; yine de onlarca olay birden sınandığı için tek bir renkli hücre şans olabilir.</li>
+          <li><b>Her zaman</b>: hissenin herhangi bir mumundan aynı süre sonraki yukarıda olma oranı. Sürekli yükselen bir hissede her olaydan sonra fiyat yukarıdadır; asıl bilgi olağanla farktır.</li>
+          <li><b>“Her zamankinden belirgin iyi / kötü”</b>: en az 8 örnek, her zamankinden en az 12 puan fark, %95 güven aralığı her zamanki oranı dışarıda bırakıyor ve geçmişin iki yarısında da aynı yönde. Rastgele yürüyüş verisinde bu şartları olayların %5’inden azı sağlar; yine de onlarca olay birden sınandığı için tek bir renkli hücre şans olabilir.</li>
           <li><b>Aralık</b>: gerçek oranın %80 olasılıkla içinde bulunduğu aralık. Örnek azsa aralık geniştir; 10 örnekte %70, “%45 ile %87 arası” demektir.</li>
           <li><b>Pazar geneli</b>: aynı olay o pazardaki tüm hisselerde binlerce kez gerçekleşmiştir. Tek hissedeki 10–20 örnek şansa açıktır; pazar genelindeki sonuç ve üç ayrı dönemdeki tutarlılığı, hissedeki bulgunun ne kadar ciddiye alınacağını gösterir. İkisi aynı yöndeyse bulgu daha güvenilirdir.</li>
           {s.setups && <SetupsHow d={s.setups} />}
-          <li><b>Araştırmanın sınırı</b>: tek hisseye özgü kurallar ileriye dönük sınamada zayıf kaldı (%54’e karşı olağan %47) ve BIST’te üç dönemde birden tutan bir dip kurulumu bulunamadı. Bu sayfa bu yüzden “al/sat sinyali” vermez; olaydan sonra geçmişte ne olduğunu, örnek sayısı ve belirsizliğiyle birlikte gösterir.</li>
+          <li><b>Araştırmanın sınırı</b>: tek hisseye özgü kurallar ileriye dönük sınamada zayıf kaldı (%54’e karşı her zaman %47) ve BIST’te üç dönemde birden tutan bir dip kurulumu bulunamadı. Bu sayfa bu yüzden “al/sat sinyali” vermez; olaydan sonra geçmişte ne olduğunu, örnek sayısı ve belirsizliğiyle birlikte gösterir.</li>
           <li>Veri TradingView’den: haftalık en çok 1000, günlük 3000 mum; aylık mumlar haftalıktan türetilir. Fiyatlar bölünme ve temettüye göre düzeltilmiştir. {subject.generated ? `Geçmiş ${Fmt.dateTime(subject.generated)} kopyasından; son mum canlı fiyatla (BIST’te 15 dakika gecikmeli) güncellenir.` : ''}</li>
         </ul>
         <p><a href={href('sozluk/olay-incelemesi')}>Sözlükte ayrıntısı</a></p>

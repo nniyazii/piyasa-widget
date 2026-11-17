@@ -142,11 +142,11 @@ async function evaluate(a: Alarm, src: Source, cache: { prices?: Map<string, num
     const on = !!st.recent && st.recent.elapsed <= 1
     const name = def.standalone ? def.label : `${sub.short} ${def.label}`
     const best = st.best
-    const odds = st.view.filter((h) => h.n >= 5).map((h) => `${h.label} %${Math.round(h.up * 100)} (olağan %${Math.round(h.base * 100)})`).join(', ')
+    const odds = st.view.filter((h) => h.n >= 5).map((h) => `${h.label} %${Math.round(h.up * 100)} (her zaman %${Math.round(h.base * 100)})`).join(', ')
     return {
       on, now: on ? 'gerçekleşti' : st.onsets.length ? `son kez ${new Date(x.t[st.onsets[st.onsets.length - 1]] * 1000).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}` : 'hiç olmadı',
       title: `${sub.short}: ${def.label}`,
-      text: `${name} (${TF_LABEL[a.tf].toLocaleLowerCase('tr')} veri${a.usd ? ', dolar bazında' : ''}). Geçmişte ${Math.max(0, st.onsets.length - 1)} kez oldu. Sonrasında yukarıda olma oranı: ${odds || 'örnek az'}.${best ? ` En belirgin vade ${best.label}.` : ' Hiçbir vadede olağandan belirgin biçimde ayrışmıyor.'}`,
+      text: `${name} (${TF_LABEL[a.tf].toLocaleLowerCase('tr')} veri${a.usd ? ', dolar bazında' : ''}). Geçmişte ${Math.max(0, st.onsets.length - 1)} kez oldu. Sonrasında yukarıda olma oranı: ${odds || 'örnek az'}.${best ? ` En belirgin vade ${best.label}.` : ' Hiçbir vadede her zamankinden belirgin biçimde ayrışmıyor.'}`,
     }
   }
   // Güçlü kurulumlar (pazar genelinde üç dönemde sınanmış)
@@ -159,7 +159,7 @@ async function evaluate(a: Alarm, src: Source, cache: { prices?: Map<string, num
     return {
       on: true, now: `güçlü ${what} kurulumu açık`,
       title: `${code(a.symbol)}: güçlü ${what} kurulumu`,
-      text: `${code(a.symbol)}: ${strongNow.setup.label}, ${REGIME_LABEL[strongNow.regime]}. Benzer durumlarda 3 ay sonra fiyat, sınanan üç dönemin en kötüsünde bile %${Math.round(st.hit * 100)} ${what === 'dip' ? 'yukarıdaydı' : 'aşağıdaydı'} (olağan %${Math.round(st.base * 100)}).`,
+      text: `${code(a.symbol)}: ${strongNow.setup.label}, ${REGIME_LABEL[strongNow.regime]}. Benzer durumlarda 3 ay sonra fiyat, sınanan üç dönemin en kötüsünde bile %${Math.round(st.hit * 100)} ${what === 'dip' ? 'yukarıdaydı' : 'aşağıdaydı'} (her zaman %${Math.round(st.base * 100)}).`,
     }
   }
   if (!su) throw new Error('kurulum verisi alınamadı (yalnızca BIST ve ABD hisselerinde çalışır)')

@@ -2,7 +2,7 @@
  * Hisse analizi grafikleri.
  *   SignalChart  Fiyat ve sinyaller: üstte fiyat (sinyal noktaları, tetik fiyatı), altta gösterge ve eşiği.
  *                İki panel aynı zaman eksenini paylaşır; her panelin kendi dikey ekseni vardır.
- *   AfterChart   Sinyalden sonra: her sinyalin sonraki seyri, ortancası ve hissenin olağan seyri.
+ *   AfterChart   Sinyalden sonra: her sinyalin sonraki seyri, ortancası ve hissenin her zamanki seyri.
  * Renk tek başına anlam taşımaz: tutan sinyal dolu, tutmayan içi boş, süren kesikli halkadır.
  */
 import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from 'react'
@@ -180,7 +180,7 @@ export function SignalChart({ bars, series, stat, trigger, horizon }: Props) {
   )
 }
 
-/** Sinyalden sonra: her sinyalin sonraki seyri (ince), ortancası (kalın) ve hissenin olağan seyri (kesikli). */
+/** Sinyalden sonra: her sinyalin sonraki seyri (ince), ortancası (kalın) ve hissenin her zamanki seyri (kesikli). */
 export function AfterChart({ bars, series, stat, unit }: { bars: Bars; series: Series; stat: SignalStat; unit: (bars: number) => string }) {
   const { c } = bars
   const sign = stat.side === 'dip' ? 1 : -1
@@ -194,7 +194,7 @@ export function AfterChart({ bars, series, stat, unit }: { bars: Bars; series: S
     const paths = stat.events.map((e) => steps.filter((k) => e.i + k < c.length).map((k) => c[e.i + k] / e.price - 1))
     const med = (list: number[]) => { if (!list.length) return NaN; const s = [...list].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2 }
     const median = steps.map((k) => med(paths.filter((p) => p.length > k).map((p) => p[k])))
-    // Olağan seyir: bağlamı sağlayan her çubuktan sonraki ortanca (seyrek örneklenir)
+    // Her zaman seyir: bağlamı sağlayan her çubuktan sonraki ortanca (seyrek örneklenir)
     const from: number[] = []
     for (let j = 14; j + span < c.length; j++) if (filterHolds(stat.filter, c, series, j)) from.push(j)
     const pick = from.length > 600 ? from.filter((_, i) => i % Math.ceil(from.length / 600) === 0) : from
@@ -218,7 +218,7 @@ export function AfterChart({ bars, series, stat, unit }: { bars: Bars; series: S
     <figure className="sc after">
       <figcaption>Sinyalden sonra<span>Her çizgi bir sinyal; sıfır, sinyalin geldiği fiyat.</span></figcaption>
       <div className="sc-plot" ref={box}>
-        <svg viewBox={`0 0 ${AW} ${AH}`} role="img" aria-label={`Sinyalden sonraki seyir: ${unit(main)} sonra ortanca ${Number.isNaN(mEnd) ? 'yok' : pct(mEnd)}, olağan ${Number.isNaN(bEnd) ? 'yok' : pct(bEnd)}.`}
+        <svg viewBox={`0 0 ${AW} ${AH}`} role="img" aria-label={`Sinyalden sonraki seyir: ${unit(main)} sonra ortanca ${Number.isNaN(mEnd) ? 'yok' : pct(mEnd)}, her zaman ${Number.isNaN(bEnd) ? 'yok' : pct(bEnd)}.`}
           onPointerMove={(e) => { const r = e.currentTarget.getBoundingClientRect(); const k = Math.round((((e.clientX - r.left) / r.width) * AW - P.l) / (AW - P.l - P.r) * span); setHover(k >= 0 && k <= span ? k : undefined) }}
           onPointerLeave={() => setHover(undefined)}>
           {ticks.map((r, i) => <g key={i}><line className={r === 0 ? 'sc-zero' : 'sc-grid'} x1={P.l} x2={AW - P.r} y1={g.y(r)} y2={g.y(r)} /><text className="sc-tick" x={P.l - 6} y={g.y(r) + 4} textAnchor="end">{pct(r, 0)}</text></g>)}
@@ -230,20 +230,20 @@ export function AfterChart({ bars, series, stat, unit }: { bars: Bars; series: S
           <path d={g.d(g.base)} className="sc-base" />
           <path d={g.d(g.median)} className="sc-median" />
           {!Number.isNaN(mEnd) && <><circle className="sc-now" cx={g.x(main)} cy={g.y(mEnd)} r={4} /><text className="sc-tag strong" x={AW - P.r + 8} y={my}>ortanca {pct(g.median[span] ?? mEnd)}</text></>}
-          {!Number.isNaN(bEnd) && <text className="sc-tag" x={AW - P.r + 8} y={by}>olağan {pct(g.base[span] ?? bEnd)}</text>}
+          {!Number.isNaN(bEnd) && <text className="sc-tag" x={AW - P.r + 8} y={by}>her zaman {pct(g.base[span] ?? bEnd)}</text>}
           {hover != null && <line className="sc-cursor" x1={g.x(hover)} x2={g.x(hover)} y1={P.t} y2={AH - P.b} />}
         </svg>
         {hover != null && (
           <div className="sc-tip" style={{ left: `${(g.x(hover) / AW) * 100}%` }} data-side={hover > span * 0.5 ? 'left' : 'right'}>
             <span>{hover === 0 ? 'Sinyal anı' : unit(hover) + ' sonra'}</span>
             <span><i className="k solid" />ortanca <b className="num">{Number.isNaN(g.median[hover]) ? '—' : pct(g.median[hover])}</b></span>
-            <span><i className="k dash" />olağan <b className="num">{Number.isNaN(g.base[hover]) ? '—' : pct(g.base[hover])}</b></span>
+            <span><i className="k dash" />her zaman <b className="num">{Number.isNaN(g.base[hover]) ? '—' : pct(g.base[hover])}</b></span>
           </div>
         )}
       </div>
       <p className="sc-legend">
         <span><i className="k solid" />sinyallerin ortancası</span>
-        <span><i className="k dash" />hissenin olağan seyri</span>
+        <span><i className="k dash" />hissenin her zamanki seyri</span>
         <span><i className="k thin hit" />tutan</span>
         <span><i className="k thin miss" />tutmayan sinyal</span>
       </p>
@@ -251,7 +251,7 @@ export function AfterChart({ bars, series, stat, unit }: { bars: Bars; series: S
   )
 }
 
-/** İsabet oranı çubuğu: nokta sinyalin isabeti, çentik olağan isabet. */
+/** İsabet oranı çubuğu: nokta sinyalin isabeti, çentik her zaman isabet. */
 export function HitBar({ hit, base }: { hit?: number; base?: number }) {
   if (hit == null) return null
   return (
@@ -432,14 +432,14 @@ export function StateChart({ c, t, sma200, rsi, vol, unit, marks = [], controls 
         {marks.length > 0 && <><span><svg viewBox="0 0 12 12" aria-hidden><Tri x={6} y={6} side="dip" o="hit" /></svg>dip sinyali</span><span><svg viewBox="0 0 12 12" aria-hidden><Tri x={6} y={6} side="top" o="hit" /></svg>tepe sinyali</span><span>dolu: tuttu, içi boş: tutmadı, kesikli: bekleniyor</span></>}
         <span><i className="k solid" />fiyat</span>
         <span><i className="k ma" />200 günlük ortalama</span>
-        {hasVol && <span><i className="k box" />hacim; koyu: olağanın 2 katından fazla{Number.isNaN(lastV) ? '' : ` (bugün ${Fmt.number(lastV, 1)} katı)`}</span>}
+        {hasVol && <span><i className="k box" />hacim; koyu: her zamankinin 2 katından fazla{Number.isNaN(lastV) ? '' : ` (bugün ${Fmt.number(lastV, 1)} katı)`}</span>}
         {g.log && <span>dikey eksen logaritmik</span>}
       </p>
     </figure>
   )
 }
 
-/** Kurulumdan sonraki ortalama seyir (pazardaki tüm hisseler): kurulum kalın, aynı piyasa durumunun olağanı kesikli. */
+/** Kurulumdan sonraki ortalama seyir (pazardaki tüm hisseler): kurulum kalın, aynı piyasa durumunun her zamanki oranı kesikli. */
 export function PathChart({ days, path, base, n }: { days: number[]; path: number[]; base: number[]; n: number }) {
   const [box, W] = useWidth(520)
   const H = 190, P = { l: 44, r: 104, t: 12, b: 26 }
@@ -456,7 +456,7 @@ export function PathChart({ days, path, base, n }: { days: number[]; path: numbe
     <figure className="sc path">
       <figcaption>Kurulumdan sonraki ortalama seyir<span>Pazardaki tüm hisselerde {Fmt.number(n, 0)} örneğin ortalaması; sıfır, kurulumun oluştuğu gün.</span></figcaption>
       <div className="sc-plot" ref={box}>
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Kurulumdan 3 ay sonra ortalama ${pct(path[e])}, olağan ${pct(base[e])}`}
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Kurulumdan 3 ay sonra ortalama ${pct(path[e])}, her zaman ${pct(base[e])}`}
           onPointerMove={(ev) => { const r = ev.currentTarget.getBoundingClientRect(); const px = ((ev.clientX - r.left) / r.width) * W; let best = 0; days.forEach((dd, k) => { if (Math.abs(x(dd) - px) < Math.abs(x(days[best]) - px)) best = k }); setHover(best) }}
           onPointerLeave={() => setHover(undefined)}>
           {[lo, 0, hi].filter((r, i, a) => a.indexOf(r) === i).map((r) => <g key={r}><line className={r === 0 ? 'sc-zero' : 'sc-grid'} x1={P.l} x2={W - P.r} y1={y(r)} y2={y(r)} /><text className="sc-tick" x={P.l - 6} y={y(r) + 4} textAnchor="end">{pct(r, 0)}</text></g>)}
@@ -468,14 +468,14 @@ export function PathChart({ days, path, base, n }: { days: number[]; path: numbe
           <path d={d(path)} className="sc-median" />
           <circle className="sc-now" cx={x(last)} cy={y(path[e])} r={4} />
           <text className="sc-tag strong" x={W - P.r + 8} y={py}>kurulum {pct(path[e])}</text>
-          <text className="sc-tag" x={W - P.r + 8} y={by}>olağan {pct(base[e])}</text>
+          <text className="sc-tag" x={W - P.r + 8} y={by}>her zaman {pct(base[e])}</text>
           {hover != null && <line className="sc-cursor" x1={x(days[hover])} x2={x(days[hover])} y1={P.t} y2={H - P.b} />}
         </svg>
         {hover != null && (
           <div className="sc-tip" style={{ left: `${(x(days[hover]) / W) * 100}%` }} data-side={hover > days.length / 2 ? 'left' : 'right'}>
             <span>{days[hover] === 0 ? 'Kurulum günü' : `${days[hover]} işlem günü sonra`}</span>
             <span><i className="k solid" />kurulum <b className="num">{pct(path[hover])}</b></span>
-            <span><i className="k dash" />olağan <b className="num">{pct(base[hover])}</b></span>
+            <span><i className="k dash" />her zaman <b className="num">{pct(base[hover])}</b></span>
           </div>
         )}
       </div>
