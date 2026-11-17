@@ -21,6 +21,7 @@ const p0 = (v: number) => '%' + Fmt.number(v * 100, v < 0.1 ? 1 : 0)
 const pct = (v: number, d = 0) => (v > 0 ? '+' : v < 0 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), d)
 const price = (v: number) => Fmt.number(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4)
 const cap = (s: string) => s.replace(/^./, (c) => c.toLocaleUpperCase('tr'))
+const PLURAL = { low: { gen: 'tabanların', loc: 'Tabanlarda' }, high: { gen: 'tepelerin', loc: 'Tepelerde' } }
 const RANGE: Record<string, string> = { M: '1', Q: '1', H: '3', Y: '3', Y5: 'all', ALL: 'all' }
 
 export function Turning() {
@@ -128,19 +129,21 @@ function Card({ side, a, e, d, sc }: { side: Side; a?: Assessment; e?: PivotEntr
           : <>Fiyat tek başına {side === 'low' ? 'düşerek' : 'yükselerek'} bu örüntüyü oluşturmuyor; diğer koşulların da değişmesi gerekir.</>}</p>
       )}
       <p className="tn-say tn-dim">
-        {a.own.count > 0 || last != null
+        {a.own.count === 0 && last != null
+          ? <>{d.subject.short} verisinde teyitli bir {sc.label.toLocaleLowerCase('tr')} {what} yok. {barDate('D', b.t[last])} tarihli {side === 'low' ? 'dip' : 'zirve'} henüz teyit edilmedi; teyit için {sc.fwd} işlem günü geçmesi gerekir.</>
+          : a.own.count > 0
           ? <>{d.subject.short} geçmişte {a.own.count} kez {sc.label.toLocaleLowerCase('tr')} {what} yaptı{a.own.gap ? <>; ikisi arasında ortanca {a.own.gap} işlem günü geçti</> : null}. {last != null ? <>Sonuncusu {barDate('D', b.t[last])} ({a.own.since} işlem günü önce{a.own.pending === last ? ', henüz teyit edilmedi' : ''}).</> : null}</>
           : <>{d.subject.short} verisinde bu hassasiyette teyitli bir {what} yok.</>}
       </p>
       <p className="tn-test">
         {a.tested && e.test && m5
-          ? <>Sınama (2021 sonrası, {d.universe?.label}): “aday” denen günlerin <b className="num">{p0(m5.prec)}</b> kadarı gerçekten bir {what} yakınındaydı (rastgele gün {p0(e.test.base)}); gerçek {what}ların {p0(m5.recall)} kadarı yakalandı. Aday günlerden {horizon} sonra fiyat {p0(m5.up)} oranında yukarıdaydı (bütün günlerde {p0(e.test.up)}).</>
+          ? <>Sınama (2021 sonrası, {d.universe?.label}): “aday” denen günlerin <b className="num">{p0(m5.prec)}</b> kadarı gerçekten bir {what} yakınındaydı (rastgele gün {p0(e.test.base)}); gerçek {PLURAL[side].gen} {p0(m5.recall)} kadarı yakalandı. Aday günlerden {horizon} sonra fiyat {p0(m5.up)} oranında yukarıdaydı (bütün günlerde {p0(e.test.up)}).</>
           : <>Bu hassasiyette sınama güvenilir bir sonuç vermedi; olasılığı ihtiyatla oku.</>}
       </p>
       <details className="tn-why">
         <summary>Neye bakıyor: {pro.length ? `lehine ${pro.length}` : 'lehine yok'}, {con.length ? `aleyhine ${con.length}` : 'aleyhine yok'}</summary>
         <table className="result-table tn-table">
-          <thead><tr><th>Gösterge</th><th className="r">Şimdi</th><th className="r">{cap(what)}larda genelde</th><th className="r">Her zaman</th></tr></thead>
+          <thead><tr><th>Gösterge</th><th className="r">Şimdi</th><th className="r">{PLURAL[side].loc} genelde</th><th className="r">Her zaman</th></tr></thead>
           <tbody>
             {[...pro, ...con].map((f) => (
               <tr key={f.id}>

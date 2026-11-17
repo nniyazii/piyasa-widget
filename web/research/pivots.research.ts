@@ -125,7 +125,9 @@ it('tepe ve taban örüntüsü', () => {
       models.set(k, { A: build((i) => S.train[i]), B: build(() => true) })
     }
     // 2. geçiş: sınama dönemi (model A, hiç görmediği veri)
-    type Ev = { n: number; pos: number; bins: { n: number; pos: number }[]; mult: { n: number; pos: number; caught: number; rets: number[] }[]; pivots: number; rets: number[] }
+    type Prac = { n: number; near5: number; near10: number; dd5: number; dd10: number; good: number; adv: number[]; ret: number[] }
+    const prac = (): Prac => ({ n: 0, near5: 0, near10: 0, dd5: 0, dd10: 0, good: 0, adv: [], ret: [] })
+    type Ev = { n: number; pos: number; bins: { n: number; pos: number }[]; mult: { n: number; pos: number; caught: number; rets: number[] }[]; pivots: number; rets: number[]; pc: Prac[]; pa: Prac }
     const evs = new Map<string, Ev>()
     const BIN = [0, 1, 2, 3, 5, 8, 12, Infinity]
     for (const s of u.series) {
@@ -136,18 +138,36 @@ it('tepe ve taban örüntüsü', () => {
         for (const side of SIDES) {
           const m = models.get(sc.id + side)?.A
           if (!m) continue
-          if (!evs.has(sc.id + side)) evs.set(sc.id + side, { n: 0, pos: 0, bins: BIN.slice(1).map(() => ({ n: 0, pos: 0 })), mult: MULTS.map(() => ({ n: 0, pos: 0, caught: 0, rets: [] })), pivots: 0, rets: [] })
+          if (!evs.has(sc.id + side)) evs.set(sc.id + side, { n: 0, pos: 0, bins: BIN.slice(1).map(() => ({ n: 0, pos: 0 })), mult: MULTS.map(() => ({ n: 0, pos: 0, caught: 0, rets: [] })), pivots: 0, rets: [], pc: MULTS.map(prac), pa: prac() })
           const E = evs.get(sc.id + side)!, piv = pivots(s.b, sc, side), y = zoneLabels(x, sc, side, piv)
           const p = new Float64Array(x.n), z = new Float64Array(d)
+          // Sonraki H gün içindeki en düşük (taban) ya da en yüksek (tepe) fiyat
+          const ext = new Float64Array(x.n).fill(NaN)
+          { const a = side === 'low' ? s.b.l : s.b.h, q: number[] = []
+            for (let i = x.n - 1; i >= 0; i--) { // [i+1 … i+H]
+              const j = i + 1
+              if (j < x.n) { while (q.length && (side === 'low' ? a[q[q.length - 1]] >= a[j] : a[q[q.length - 1]] <= a[j])) q.pop(); q.push(j) }
+              while (q.length && q[0] > i + H) q.shift()
+              if (i + H < x.n && q.length) ext[i] = a[q[0]]
+            } }
+          const add = (P: Prac, i: number, ret: number) => {
+            const c = s.b.c[i], adv = side === 'low' ? Math.min(0, ext[i] / c - 1) : Math.max(0, ext[i] / c - 1)
+            const lo = side === 'low' ? Math.min(ext[i], s.b.l[i]) : Math.max(ext[i], s.b.h[i])
+            const gap = side === 'low' ? c / lo - 1 : 1 - c / lo
+            P.n++; if (gap <= 0.05) P.near5++; if (gap <= 0.1) P.near10++
+            if (Math.abs(adv) <= 0.05) P.dd5++; if (Math.abs(adv) <= 0.1) P.dd10++
+            if (side === 'low' ? ret > 0 : ret < 0) P.good++
+            if (P.adv.length < 30000) { P.adv.push(adv); P.ret.push(ret) }
+          }
           for (let i = 0; i < x.n; i++) {
             if (y[i] < 0 || s.b.t[i] < T_TEST) continue
             p[i] = probability(m, vectorOf(m, x, near, i, z))
             const ratio = p[i] / m.base, ret = s.b.c[i + H] / s.b.c[i] - 1
             E.n++; E.pos += y[i]
-            if (rnd() < 0.05) E.rets.push(ret)
+            if (rnd() < 0.05) { E.rets.push(ret); if (!Number.isNaN(ext[i])) add(E.pa, i, ret) }
             const bi = BIN.findIndex((e, k) => k > 0 && ratio < e) - 1
             E.bins[bi].n++; E.bins[bi].pos += y[i]
-            MULTS.forEach((mm, k) => { if (ratio >= mm) { E.mult[k].n++; E.mult[k].pos += y[i]; if (E.mult[k].rets.length < 20000) E.mult[k].rets.push(ret) } })
+            MULTS.forEach((mm, k) => { if (ratio >= mm) { E.mult[k].n++; E.mult[k].pos += y[i]; if (E.mult[k].rets.length < 20000) E.mult[k].rets.push(ret); if (!Number.isNaN(ext[i])) add(E.pc[k], i, ret) } })
           }
           for (const pv of piv.confirmed) {
             if (s.b.t[pv] < T_TEST || y[pv] < 0) continue
@@ -165,11 +185,14 @@ it('tepe ve taban örüntüsü', () => {
         const k = sc.id + side, S = slots.get(k), M = models.get(k), E = evs.get(k)
         if (!S || !M?.B) continue
         const hit = (a: number[]) => (a.length ? a.filter((r) => r > 0).length / a.length : NaN)
+        const pr = (q: Prac) => ({ n: q.n, near5: r4(q.near5 / q.n), near10: r4(q.near10 / q.n), dd5: r4(q.dd5 / q.n), dd10: r4(q.dd10 / q.n), good: r4(q.good / q.n), adv: r4(quant(q.adv, 0.5)), adv75: r4(quant(q.adv, side === 'low' ? 0.25 : 0.75)), ret: r4(quant(q.ret, 0.5)) })
         const test = E && E.pos >= 30 ? {
           days: E.n, base: r4(E.pos / E.n), pivots: E.pivots,
           bins: E.bins.map((b, i) => [BIN[i], b.n, b.n ? r4(b.pos / b.n) : 0]),
           mult: E.mult.map((mm, i) => ({ m: MULTS[i], n: mm.n, prec: mm.n ? r4(mm.pos / mm.n) : 0, recall: E.pivots ? r4(mm.caught / E.pivots) : 0, ret: r4(quant(mm.rets, 0.5)), up: r4(hit(mm.rets)) })),
           ret: r4(quant(E.rets, 0.5)), up: r4(hit(E.rets)),
+          // Pratik ölçüler (sonraki H gün): fiyat dibe/zirveye %5 ve %10 yakın mı, sonra en fazla ne kadar ters gitti, H gün sonra doğru yönde mi
+          prac: { h: Math.min(sc.fwd, 63), all: pr(E.pa), mult: E.pc.map((q, i) => ({ m: MULTS[i], ...pr(q) })) },
         } : undefined
         entry[side] = {
           model: M.B, pivots: S.piv, gap: [quant(S.gaps, 0.25), quant(S.gaps, 0.5), quant(S.gaps, 0.75)],
@@ -178,6 +201,7 @@ it('tepe ve taban örüntüsü', () => {
         }
         const top = M.B.w.map((w, i) => ({ id: ids[i], w })).sort((a, b) => Math.abs(b.w) - Math.abs(a.w)).slice(0, 6).map((q) => `${q.id}${q.w > 0 ? '+' : '−'}${Math.abs(q.w).toFixed(2)}`).join(' ')
         console.log(`${sc.label.padEnd(13)} ${side === 'low' ? 'taban' : 'tepe '}: ${String(S.piv).padStart(6)} dönüş, olağan %${(M.B.base * 100).toFixed(1)} | ${top}`)
+        if (test) { const a = test.prac.all, c = test.prac.mult.find((q) => q.m === 5)!, f = (v: number) => (v * 100).toFixed(0); console.log(`    PRATİK (${test.prac.h} gün): aday ${c.n} gün | dibe/zirveye %5 yakın ${f(c.near5)} vs ${f(a.near5)} | %10 yakın ${f(c.near10)} vs ${f(a.near10)} | sonra en çok %5 ters ${f(c.dd5)} vs ${f(a.dd5)} | %10 ${f(c.dd10)} vs ${f(a.dd10)} | doğru yön ${f(c.good)} vs ${f(a.good)} | ortanca ters ${(c.adv*100).toFixed(1)} vs ${(a.adv*100).toFixed(1)} (kötü çeyrek ${(c.adv75*100).toFixed(1)} vs ${(a.adv75*100).toFixed(1)}) | getiri ${(c.ret*100).toFixed(1)} vs ${(a.ret*100).toFixed(1)}`) }
         if (test) console.log(`    sınama: ${test.days} gün, olağan %${(test.base * 100).toFixed(1)}; ` + test.mult.map((q) => `≥${q.m}x: %${(q.prec * 100).toFixed(0)} (${q.n} gün, yakalanan %${(q.recall * 100).toFixed(0)}, sonra ${(q.ret * 100).toFixed(1)}%/${(q.up * 100).toFixed(0)})`).join('  ') + `  | tüm günler sonra ${(test.ret * 100).toFixed(1)}%/${(test.up * 100).toFixed(0)}`)
         else console.log('    sınama: yeterli örnek yok')
       }
