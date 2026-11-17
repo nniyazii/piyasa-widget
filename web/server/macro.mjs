@@ -33,7 +33,7 @@ export async function macroSeries() {
 }
 
 /** Mum grafikler için açılış/yüksek/düşük/kapanış: aylık (1968'den), haftalık (~19 yıl), günlük (~6 yıl) */
-// VIX ve US10Y yalnızca tepe/taban modelinin makro girdileri içindir (varlık listesinde gösterilmez)
+// VIX ve US10Y: makro tablo ve ileride kullanılmak üzere günlük mumlar (varlık listesinde gösterilmez)
 export const CANDLE_ASSETS = ['GOLD', 'SILVER', 'OIL', 'COPPER', 'SPX', 'XU100', 'USDTRY', 'DXY', 'GAS', 'NDX', 'BTC', 'VIX', 'US10Y']
 const CANDLE_TF = { M: { res: '1M', count: 720 }, W: { res: '1W', count: 1500 }, D: { res: '1D', count: 3000 } }
 /** { KOD: { M|W|D: [[zaman (sn), açılış, yüksek, düşük, kapanış, hacim?], …] } } */

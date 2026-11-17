@@ -52,12 +52,11 @@ jobs:
           done
         timeout-minutes: 6
         continue-on-error: true
-      - name: Tepe ve taban örüntüsü (pazar genelinde öğrenme ve geriye dönük sınama)
-        # Günlük kopyadan yeniden öğrenilir; olmazsa yayındaki kopya, o da yoksa depodaki dosya kalır
+      - name: Abartılı satış sınaması (pazar genelinde, 2021 öncesi eşikler, sonrası sınama)
         run: |
-          if [ -d dist/data/bars/D ] && [ -f dist/data/candles/VIX.json ] && DATA=dist/data/bars CANDLES=dist/data/candles OUT=dist/data/pivots.new.json npm run pivots; then mv dist/data/pivots.new.json dist/data/pivots.json
-          else rm -f dist/data/pivots.new.json; curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/pivots.json" -o dist/data/pivots.new.json && mv dist/data/pivots.new.json dist/data/pivots.json || rm -f dist/data/pivots.new.json; fi
-        timeout-minutes: 8
+          if [ -d dist/data/bars/D ] && DATA=dist/data/bars CANDLES=dist/data/candles OUT=dist/data/extremes.new.json npm run extremes; then mv dist/data/extremes.new.json dist/data/extremes.json
+          else rm -f dist/data/extremes.new.json; curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/extremes.json" -o dist/data/extremes.new.json && mv dist/data/extremes.new.json dist/data/extremes.json || rm -f dist/data/extremes.new.json; fi
+        timeout-minutes: 6
         continue-on-error: true
       - name: Görünümün hazır hâli (Android uygulaması için)
         run: |

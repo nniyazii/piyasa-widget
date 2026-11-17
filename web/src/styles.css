@@ -1347,3 +1347,28 @@ button.ev-row.on { box-shadow: -12px 0 0 var(--sunken), 12px 0 0 var(--sunken); 
 .tn-dir.pro { color: var(--up); } .tn-dir.con { color: var(--down); }
 .linklike { border: 0; background: none; padding: 0; font: inherit; font-weight: 650; color: var(--ink-2); cursor: pointer; }
 @media (max-width: 760px) { .tn-cards { grid-template-columns: minmax(0, 1fr); } .tn-scales button { padding: 5px 8px; font-size: 12.5px; } }
+
+/* Dip ve tepe (abartılı satış) */
+.ex-gauges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.ex-gauge { padding: 14px 16px; border-radius: var(--radius); background: var(--sunken); }
+.ex-gauge h3 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--ink-3); }
+.ex-val { margin: 4px 0 0; font-size: 19px; font-weight: 700; }
+.ex-where { margin: 14px 0 0; max-width: 70ch; }
+.ex-evidence { margin-top: 26px; }
+.ex-table { margin-top: 10px; font-size: 13px; }
+.ex-table th[scope=row] { font-weight: 600; white-space: normal; }
+.ex-table .s { display: block; font-size: 11px; font-weight: 400; color: var(--ink-3); }
+.ex-table td b { font-size: 15px; }
+.ex-table td.pos b, .ex-table td.pos { color: var(--up); } .ex-table td.neg b, .ex-table td.neg { color: var(--down); }
+.ex-table td .s { color: var(--ink-3); }
+.ex-years { display: flex; gap: 6px; align-items: flex-end; margin-top: 8px; flex-wrap: wrap; }
+.ex-years > div { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ex-years .bar { position: relative; width: 22px; height: 60px; border-radius: 4px; background: var(--sunken); overflow: hidden; }
+.ex-years .bar .a { position: absolute; left: 0; right: 0; bottom: 0; background: var(--ink-4); }
+.ex-years .pos .bar .a { background: var(--up); } .ex-years .neg .bar .a { background: var(--down); }
+.ex-years .bar .b { position: absolute; left: -2px; right: -2px; height: 2px; background: var(--ink); }
+.ex-years em { font-style: normal; font-size: 10.5px; color: var(--ink-3); }
+.ex-ep td.pos { color: var(--up); } .ex-ep td.neg { color: var(--down); }
+.ex-alone, .ex-top { margin-top: 16px; }
+.ex-alone { border-top-color: var(--down); }
+@media (max-width: 760px) { .ex-gauges { grid-template-columns: minmax(0, 1fr); } }

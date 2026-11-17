@@ -23,10 +23,10 @@ import { Outlook, OutlookLine } from './Outlook'
 /** Para arzı değerlendirmesinin Görünüm'deki varlığı */
 const OUTLOOK_OF: Record<string, string> = { 'm2-usdtry': 'USDTRY', 'm2-gold-usd': 'GOLD', 'm2-gold-try': 'GAUTRY', 'm2-bist': 'XU100USD' }
 import { StockAnalysis } from './StockAnalysis'
-import { Turning } from './Turning'
+import { Extremes } from './Extremes'
 
 const TABS = [
-  { path: '', label: 'Tepe ve taban' },
+  { path: '', label: 'Dip ve tepe' },
   { path: 'olaylar', label: 'Olaylar' },
   { path: 'makro', label: 'Makro' },
   { path: 'para-arzi', label: 'Para arzı' },
@@ -54,7 +54,7 @@ export function Analysis({ tab, arg }: { tab?: string; arg?: string }) {
       </nav>
       {current.path === 'hisse' ? <StockAnalysis symbol={arg} />
         : current.path === 'makro' ? <Macro />
-        : current.path === '' ? <Turning />
+        : current.path === '' ? <Extremes />
         : current.path === 'olaylar' ? <Outlook practical={s.rows.length || s.advices.length ? <Overview s={s} /> : undefined} />
         : !s.rows.length && !s.advices.length
         ? <p className="an-answer" aria-live="polite">{s.error ?? 'Fiyatlar alınıyor…'}</p>

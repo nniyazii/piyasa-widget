@@ -221,35 +221,32 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   for (const s of ['Dolar (al|sat)', 'Altın (al|sat)', 'Gram altın (al|sat)', 'BIST (al|sat)', 'Ev (al|için bekle)']) if (!money.some((t) => new RegExp('^' + s).test(t))) throw new Error('para arzı kartı yok: ' + s + ' | ' + money.join(' ¦ '))
 })
 
-await step('tepe ve taban: hassasiyet seçimi, sonuç, tetik fiyatı, sınama, grafikte dönüşler', async () => {
-  await page.goto(BASE + '/#/analiz?v=GOLD&h=Q')
-  await page.locator('.tn-cards .tn-card').nth(1).waitFor({ timeout: 40000 })
-  if (!/Altın/.test(await page.locator('.tn-answer').textContent())) throw new Error('cevap: ' + (await page.locator('.tn-answer').textContent()))
-  if (await page.locator('.tn-scales button').count() !== 6) throw new Error('altı hassasiyet bekleniyordu')
-  // İki kart: taban ve tepe; olasılık, rastgele günle karşılaştırma ve sınama cümlesi
-  for (const i of [0, 1]) {
-    const t = await page.locator('.tn-card').nth(i).innerText()
-    if (!/olma olasılığı %[\d,]+\. Rastgele bir günde bu olasılık %[\d,]+/.test(t)) throw new Error('olasılık cümlesi yok: ' + t.slice(0, 120))
-    if (!/Sınama \(2021 sonrası|sınama güvenilir bir sonuç vermedi/.test(t)) throw new Error('sınama cümlesi yok')
-    if (!/geçmişte \d+ kez 3 aylık (taban|tepe) yaptı/.test(t)) throw new Error('geçmiş dönüş sayısı yok')
-  }
-  // Aday olmayan tarafta ya tetik fiyatı ya da fiyatın tek başına yetmediği yazar
-  const cards = await page.locator('.tn-card').allInnerTexts()
-  if (!cards.some((t) => /Aday sayılması için fiyatın yaklaşık|Fiyat tek başına|: aday/.test(t))) throw new Error('tetik fiyatı cümlesi yok')
-  // Örüntü tablosu: şimdi, dönüşlerde genelde, her zaman
-  await page.locator('.tn-why > summary').first().click()
-  if (await page.locator('.tn-why[open] .tn-table tbody tr').count() < 2) throw new Error('örüntü tablosu boş')
-  // Grafik ve hassasiyet değişimi; adres güncellenir
+await step('dip ve tepe: düşüşün sertliği, pazar geneli, geçmiş sonuçlar, panik dönemleri', async () => {
+  await page.goto(BASE + '/#/analiz?v=NASDAQ:NVDA')
+  await page.locator('.ex-gauge').nth(1).waitFor({ timeout: 40000 })
+  if (!/NVDA/.test(await page.locator('.tn-answer').textContent())) throw new Error('cevap: ' + (await page.locator('.tn-answer').textContent()))
+  if (!/hisselerin %[\d,]+’i aşırı satılmış/.test(await page.locator('.ex-gauge').nth(1).innerText())) throw new Error('pazar genişliği yok')
+  // Sınama cümlesi ve tablo: 2021 sonrası ve öncesi, her zamanki oranla
+  const say = await page.locator('.ex-evidence .tn-say').first().textContent()
+  if (!/10 seferin \d+ tanesinde yukarıdaydı; herhangi bir günde alınsaydı 10 seferin \d+/.test(say)) throw new Error('sınama cümlesi: ' + say)
+  if (await page.locator('.ex-evidence tbody tr').count() !== 2) throw new Error('iki dönem satırı bekleniyordu')
+  if (await page.locator('.ex-years > div').count() < 3) throw new Error('yıl yıl döküm yok')
+  // Panik dönemleri, tek başına düşüş uyarısı, tepe notu, grafik
+  if (await page.locator('.ex-ep tbody tr').count() < 5) throw new Error('panik dönemleri eksik')
+  await page.locator('.ex-alone').waitFor()
+  await page.locator('.ex-top', { hasText: 'güvenilir bir işaret yok' }).waitFor()
   await page.locator('.cc-plot canvas').first().waitFor({ timeout: 10000 })
-  await page.locator('.tn-scales button', { hasText: '1 yıllık' }).click()
-  await page.waitForFunction(() => /h=Y/.test(location.hash), null, { timeout: 5000 })
-  await page.locator('.tn-card', { hasText: '1 yıllık taban bölgesinde' }).waitFor({ timeout: 10000 })
-  // Hisse: arama ile seç; BIST dolar bazında
+  // Makro varlık: genişlik yok, kendi geçmişi
+  await page.locator('.wb-assets .chip', { hasText: 'Altın' }).first().click()
+  await page.waitForFunction(() => /v=GOLD/.test(location.hash), null, { timeout: 5000 })
+  await page.locator('.tn-answer', { hasText: 'Altın' }).waitFor({ timeout: 20000 })
+  if (await page.locator('.ex-gauge').count() !== 1) throw new Error('makroda tek gösterge bekleniyordu')
+  // BIST: dolar bazında, BIST sınaması
   await page.locator('.st-search input').fill('thyao')
   await page.locator('.st-hits button', { hasText: 'THYAO' }).first().click()
   await page.locator('.tn-answer', { hasText: 'THYAO' }).waitFor({ timeout: 40000 })
   if (!/dolar bazında/.test(await page.locator('.cc-ohlc b').first().textContent())) throw new Error('BIST dolar bazında değil')
-  if (!/BIST hisseleri/.test(await page.locator('.tn-test').first().textContent())) throw new Error('BIST modeli kullanılmadı')
+  if (!/BIST hisseleri/.test(await page.locator('.ex-evidence .tn-say').first().textContent())) throw new Error('BIST sınaması kullanılmadı')
 })
 
 await step('görünüm: tek cümlelik sonuç, vade kutuları, mum grafik, ayrıntı kapalı', async () => {
@@ -315,7 +312,7 @@ await step('analiz: hisse seç, mum grafik, pazar geneli kanıt, güçlü kurulu
   await page.goto(BASE + '/#/analiz')
   await page.locator('.an-tabs a', { hasText: 'Hisse' }).click()
   await page.locator('.an-tabs a[aria-current=page]', { hasText: 'Hisse' }).waitFor({ timeout: 5000 })
-  await page.locator('.tn-scales').waitFor({ state: 'detached', timeout: 5000 })
+  await page.locator('.ex-gauges').waitFor({ state: 'detached', timeout: 5000 })
   await page.locator('.st-search input').fill('thyao')
   await page.locator('.st-hits button', { hasText: 'THYAO' }).first().click()
   await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
@@ -400,7 +397,7 @@ await step('alarmlar: fiyat, avantajlı fiyat, olay ve güçlü kurulum kur; ça
 await step('mobil: analiz sayfalarında yatay taşma yok', async () => {
   const m = await ctx.newPage()
   await m.setViewportSize({ width: 390, height: 800 })
-  for (const h of ['analiz?v=GOLD&h=Q', 'analiz?v=BIST:THYAO&h=Y', 'analiz/olaylar?v=GOLD', 'analiz/hisse/BIST:THYAO', 'analiz/makro', 'alarmlar?tur=olay&s=GOLD&e=rsi-30&tf=W']) {
+  for (const h of ['analiz?v=GOLD', 'analiz?v=BIST:THYAO', 'analiz?v=NASDAQ:NVDA', 'analiz/olaylar?v=GOLD', 'analiz/hisse/BIST:THYAO', 'analiz/makro', 'alarmlar?tur=olay&s=GOLD&e=rsi-30&tf=W']) {
     await m.goto(BASE + '/#/' + h)
     await m.waitForTimeout(3500)
     const over = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
