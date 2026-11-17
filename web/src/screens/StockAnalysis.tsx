@@ -8,9 +8,8 @@ import type { SearchHit } from '../core/catalog'
 import * as Fmt from '../core/format'
 import type { World } from '../core/macro'
 import type { Basis } from '../core/setups'
-import { sentence, TF_LABEL, type Tf } from '../core/study'
+import { sentence, type Tf } from '../core/study'
 import { marketOfSubject } from '../core/subject'
-import { chartUrl } from '../core/tradingview'
 import { loadBars, loadSetups, loadSymbols, resolveSymbol, type SetupData } from '../data/bars'
 import { customEvent } from '../core/study'
 import { useCustomEvents } from '../data/custom'
@@ -176,46 +175,35 @@ function Result({ s, basis, onBasis, initialEvent, initialTf }: { s: Loaded; bas
   const strongOn = s.setups?.list.some((x) => x.active && x.strength?.strong)
   return (
     <>
-      <header className="an-head">
-        <h2>{code}: yakın zamanda ne oldu, bundan sonrası için geçmiş ne söylüyor?</h2>
-        <p className="an-answer ev-answer" aria-live="polite">{lead ? lead.text : 'Yakın zamanda dikkat çekici bir olay olmadı.'}</p>
-      </header>
-      <p className="an-sub">
-        {lead ? `${TF_LABEL[lead.tf]} veriden. ${lead.clear ? '' : 'Bu olay geçmişte yönü belirgin biçimde değiştirmemiş. '}` : ''}
-        Grafikte bir olay seç: hissedeki tüm geçmiş örnekleri işaretlenir, sonrasındaki yön olasılıkları üstte durur. {strongOn ? 'Ayrıca şu an güçlü bir kurulum açık (aşağıda).' : ''}
-      </p>
-      {subject.market === 'TR' && (
-        <div className="wb-basis">
+      <header className="an-head wb-head">
+        <h2>{code}: yakın zamanda ne oldu, geçmişte sonrasında ne olmuştu?</h2>
+        {subject.market === 'TR' && (
           <div className="segmented" role="group" aria-label="Fiyat bazı">
             <button type="button" aria-pressed={basis === 'usd'} onClick={() => onBasis('usd')}>Dolar bazında</button>
             <button type="button" aria-pressed={basis === 'try'} onClick={() => onBasis('try')}>TL</button>
           </div>
-          <span className="note">{subject.usd ? 'Fiyatlar Dolar/TL kuruna bölündü: TL’deki enflasyon yükselişi olduğundan büyük göstermesin diye.' : 'TL fiyatlarında enflasyon nedeniyle “yukarıda olma” oranları yüksek çıkar; olağan oranla farkına bak.'}</span>
-        </div>
-      )}
+        )}
+      </header>
 
       <Workbench subject={subject} world={s.world} defaultTf="W" initialEvent={initialEvent} initialTf={initialTf} lead={lead} market={s.market} />
 
-      <p className="st-alarm"><a className="btn ghost small" href={href('alarmlar', { tur: 'fiyat', s: s.symbol })}><Icon name="bell" />Fiyat alarmı kur</a><a className="btn ghost small" href={chartUrl(s.symbol)} target="_blank" rel="noreferrer"><Icon name="external" />TradingView’de aç</a></p>
-
       {s.setups && head && (
-        <section className="an-group">
-          <h3>Güçlü kurulumlar: pazar genelinde üç ayrı dönemde sınanmış dip ve tepe durumları</h3>
-          <p className="an-sub"><b>{head.answer}</b> {head.sub}</p>
-          <details className="an-how st-frame" open={strongOn || undefined}>
-            <summary>Kurulumlar, koşullar ve bu hissedeki geçmiş örnekler</summary>
-            <SetupsView d={s.setups} symbol={s.symbol} onBasis={onBasis} />
-          </details>
-        </section>
+        <details className="an-how wb-setups" open={strongOn || undefined}>
+          <summary>Güçlü kurulumlar: {head.answer}</summary>
+          <p className="an-sub">{head.sub}</p>
+          <SetupsView d={s.setups} symbol={s.symbol} onBasis={onBasis} />
+        </details>
       )}
 
       <details className="an-how">
         <summary>Nasıl hesaplanıyor, nelere dikkat etmeli</summary>
         <ul>
+          <li><b>Kutudaki sayı</b>: “9’da 3”, olayın önceki 9 seferinin 3’ünde fiyatın seçilen süre sonra daha yukarıda olduğunu söyler. “Olağan: 10’da 7”, hissenin herhangi bir andan aynı süre sonra 10 seferin 7’sinde yukarıda olduğunu. Kutulara dokunarak süreyi değiştirirsin; grafikteki okların rengi de o süreye göre boyanır.</li>
+          {subject.market === 'TR' && <li><b>Dolar bazında</b>: fiyatlar Dolar/TL kuruna bölünür; TL’deki enflasyon yükselişi olduğundan büyük göstermesin diye. TL’ye geçebilirsin.</li>}
           <li><b>Olay</b>: bir durumun başladığı mumdur (RSI’ın 30’un altına indiği ilk mum gibi). Aynı olayın iki başlangıcı arasında bir süre aranır; böylece tek bir hareket birkaç kez sayılmaz.</li>
           <li><b>Yukarıda olma oranı</b>: olayın geçmişteki her örneğinden sonra, seçilen vadede fiyatın daha yukarıda olduğu örneklerin payı. Olay yakın zamanda gerçekleştiyse ölçüm, olaydan bugüne geçen süre kadar ilerlenip oradan yapılır; yani tablo “bugünden sonrası” içindir.</li>
           <li><b>Olağan</b>: hissenin herhangi bir mumundan aynı süre sonraki yukarıda olma oranı. Sürekli yükselen bir hissede her olaydan sonra fiyat yukarıdadır; asıl bilgi olağanla farktır.</li>
-          <li><b>Renkli hücre</b> (belirgin): en az 8 örnek, olağandan en az 12 puan fark, %95 güven aralığı olağan oranı dışarıda bırakıyor ve geçmişin iki yarısında da aynı yönde. Rastgele yürüyüş verisinde bu şartları olayların %5’inden azı sağlar; yine de onlarca olay birden sınandığı için tek bir renkli hücre şans olabilir.</li>
+          <li><b>“Olağandan belirgin iyi / kötü”</b>: en az 8 örnek, olağandan en az 12 puan fark, %95 güven aralığı olağan oranı dışarıda bırakıyor ve geçmişin iki yarısında da aynı yönde. Rastgele yürüyüş verisinde bu şartları olayların %5’inden azı sağlar; yine de onlarca olay birden sınandığı için tek bir renkli hücre şans olabilir.</li>
           <li><b>Aralık</b>: gerçek oranın %80 olasılıkla içinde bulunduğu aralık. Örnek azsa aralık geniştir; 10 örnekte %70, “%45 ile %87 arası” demektir.</li>
           <li><b>Pazar geneli</b>: aynı olay o pazardaki tüm hisselerde binlerce kez gerçekleşmiştir. Tek hissedeki 10–20 örnek şansa açıktır; pazar genelindeki sonuç ve üç ayrı dönemdeki tutarlılığı, hissedeki bulgunun ne kadar ciddiye alınacağını gösterir. İkisi aynı yöndeyse bulgu daha güvenilirdir.</li>
           {s.setups && <SetupsHow d={s.setups} />}

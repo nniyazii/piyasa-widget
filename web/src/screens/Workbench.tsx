@@ -8,7 +8,7 @@ import * as Fmt from '../core/format'
 import type { World } from '../core/macro'
 import { macroEventDefs } from '../core/macroEvents'
 import {
-  agoLabel, CUSTOM_IND, customEvent, customLabel, eventDefs, GROUP_LABEL, HORIZON_LABEL, joints, LONG_MA_LABEL, prepare, RECENT_LABEL, recentStudies, sentence, study, TF_LABEL,
+  agoLabel, CUSTOM_IND, customEvent, customLabel, eventDefs, GROUP_LABEL, HORIZON_LABEL, joints, LONG_MA_LABEL, prepare, RECENT_LABEL, recentStudies, study, TF_LABEL,
   type CustomCond, type CustomInd, type EventDef, type EventGroup, type HorizonStat, type Study, type Tf,
 } from '../core/study'
 import { customActions, useCustomEvents } from '../data/custom'
@@ -22,6 +22,21 @@ const TF_KEY = 'piyasa.tezgah.tf'
 const p0 = (v: number) => (Number.isNaN(v) ? '—' : '%' + Fmt.number(v * 100, 0))
 const pct = (v: number | undefined, d = 0) => (v == null || Number.isNaN(v) ? '—' : (v > 0.00005 ? '+' : v < -0.00005 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), d))
 export const savedTf = (fallback: Tf): Tf => { try { const v = localStorage.getItem(TF_KEY); return v === 'M' || v === 'W' || v === 'D' ? v : fallback } catch { return fallback } }
+
+export type Tone = 'up' | 'down' | 'flat' | 'thin'
+/** Düz sözle sonuç: olağandan belirgin iyi / kötü / farksız / örnek az */
+export function verdict(s: HorizonStat): { tone: Tone; text: string } {
+  if (s.n < 5) return { tone: 'thin', text: 'örnek az' }
+  if (!s.clear) return { tone: 'flat', text: 'olağandan farksız' }
+  return s.up > s.base ? { tone: 'up', text: 'olağandan belirgin iyi' } : { tone: 'down', text: 'olağandan belirgin kötü' }
+}
+const hits = (s: HorizonStat) => Math.round(s.up * s.n)
+/** Liste satırlarında tek sonuç: "3 ay sonra 9'da 3; olağandan belirgin kötü" */
+export function Verdict({ stats }: { stats: HorizonStat[] }) {
+  const s = stats.find((x) => x.clear) ?? stats[1] ?? stats[0]
+  const v = verdict(s)
+  return <span className={'vc ' + v.tone}><b className="num">{s.n < 5 ? '—' : `${s.n}’de ${hits(s)}`}</b><em>{s.label} sonra; {v.text.replace('olağandan ', '')}</em></span>
+}
 
 /** Bir vadenin olasılık hücresi: yukarıda olma oranı, olağan oran çentiği, güven aralığı ve ortalama hareketler */
 export function Odds({ s, compact }: { s: HorizonStat; compact?: boolean }) {
@@ -141,7 +156,8 @@ export function Workbench({ subject, world, defaultTf = 'W', initialEvent, initi
   const [tf, setTfState] = useState<Tf>(() => { const s = initialTf ?? (!initialEvent && lead ? lead.tf : savedTf(defaultTf)); return available.includes(s) ? s : available.includes(defaultTf) ? defaultTf : available[0] ?? 'W' })
   const setTf = (t: Tf) => { setTfState(t); setPicked(undefined); try { localStorage.setItem(TF_KEY, t) } catch { /* depolama kapalı */ } }
   const [eventId, setEventId] = useState<string | undefined>(initialEvent ?? lead?.event)
-  const [hz, setHz] = useState(2)
+  // Seçili vade: kullanıcı seçmediyse olayın en belirgin vadesi, o da yoksa ikinci vade (yaklaşık 3 ay)
+  const [hzPick, setHz] = useState<number | undefined>()
   const [picked, setPicked] = useState<number | undefined>()
   const [composing, setComposing] = useState(false)
   useEffect(() => { if (initialEvent) { setEventId(initialEvent); if (initialTf && available.includes(initialTf)) setTfState(initialTf); setPicked(undefined) } }, [initialEvent, initialTf])
@@ -164,99 +180,106 @@ export function Workbench({ subject, world, defaultTf = 'W', initialEvent, initi
   const { x, defs, recent } = model
   const def = defs.find((d) => d.id === eventId) ?? recent[0]?.def ?? defs[0]
   const st = recent.find((s) => s.def.id === def.id) ?? study(x, def)
+  const hz = hzPick ?? (st.best ? st.view.indexOf(st.best) : 1)
   const marks: Mark[] = st.onsets.map((i) => { const r = st.outcomes.get(i)![hz]; return { index: i, outcome: r == null ? 'open' : r > 0 ? 'up' : 'down' } })
   const name = def.standalone ? def.label : `${subject.short} ${def.label}`
   const dates = (i: number) => barDate(tf, x.t[i])
   const grouped = (g: EventGroup) => defs.filter((d) => d.group === g && !recent.some((r) => r.def.id === d.id))
   const ev = market?.(tf, def.id)
   const pickedOut = picked != null ? st.outcomes.get(picked) : undefined
+  const sel = st.view[hz], v = verdict(sel)
+  const last = st.onsets.length ? st.onsets[st.onsets.length - 1] : undefined
+  const pickEvent = (id: string) => { setEventId(id); setHz(undefined); setPicked(undefined) }
   return (
     <section className="an-group wb">
-      <h3>{heading ?? 'Grafik: olay geçmişte ne zaman oldu, sonrasında ne oldu'}</h3>
+      {heading && <h3>{heading}</h3>}
       <div className="wb-pick">
-        <label className="sc-pick">Olay
-          <select className="select" value={def.id} onChange={(e) => { setEventId(e.target.value); setPicked(undefined) }}>
+        <div className="segmented" role="group" aria-label="Zaman dilimi">{available.map((t) => <button key={t} type="button" aria-pressed={tf === t} onClick={() => { setTf(t); setHz(undefined) }}>{TF_LABEL[t]}</button>)}</div>
+        <label className="sc-pick"><span className="sr-only">Olay</span>
+          <select className="select" value={def.id} onChange={(e) => pickEvent(e.target.value)}>
             {recent.length > 0 && <optgroup label={`Yakın zamanda olanlar (${RECENT_LABEL[tf]})`}>{recent.map((r) => <option key={r.def.id} value={r.def.id}>{r.def.label} ({agoLabel(tf, r.recent!.elapsed)})</option>)}</optgroup>}
             {(Object.keys(GROUP_LABEL) as EventGroup[]).map((g) => grouped(g).length > 0 && <optgroup key={g} label={GROUP_LABEL[g]}>{grouped(g).map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</optgroup>)}
           </select>
         </label>
-        <button type="button" className="btn ghost small" onClick={() => setComposing((v) => !v)} aria-expanded={composing}><Icon name="plus" />Kendi olayını tanımla</button>
-        {def.group === 'özel' && <button type="button" className="btn ghost small" onClick={() => { customActions.remove(def.id.slice(2)); setEventId(undefined) }}><Icon name="trash" />Bu olayı sil</button>}
       </div>
-      {composing && <Composer onDone={(id) => { setComposing(false); setEventId(id); setPicked(undefined) }} />}
 
-      <div className="wb-side">
+      <div className={'wb-card ' + v.tone}>
         <p className="wb-name">{name}</p>
-        <p className="wb-count">
-          {st.onsets.length ? <><b className="num">{st.onsets.length}</b> kez oldu ({dates(st.onsets[0])} – {dates(st.onsets[st.onsets.length - 1])}).</> : 'Bu varlıkta hiç olmadı.'}
-          {st.recent ? ` Sonuncusu ${agoLabel(tf, st.recent.elapsed)}${st.recent.detail ? ` (${st.recent.detail})` : ''}${st.recent.since != null ? `; o günden beri ${pct(st.recent.since, 1)}` : ''}.` : ''}
-        </p>
-        {st.onsets.length > 0 && <OddsTable stats={st.view} caption={st.recent ? 'Bugünden sonra yukarıda olma oranı' : 'Olaydan sonra yukarıda olma oranı'} />}
-        <div className="wb-hz">
-          <span>İşaret rengi ve dağılım:</span>
-          <div className="segmented" role="group" aria-label="Vade">{HORIZON_LABEL[tf].map((h, i) => <button key={h} type="button" aria-pressed={hz === i} onClick={() => setHz(i)}>{h}</button>)}</div>
-          <span>sonrası</span>
-        </div>
-        <p className="note">
-          {!st.onsets.length ? 'Başka bir olay ya da zaman dilimi seç.'
-            : st.recent ? `Olay yakın zamanda gerçekleşti; olasılıklar, önceki ${st.recent.stats[0].n} örnekte olaydan aynı süre geçtikten sonrası içindir.`
-              : 'Olay yakın zamanda gerçekleşmedi; olasılıklar olayın gerçekleştiği mumdan sonrası içindir ve tekrar gerçekleştiğinde ne beklenebileceğini gösterir.'}
-          {st.best ? ` En belirgin vade ${st.best.label}: ${p0(st.best.up)} (olağan ${p0(st.best.base)}).` : st.onsets.length ? ' Hiçbir vadede olağandan belirgin biçimde ayrışmıyor.' : ''}
-        </p>
-        <p className="st-alarm"><a className="btn ghost small" href={href('alarmlar', { tur: 'olay', s: subject.id, e: def.id, tf })}><Icon name="bell" />Bu olay olunca haber ver</a></p>
-      </div>
-
-      <CandleChart bars={bars} tf={tf} title={subject.label} marks={marks} selected={picked} onPick={setPicked} ma={x.ma} maLabel={LONG_MA_LABEL[tf]} rsi={x.rsi}
-        controls={<div className="segmented" role="group" aria-label="Zaman dilimi">{available.map((t) => <button key={t} type="button" aria-pressed={tf === t} onClick={() => setTf(t)}>{TF_LABEL[t]}</button>)}</div>} />
-
-      {picked != null && pickedOut && (
-        <p className="wb-picked" role="status">
-          <b>{dates(picked)}</b> gerçekleşmesinden sonra: {HORIZON_LABEL[tf].map((h, i) => <span key={h}>{h} <b className={'num ' + (pickedOut[i] == null ? '' : pickedOut[i]! > 0 ? 'pos' : 'neg')}>{pickedOut[i] == null ? 'bekleniyor' : pct(pickedOut[i], 1)}</b></span>)}
-          <button type="button" className="btn ghost small" onClick={() => setPicked(undefined)}>Kapat</button>
-        </p>
-      )}
-      <Strip st={st} hz={hz} picked={picked} onPick={setPicked} dates={dates} />
-
-      {ev && (
-        <div className="wb-market">
-          <b>{subject.market === 'TR' ? 'BIST' : 'ABD'} hisselerinin tamamında aynı olay ({Fmt.number(ev.stocks, 0)} hisse)</b>
-          <OddsTable compact stats={ev.n.map((n, i) => ({ bars: i, label: HORIZON_LABEL[tf][i], n, up: ev.up[i], lo: ev.up[i], hi: ev.up[i], median: NaN, q25: NaN, q75: NaN, avgUp: NaN, avgDown: NaN, base: ev.base[i], baseMedian: NaN, consistent: true, clear: n >= 200 && Math.abs(ev.up[i] - ev.base[i]) >= 0.05 && ev.periods.every((p) => p[0] < 100 || Math.sign(p[1] - p[2]) === Math.sign(ev.up[i] - ev.base[i])) }))} />
-          <p className="note">Üç dönemde ({HORIZON_LABEL[tf][2]} sonrası): {ev.periods.map((p, i) => `${['2019’a kadar', '2020–2023', '2024’ten beri'][i]} ${p[0] ? `${p0(p[1])} (olağan ${p0(p[2])}, ${Fmt.number(p[0], 0)} kez)` : 'veri yok'}`).join('; ')}. Renkli hücre: pazar genelinde olağandan en az 5 puan farklı ve üç dönemde aynı yönde.</p>
-        </div>
-      )}
-
-      {st.recent && st.recent.paths.length >= 3 && (
-        <details className="an-how st-frame">
-          <summary>Bu sefer ve geçmiş örnekler üst üste</summary>
-          <div className="ev-more"><EventFan paths={st.recent.paths.map((p) => ({ name: dates(p.index), path: p.path }))} current={st.recent.current} elapsed={st.recent.elapsed} span={st.stats[st.stats.length - 1].bars} label={subject.short} tf={tf} /></div>
-        </details>
-      )}
-
-      <div className="wb-recent">
-        <h4>Yakın zamanda ne oldu ({RECENT_LABEL[tf]})</h4>
-        {recent.length > 0 && <p className="note">Bu zaman diliminde {defs.length} olay tanımı sınandı; {recent.length} tanesi yakın zamanda gerçekleşti. Renkli hücreler olağandan belirgin biçimde ayrışanlardır; rastgele veride de yaklaşık 20 olaydan biri şans eseri böyle görünür, bu yüzden tek bir renkli hücreye değil, birbirini destekleyen olaylara bak.</p>}
-        {!recent.length && <p className="note">Bu zaman diliminde yakın zamanda istatistiksel olarak dikkat çekici bir olay olmadı. Başka bir zaman dilimi seç ya da olay listesinden bir olayın geçmişine bak.</p>}
-        {recent.map((r) => (
-          <button key={r.def.id} type="button" className={'ev-row btn-row' + (r.best ? ' strong' : '') + (r.def.id === def.id ? ' on' : '')} onClick={() => { setEventId(r.def.id); setPicked(undefined) }}>
-            <span className="when">{dates(r.recent!.index)}<em>{agoLabel(tf, r.recent!.elapsed)}</em></span>
-            <span className="what"><b>{sentence(subject.short, r)}</b><em>önceden {r.recent!.stats[0].n} kez{r.recent!.since != null ? `; o günden beri ${pct(r.recent!.since, 1)}` : ''}</em></span>
-            <OddsTable compact stats={r.view} />
-          </button>
-        ))}
-        {model.joints.length > 0 && (
+        {!st.onsets.length ? <p className="wb-say">Bu varlıkta hiç olmadı. Başka bir olay ya da zaman dilimi seç.</p> : (
           <>
-            <h4>Birlikte gerçekleşenler</h4>
-            <p className="note">Yakın zamandaki iki olayın geçmişte de birlikte (aynı {RECENT_LABEL[tf].replace('son ', '')} içinde) gerçekleştiği anlar ve bugünden sonrası.</p>
-            {model.joints.map((j) => (
-              <div key={j.a.id + j.b.id} className={'ev-row' + (j.best ? ' strong' : '')}>
-                <span className="when">{j.anchors.length} kez<em>birlikte</em></span>
-                <span className="what"><b>{j.a.label}</b><em>ve {j.b.label}</em></span>
-                <OddsTable compact stats={j.stats} />
-              </div>
-            ))}
+            <p className="wb-say">
+              {st.recent
+                ? <>{agoLabel(tf, st.recent.elapsed).replace(/^./, (c) => c.toLocaleUpperCase('tr'))} oldu{st.recent.detail ? ` (${st.recent.detail})` : ''}. Önceki <b className="num">{sel.n}</b> seferin </>
+                : <>Geçmişte <b className="num">{st.onsets.length}</b> kez oldu (son: {dates(last!)}). Bunların </>}
+              {sel.n < 5 ? <>sayısı sonuç çıkarmak için az.</> : <><b className="num">{hits(sel)}</b> tanesinde fiyat{st.recent && st.recent.elapsed > 0 ? ', bugünkü aşamadan' : ''} {sel.label} sonra daha yukarıdaydı. Olağan: 10’da {Fmt.number(sel.base * 10, 0)}.</>}
+            </p>
+            <p className={'wb-verdict ' + v.tone}>{v.tone === 'thin' ? 'Örnek az' : v.text.replace(/^./, (c) => c.toLocaleUpperCase('tr'))}</p>
+            <div className="wb-hzs" role="group" aria-label="Ne kadar sonra">
+              {st.view.map((s, i) => { const t = verdict(s); return (
+                <button key={s.bars} type="button" className={t.tone} aria-pressed={hz === i} onClick={() => { setHz(i); setPicked(undefined) }} title={t.text}>
+                  <span>{s.label} sonra</span><b className="num">{s.n < 5 ? '—' : `${s.n}’de ${hits(s)}`}</b>
+                </button>
+              ) })}
+            </div>
           </>
         )}
       </div>
+
+      <CandleChart bars={bars} tf={tf} title={subject.label} marks={marks} selected={picked} onPick={setPicked} ma={x.ma} maLabel={LONG_MA_LABEL[tf]} rsi={x.rsi} />
+
+      {picked != null && pickedOut && (
+        <p className="wb-picked" role="status">
+          <b>{dates(picked)}</b> sonrası: {HORIZON_LABEL[tf].map((h, i) => <span key={h}>{h} <b className={'num ' + (pickedOut[i] == null ? '' : pickedOut[i]! > 0 ? 'pos' : 'neg')}>{pickedOut[i] == null ? 'bekleniyor' : pct(pickedOut[i], 1)}</b></span>)}
+          <button type="button" className="btn ghost small" onClick={() => setPicked(undefined)}>Kapat</button>
+        </p>
+      )}
+
+      <p className="st-alarm">
+        <a className="btn ghost small" href={href('alarmlar', { tur: 'olay', s: subject.id, e: def.id, tf, usd: subject.kind === 'stock' && subject.usd ? '1' : undefined })}><Icon name="bell" />Bu olay olunca haber ver</a>
+        <button type="button" className="btn ghost small" onClick={() => setComposing((c) => !c)} aria-expanded={composing}><Icon name="plus" />Kendi olayını tanımla</button>
+        {def.group === 'özel' && <button type="button" className="btn ghost small" onClick={() => { customActions.remove(def.id.slice(2)); setEventId(undefined) }}><Icon name="trash" />Bu olayı sil</button>}
+      </p>
+      {composing && <Composer onDone={(id) => { setComposing(false); pickEvent(id) }} />}
+
+      {st.onsets.length > 0 && (
+        <details className="an-how st-frame wb-more">
+          <summary>Ayrıntı: yüzdeler, her seferin sonucu{ev ? ', bütün hisselerde aynı olay' : ''}</summary>
+          <OddsTable stats={st.view} caption={st.recent ? 'Bugünden sonra yukarıda olma oranı (yüzde), olağan oran, olası aralık ve ortalama kazanç/kayıp' : 'Olaydan sonra yukarıda olma oranı (yüzde), olağan oran, olası aralık ve ortalama kazanç/kayıp'} />
+          <Strip st={st} hz={hz} picked={picked} onPick={setPicked} dates={dates} />
+          {ev && (
+            <div className="wb-market">
+              <b>{subject.market === 'TR' ? 'BIST' : 'ABD'} hisselerinin tamamında aynı olay ({Fmt.number(ev.stocks, 0)} hisse)</b>
+              <OddsTable compact stats={ev.n.map((n, i) => ({ bars: i, label: HORIZON_LABEL[tf][i], n, up: ev.up[i], lo: ev.up[i], hi: ev.up[i], median: NaN, q25: NaN, q75: NaN, avgUp: NaN, avgDown: NaN, base: ev.base[i], baseMedian: NaN, consistent: true, clear: n >= 200 && Math.abs(ev.up[i] - ev.base[i]) >= 0.05 && ev.periods.every((p) => p[0] < 100 || Math.sign(p[1] - p[2]) === Math.sign(ev.up[i] - ev.base[i])) }))} />
+              <p className="note">Tek hissedeki birkaç örnek şansa açıktır; pazar genelindeki sonuç aynı yöndeyse bulgu daha güvenilirdir. Üç dönemde ({HORIZON_LABEL[tf][2]} sonrası): {ev.periods.map((p, i) => `${['2019’a kadar', '2020–2023', '2024’ten beri'][i]} ${p[0] ? `${p0(p[1])} (olağan ${p0(p[2])})` : 'veri yok'}`).join('; ')}.</p>
+            </div>
+          )}
+          {st.recent && st.recent.paths.length >= 3 && <div className="ev-more"><EventFan paths={st.recent.paths.map((p) => ({ name: dates(p.index), path: p.path }))} current={st.recent.current} elapsed={st.recent.elapsed} span={st.stats[st.stats.length - 1].bars} label={subject.short} tf={tf} /></div>}
+          {model.joints.length > 0 && (
+            <>
+              <h4>Yakın zamandaki iki olay geçmişte de birlikte olduğunda</h4>
+              {model.joints.map((j) => (
+                <div key={j.a.id + j.b.id} className="ev-row">
+                  <span className="what"><b>{j.a.label}</b><em>ve {j.b.label}; {j.anchors.length} kez birlikte</em></span>
+                  <Verdict stats={j.stats} />
+                </div>
+              ))}
+            </>
+          )}
+        </details>
+      )}
+
+      {recent.length > 0 && (
+        <div className="wb-recent">
+          <h4>Yakın zamanda olanlar ({RECENT_LABEL[tf]})</h4>
+          {recent.map((r) => (
+            <button key={r.def.id} type="button" className={'ev-row btn-row' + (r.def.id === def.id ? ' on' : '')} onClick={() => pickEvent(r.def.id)}>
+              <span className="what"><b>{nameOf(subject, r.def)}</b><em>{dates(r.recent!.index)}, {agoLabel(tf, r.recent!.elapsed)}</em></span>
+              <Verdict stats={r.view} />
+            </button>
+          ))}
+          <p className="note">{defs.length} olay sınandı; bu kadar sınamada yaklaşık 20’de biri şans eseri “belirgin” görünür.</p>
+        </div>
+      )}
     </section>
   )
 }

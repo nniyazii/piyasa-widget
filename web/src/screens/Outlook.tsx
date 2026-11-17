@@ -7,15 +7,14 @@ import * as Fmt from '../core/format'
 import type { MacroData, World } from '../core/macro'
 import { world as worldOf } from '../core/macro'
 import { LAYER_LABEL, outlookView, type Layer, type LayerId, type Outlook as View, type OutlookView, type Stance } from '../core/outlook'
-import { agoLabel, customEvent, sentence, TF_LABEL, type Study, type Tf } from '../core/study'
+import { agoLabel, TF_LABEL, type Study, type Tf } from '../core/study'
 import { MACRO_ASSETS } from '../core/subject'
-import { useCustomEvents } from '../data/custom'
 import { loadMacro } from '../data/macro'
 import { loadSubject, type Subject } from '../data/subjects'
 import { barDate } from '../ui/CandleChart'
 import { Icon } from '../ui/Icon'
 import { href, setQuery, useRoute } from '../ui/router'
-import { nameOf, OddsTable, recentOf, Workbench } from './Workbench'
+import { nameOf, recentOf, Verdict, Workbench } from './Workbench'
 
 export { loadMacro }
 const SEEN_KEY = 'piyasa.gorunum.v1'
@@ -95,7 +94,6 @@ function useAcross(world: World | undefined) {
 
 function Page({ v, world, loading, generated, practical }: { v?: OutlookView; world?: World; loading: boolean; generated?: number; practical?: ReactNode }) {
   const { query } = useRoute()
-  const custom = useCustomEvents()
   const across = useAcross(world)
   const saved = (() => { try { return localStorage.getItem(ASSET_KEY) } catch { return null } })()
   // Adreste varlık yoksa başlıktaki olayın varlığı açılır; o da yoksa son bakılan
@@ -113,16 +111,10 @@ function Page({ v, world, loading, generated, practical }: { v?: OutlookView; wo
   const shown = across ? (all ? across.list : across.list.slice(0, 8)) : []
   return (
     <>
-      <header className="an-head">
-        <h2>Görünüm: son dönemde ne oldu, bundan sonrası için geçmiş ne söylüyor?</h2>
-        <p className="an-answer ev-answer" aria-live="polite">
-          {!across ? 'Mum verileri yükleniyor…' : top ? sentence(top.subject.short, top.study) : 'Yakın zamanda yön olasılığını belirgin biçimde değiştiren bir olay yok.'}
-        </p>
+      <header className="an-head wb-head">
+        <h2>Yakın zamanda ne oldu, geçmişte aynı şeyden sonra ne olmuştu?</h2>
       </header>
-      <p className="an-sub">
-        {top ? `${TF_LABEL[top.tf]} veriden; ${agoLabel(top.tf, top.study.recent!.elapsed)}. ` : ''}
-        Aşağıdaki grafikte varlık, zaman dilimi ve olay seç: olayın bütün geçmiş örnekleri mum grafikte işaretlenir, sonrasındaki yön olasılıkları üstünde durur.
-      </p>
+      {!across && <p className="an-answer" aria-live="polite">Mum verileri yükleniyor…</p>}
 
       {across && subject && (
         <div id="tezgah">
@@ -130,26 +122,22 @@ function Page({ v, world, loading, generated, practical }: { v?: OutlookView; wo
             {across.subjects.map((a) => <button key={a.id} type="button" className="chip" aria-pressed={a.id === subject.id} onClick={() => pick(a.id)}>{a.short}</button>)}
             <a className="chip link" href={href('analiz/hisse')}>Hisse…</a>
           </div>
-          <Workbench key={subject.id} subject={subject} world={world} defaultTf="W" initialEvent={query.get('e') ?? undefined} initialTf={((t) => (t === 'M' || t === 'W' || t === 'D' ? t : undefined))(query.get('tf'))} focus={focus} lead={top && top.subject.id === subject.id ? { tf: top.tf, event: top.study.def.id } : undefined} heading={`${subject.label}: olay geçmişte ne zaman oldu, sonrasında ne oldu`} />
+          <Workbench key={subject.id} subject={subject} world={world} defaultTf="W" initialEvent={query.get('e') ?? undefined} initialTf={((t) => (t === 'M' || t === 'W' || t === 'D' ? t : undefined))(query.get('tf'))} focus={focus} lead={top && top.subject.id === subject.id ? { tf: top.tf, event: top.study.def.id } : undefined} />
         </div>
       )}
 
       {across && (
         <section className="an-group">
-          <h3>Bütün varlıklarda yakın zamanda olanlar</h3>
-          <p className="note">
-            {across.subjects.length} varlık, üç zaman dilimi: {Fmt.number(across.tested, 0)} olay tanımı sınandı, {across.recent} tanesi yakın zamanda gerçekleşti, {across.list.length ? `aşağıdakiler sonrasında yönü olağandan belirgin biçimde ayrıştırmış olanlar.` : 'hiçbiri yönü olağandan belirgin biçimde ayrıştırmamış.'}
-            {across.recent >= 20 ? ` Bu kadar sınamada yaklaşık ${Math.max(1, Math.round(across.recent * 0.05))} tanesi şans eseri belirgin görünür; birbirini destekleyenlere ve örnek sayısına bak.` : ''}
-          </p>
+          <h3>Bütün varlıklarda: yakın zamanda olan ve geçmişte sonrası olağandan farklı çıkmış olaylar</h3>
+          {!across.list.length && <p className="note">Hiçbir varlıkta, sonrasını olağandan belirgin biçimde ayrıştırmış bir olay yok.</p>}
           {shown.map((h) => (
-            <button key={h.subject.id + h.tf + h.study.def.id} type="button" className="ev-row btn-row strong" onClick={() => pick(h.subject.id, { tf: h.tf, event: h.study.def.id })}>
-              <span className="when">{barDate(h.tf, h.subject.frames[h.tf]!.t[h.study.recent!.index])}<em>{TF_LABEL[h.tf].toLocaleLowerCase('tr')} veri</em></span>
-              <span className="what"><b>{nameOf(h.subject, h.study.def)}</b><em>{agoLabel(h.tf, h.study.recent!.elapsed)}; önceden {h.study.recent!.stats[0].n} kez</em></span>
-              <OddsTable compact stats={h.study.view} />
+            <button key={h.subject.id + h.tf + h.study.def.id} type="button" className="ev-row btn-row" onClick={() => pick(h.subject.id, { tf: h.tf, event: h.study.def.id })}>
+              <span className="what"><b>{nameOf(h.subject, h.study.def)}</b><em>{barDate(h.tf, h.subject.frames[h.tf]!.t[h.study.recent!.index])}, {agoLabel(h.tf, h.study.recent!.elapsed)}; {TF_LABEL[h.tf].toLocaleLowerCase('tr')} veri</em></span>
+              <Verdict stats={h.study.view} />
             </button>
           ))}
           {across.list.length > 8 && <button type="button" className="btn ghost small" onClick={() => setAll((x) => !x)}>{all ? 'Daha az göster' : `Hepsini göster (${across.list.length})`}</button>}
-          {custom.length > 0 && <p className="note">Kendi olayların ({custom.map((c) => customEvent(c).label).join('; ')}) grafikte olay listesinin sonunda.</p>}
+          {across.list.length > 0 && <p className="note">{Fmt.number(across.tested, 0)} olay sınandı; bu kadar sınamada yaklaşık {Math.max(1, Math.round(across.recent * 0.05))} tanesi şans eseri belirgin görünür.</p>}
         </section>
       )}
 
@@ -162,10 +150,11 @@ function Page({ v, world, loading, generated, practical }: { v?: OutlookView; wo
       <details className="an-how">
         <summary>Olasılıklar nasıl hesaplanıyor, nelere dikkat etmeli</summary>
         <ul>
+          <li><b>Kutudaki sayı</b>: “9’da 3”, olayın önceki 9 seferinin 3’ünde fiyatın seçilen süre sonra daha yukarıda olduğunu söyler. “Olağan: 10’da 7”, varlığın herhangi bir andan aynı süre sonra 10 seferin 7’sinde yukarıda olduğunu. Kutulara dokunarak süreyi değiştirirsin; grafikteki okların rengi de o süreye göre boyanır.</li>
           <li><b>Olay</b>: bir durumun başladığı mumdur: sert düşüş ya da yükseliş (varlığın kendi oynaklığına göre), uzun ortalamanın kırılması, 1 ve 3 yılın zirvesi ya da dibi, art arda aynı yönde mumlar, zirveden %10, %20, %35 gerileme, RSI’ın 30’un altına inmesi ya da 70’in üstüne çıkması, Bollinger bandının dışına taşma, MACD kesişimi, hacimli satış ve alış. Aylık veride makro durumların başlaması da olaydır (reel faizin eksiye dönmesi, doların güçlenmesi gibi). Kendi olayını da tanımlayabilirsin.</li>
           <li><b>Yukarıda olma oranı</b>: olayın geçmişteki her örneğinden sonra, seçilen vadede fiyatın daha yukarıda olduğu örneklerin payı. Olay yakın zamanda gerçekleştiyse ölçüm, olaydan bugüne geçen süre kadar ilerlenip oradan yapılır; tablo “bugünden sonrası” içindir. Olay yakın zamanda gerçekleşmediyse tablo olay mumundan sonrası içindir: tekrar gerçekleştiğinde ne beklenebileceğini gösterir.</li>
           <li><b>Olağan</b>: varlığın herhangi bir mumundan aynı süre sonraki yukarıda olma oranı. Asıl bilgi olağanla farktır.</li>
-          <li><b>Renkli hücre</b> (belirgin): en az 8 örnek, olağandan en az 12 puan fark, %95 güven aralığı olağan oranı dışarıda bırakıyor ve geçmişin iki yarısında da aynı yönde. Rastgele yürüyüş verisinde olayların %5’inden azı bu şartları sağlar.</li>
+          <li><b>“Olağandan belirgin iyi / kötü”</b>: en az 8 örnek, olağandan en az 12 puan fark, %95 güven aralığı olağan oranı dışarıda bırakıyor ve geçmişin iki yarısında da aynı yönde. Rastgele yürüyüş verisinde olayların %5’inden azı bu şartları sağlar.</li>
           <li><b>Çoklu sınama</b>: onlarca olay birden sınandığı için birkaç renkli hücre şans eseri çıkar. Listenin üstündeki sayı bunu söyler. Aynı yönü gösteren birkaç olay, farklı zaman dilimlerinde tekrar eden bulgu ve çok örnek, tek bir renkli hücreden daha güvenilirdir.</li>
           <li><b>Hücredeki ayrıntı</b>: aralık, gerçek oranın %80 olasılıkla içinde bulunduğu yerdir. “Yukarı / aşağı” satırı, yukarıda biten örneklerin ortalama kazancı ile aşağıda bitenlerin ortalama kaybıdır: oran %60 olsa bile kayıplar kazançlardan büyükse beklenti olumsuz olabilir.</li>
           <li>Veri TradingView’den: aylık mumlar 1960’lara, haftalık 1990’lara, günlük yaklaşık 12 yıl geriye gider (varlığa göre değişir). Günde bir yenilenir; son mum kapanmamış olabilir.</li>
@@ -184,12 +173,11 @@ function Stance12({ v, generated }: { v: OutlookView; generated?: number }) {
   const changes = useChanges(v)
   return (
     <>
-      <section className="ov-regime">
-        <b>Makro tablo ({v.month}): {v.regime.title}</b>
+      <details className="an-how ov-regime-d">
+        <summary>Makro tablo ({v.month}): {v.regime.title}</summary>
         <ul>{v.regime.lines.map((l) => <li key={l}>{l}</li>)}</ul>
-        <a href={href('analiz/makro')}>Makro tablonun ayrıntısı, örüntüler ve benzer dönemler</a>
-        <span className="note"> Makro durumların başlamasından sonra bir varlığın ne yaptığını görmek için grafikte “Aylık” zaman dilimini seç; olay listesinde “Makro durumların başlaması” bölümü açılır.</span>
-      </section>
+        <p><a href={href('analiz/makro')}>Makro tablonun ayrıntısı, örüntüler ve benzer dönemler</a></p>
+      </details>
 
       {changes.length > 0 && (
         <section className="ov-changes" role="status">
@@ -198,11 +186,9 @@ function Stance12({ v, generated }: { v: OutlookView; generated?: number }) {
         </section>
       )}
 
-      <section className="an-group ov-state">
-        <h3>12 aylık görüş: dört kanıt birlikte ne diyor</h3>
-        <p className="note">Olaylardan bağımsız olarak bugünkü tablonun okunması: {pro.length || con.length ? <>{pro.length ? <>olumlu {join(pro.map((o) => o.asset.short))}</> : null}{pro.length && con.length ? '; ' : ''}{con.length ? <>olumsuz {join(con.map((o) => o.asset.short))}</> : null}.</> : 'belirgin bir yön yok.'}</p>
-        <details className="an-how st-frame">
-          <summary>Görüş tablosu ve varlık varlık gerekçe</summary>
+      <section className="ov-state">
+        <details className="an-how">
+          <summary>12 aylık görüş: {pro.length || con.length ? [pro.length ? 'olumlu ' + join(pro.map((o) => o.asset.short)) : '', con.length ? 'olumsuz ' + join(con.map((o) => o.asset.short)) : ''].filter(Boolean).join('; ') : 'belirgin bir yön yok'}</summary>
           <div className="mc-scroll">
             <table className="result-table ov-table">
               <thead><tr><th>Varlık</th><th>Görüş</th><th className="c">Güven</th>{ORDER.map((id) => <th key={id} className="c">{LAYER_LABEL[id]}</th>)}</tr></thead>

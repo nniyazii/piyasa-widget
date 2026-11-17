@@ -1286,3 +1286,37 @@ button.ev-row.on { box-shadow: -12px 0 0 var(--sunken), 12px 0 0 var(--sunken); 
 }
 
 .st-hits li.off button { opacity: 0.55; }
+
+/* Sade tezgâh: tek cümlelik sonuç, vade kutuları, ayrıntı kapalı */
+.wb-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.wb-head h2 { margin: 0; }
+.wb-pick { margin: 12px 0; }
+.wb-pick .sc-pick { flex: 1; min-width: 200px; }
+.wb-pick .sc-pick .select { width: 100%; max-width: 460px; height: 38px; }
+.wb-card { padding: 16px 18px; border-radius: var(--radius); background: var(--sunken); border-left: 4px solid var(--ink-4); }
+.wb-card.up { border-left-color: var(--up); } .wb-card.down { border-left-color: var(--down); }
+.wb-card .wb-name { font-size: clamp(19px, 2.4vw, 24px); }
+.wb-say { margin: 8px 0 0; max-width: 60ch; font-size: 15.5px; line-height: 1.55; color: var(--ink-2); }
+.wb-say b { color: var(--ink); font-size: 17px; }
+.wb-verdict { display: inline-block; margin: 10px 0 0; padding: 3px 10px; border-radius: 999px; font-size: 13.5px; font-weight: 650; background: var(--surface); color: var(--ink-2); }
+.wb-verdict.up { background: var(--up); color: #fff; } .wb-verdict.down { background: var(--down); color: #fff; }
+.wb-hzs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 14px; max-width: 520px; }
+.wb-hzs button { display: block; padding: 7px 4px 8px; border: 1.5px solid transparent; border-radius: 10px; background: var(--surface); color: var(--ink); font: inherit; text-align: center; cursor: pointer; }
+.wb-hzs button span { display: block; font-size: 11.5px; color: var(--ink-3); }
+.wb-hzs button b { display: block; margin-top: 2px; font-size: 16px; font-weight: 680; }
+.wb-hzs button.up b { color: var(--up); } .wb-hzs button.down b { color: var(--down); } .wb-hzs button.thin b { color: var(--ink-4); }
+.wb-hzs button[aria-pressed='true'] { border-color: var(--ink); }
+.wb > .st-alarm { margin-top: 12px; }
+.wb-more { margin-top: 18px; }
+.wb-more .wb-odds { max-width: 560px; margin-top: 12px; }
+.wb-more h4 { margin: 22px 0 4px; font-size: 14.5px; font-weight: 680; }
+.wb-setups, .ov-regime-d { margin-top: 18px; }
+.ov-state { margin-top: 0; padding-top: 0; border-top: 0; }
+.wb-recent { margin-top: 28px; }
+.wb .ev-row, .an-group > .ev-row { grid-template-columns: minmax(0, 1fr) auto; }
+.vc { display: block; text-align: right; }
+.vc b { display: block; font-size: 15px; font-weight: 680; }
+.vc em { display: block; font-style: normal; font-size: 11.5px; color: var(--ink-3); }
+.vc.up b { color: var(--up); } .vc.down b { color: var(--down); } .vc.thin b { color: var(--ink-4); }
+.vc.up em { color: var(--up); } .vc.down em { color: var(--down); }
+@media (max-width: 560px) { .vc em { max-width: 16ch; margin-left: auto; } .wb-card { padding: 14px; } }

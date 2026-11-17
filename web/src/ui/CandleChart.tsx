@@ -127,19 +127,17 @@ export function CandleChart({ bars, tf, title, marks, selected, onPick, ma, maLa
       </div>
       {n > 0 && (
         <p className="cc-ohlc num" aria-live="off">
-          <b>{title}</b> {barDate(tf, bars.t[i])}: açılış {num(bars.o[i])}, yüksek {num(bars.h[i])}, düşük {num(bars.l[i])}, kapanış <b>{num(bars.c[i])}</b>
+          <b>{title}</b> {barDate(tf, bars.t[i])}: <b>{num(bars.c[i])}</b>
           <span className={bars.c[i] >= bars.o[i] ? 'pos' : 'neg'}> {bars.c[i] >= bars.o[i] ? '+' : '−'}%{Fmt.number(Math.abs((bars.c[i] / bars.o[i] - 1) * 100), 1)}</span>
-          {rsi && !Number.isNaN(rsi[i]) && <span> RSI {Fmt.number(rsi[i], 0)}</span>}
+          {rsi && !Number.isNaN(rsi[i]) && <span>; RSI {Fmt.number(rsi[i], 0)}</span>}
         </p>
       )}
       <div className="cc-plot" ref={el} role="img" aria-label={`${title} mum grafiği; ${marks.length} olay işaretli`} />
       <div className={'cc-plot cc-rsi' + (hasRsi ? '' : ' hidden')} ref={el2} aria-hidden />
       <p className="sc-legend">
+        {marks.length > 0 && <><span><b className="cc-arrow up">▲</b>olay; sonrasında fiyat yukarıda</span><span><b className="cc-arrow down">▲</b>aşağıda</span><span><b className="cc-arrow">▲</b>henüz belli değil</span></>}
         {maLabel && <span><i className="k ma" />{maLabel}</span>}
-        {hasVol && <span><i className="k box" />hacim</span>}
-        {hasRsi && <span>alt panel: RSI (30 ve 70 çizgileri)</span>}
-        {marks.length > 0 && <><span><b className="cc-arrow up">▲</b>olay; sonrasında fiyat yukarıda</span><span><b className="cc-arrow down">▲</b>aşağıda</span><span><b className="cc-arrow">▲</b>sonucu bekleniyor</span><span>oka tıkla: o gerçekleşmenin ayrıntısı</span></>}
-        <span>yakınlaştır: fare tekerleği ya da iki parmak; kaydır: sürükle</span>
+        {hasRsi && <span>alt panel: RSI</span>}
       </p>
     </figure>
   )
