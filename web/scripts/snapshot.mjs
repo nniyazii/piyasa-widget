@@ -169,6 +169,11 @@ try {
     shards.forEach((b, i) => writeFileSync(join(OUT, 'bars', tf, `${nn(i)}.json`), JSON.stringify({ bars: b })))
     counts[tf] = Object.keys(data).length
   }
+  // Kopyadaki sembollerin dizini: başka borsa koduyla ya da yalnızca kısa kodla gelen sembolü doğru olana yönlendirmek için
+  const { readFileSync, existsSync } = await import('node:fs')
+  const symbols = new Set()
+  for (const tf of Object.keys(DEEP)) for (let i = 0; i < SHARDS; i++) { const f = join(OUT, 'bars', tf, `${nn(i)}.json`); if (existsSync(f)) for (const k of Object.keys(JSON.parse(readFileSync(f, 'utf8')).bars ?? {})) symbols.add(k) }
+  writeFileSync(join(OUT, 'bars', 'symbols.json'), JSON.stringify([...symbols].sort()))
   writeFileSync(join(OUT, 'bars', 'meta.json'), JSON.stringify({ generated: fresh ? prevMeta.generated : Date.now(), shards: SHARDS, version: VERSION, counts }))
   console.log(`bars: ${fresh ? 'önceki kopya taşındı' : 'yeniden çekildi'} (${Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(', ')})`)
 } catch (e) { console.log(`bars alınamadı (${e.message})`) }

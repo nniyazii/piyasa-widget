@@ -39,11 +39,33 @@ async function fetchBars(sym: string): Promise<StockBars | undefined> {
   const nn = String(shardOf(sym)).padStart(2, '0')
   const get = async (tf: 'W' | 'D') => {
     const url = `data/bars/${tf}/${nn}.json?v=${meta.generated}`
-    if (!files.has(url)) files.set(url, json<{ bars: Record<string, Packed> }>(url).then((x) => x?.bars))
+    // Başarısız indirme saklanmaz: bağlantı düzelince yeniden denenir
+    if (!files.has(url)) files.set(url, json<{ bars: Record<string, Packed> }>(url).then((x) => { if (!x) files.delete(url); return x?.bars }))
     return unpack((await files.get(url))?.[sym])
   }
   const [W, D] = await Promise.all([get('W'), get('D')])
   return W || D ? { symbol: sym, generated: meta.generated, source: 'snapshot', W, D } : undefined
+}
+
+let symbolList: Promise<string[] | undefined> | undefined
+/** Kopyadaki sembollerin dizini (statik yayında); alınamazsa undefined */
+export function loadSymbols(): Promise<string[] | undefined> {
+  symbolList ??= json<string[]>('data/bars/symbols.json').then((l) => { if (!Array.isArray(l)) { symbolList = undefined; return undefined }; return l })
+  return symbolList
+}
+const EXCHANGE_ORDER = ['NASDAQ', 'NYSE', 'AMEX', 'BIST']
+/**
+ * Kopyada bulunmayan bir sembolün kopyadaki karşılıkları: aynı kısa kod (NVDA, BCBA:NVDA → NASDAQ:NVDA).
+ * Dizin alınamadıysa undefined (bilinmiyor); karşılık yoksa boş liste.
+ */
+export async function resolveSymbol(symbol: string): Promise<{ known: boolean; matches: string[] } | undefined> {
+  const list = await loadSymbols()
+  if (!list) return undefined
+  const sym = symbol.toUpperCase()
+  if (list.includes(sym)) return { known: true, matches: [sym] }
+  const code = sym.split(':').pop()!
+  const rank = (s: string) => { const i = EXCHANGE_ORDER.indexOf(s.split(':')[0]); return i < 0 ? 9 : i }
+  return { known: false, matches: list.filter((s) => s.split(':').pop() === code).sort((a, b) => rank(a) - rank(b)) }
 }
 
 let setupFile: Promise<{ generated: number; markets: Record<string, { stocks: number; setups: SetupTable }> } | undefined> | undefined

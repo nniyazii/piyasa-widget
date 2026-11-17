@@ -297,6 +297,15 @@ await step('analiz: hisse seç, mum grafik, pazar geneli kanıt, güçlü kurulu
   const setups = page.locator('.an-group', { hasText: 'Güçlü kurulumlar' })
   // Cevap veriye bağlıdır: pazarda kanıtlanmış kurulum yoksa bunu söyler, varsa hissenin ona göre durumunu
   if (!/kurulum/.test(await setups.locator('.an-sub').first().textContent())) throw new Error('BIST kurulum cevabı: ' + (await setups.locator('.an-sub').first().textContent()))
+  // Yalnızca kısa kodla ya da başka borsa koduyla gelen sembol kopyadaki karşılığına yönlenir
+  await page.goto(BASE + '/#/analiz/hisse/nvda')
+  await page.waitForFunction(() => /hisse\/NASDAQ(:|%3A)NVDA/.test(location.hash), null, { timeout: 30000 })
+  await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
+  await page.goto(BASE + '/#/analiz/hisse/BCBA:NVDA')
+  await page.waitForFunction(() => /hisse\/NASDAQ(:|%3A)NVDA/.test(location.hash), null, { timeout: 30000 })
+  // Kopyada hiç olmayan sembol: açık bir açıklama
+  await page.goto(BASE + '/#/analiz/hisse/XETR:YOKBOYLE')
+  await page.locator('.an-answer', { hasText: 'kopyada yok' }).waitFor({ timeout: 30000 })
   // ABD: güçlü kurulumlar, üç dönemin sonucu
   await page.goto(BASE + '/#/analiz/hisse/NASDAQ:AAPL')
   await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })

@@ -1284,3 +1284,5 @@ button.ev-row.on { box-shadow: -12px 0 0 var(--sunken), 12px 0 0 var(--sunken); 
   .wb-odds .ev-odds { padding: 4px 2px; }
   .wb-odds .ev-odds .s { font-size: 10px; }
 }
+
+.st-hits li.off button { opacity: 0.55; }

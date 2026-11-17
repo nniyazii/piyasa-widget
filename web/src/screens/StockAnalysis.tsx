@@ -11,7 +11,7 @@ import type { Basis } from '../core/setups'
 import { sentence, TF_LABEL, type Tf } from '../core/study'
 import { marketOfSubject } from '../core/subject'
 import { chartUrl } from '../core/tradingview'
-import { loadBars, loadSetups, type SetupData } from '../data/bars'
+import { loadBars, loadSetups, loadSymbols, resolveSymbol, type SetupData } from '../data/bars'
 import { customEvent } from '../core/study'
 import { useCustomEvents } from '../data/custom'
 import { loadWorld } from '../data/macro'
@@ -29,12 +29,13 @@ const BASIS_KEY = 'piyasa.hisse.baz'
 const savedBasis = (): Basis => { try { return localStorage.getItem(BASIS_KEY) === 'try' ? 'try' : 'usd' } catch { return 'usd' } }
 const EXAMPLES = ['NASDAQ:SNDK', 'BIST:THYAO', 'NASDAQ:NVDA', 'BIST:ASELS']
 
-interface Loaded { symbol: string; subject?: Subject; setups?: SetupData; market?: MarketLookup; world?: World }
+interface Loaded { symbol: string; subject?: Subject; setups?: SetupData; market?: MarketLookup; world?: World; /** Veri yoksa: kopyadaki aynı kodlu semboller; failed: sembol kopyada var ama indirilemedi */ matches?: string[]; failed?: boolean }
 
 export function StockAnalysis({ symbol }: { symbol?: string }) {
   const sym = symbol?.toUpperCase()
   const { query } = useRoute()
   const [state, setState] = useState<Loaded | undefined>()
+  const [attempt, setAttempt] = useState(0)
   // BIST hisseleri varsayılan olarak dolar bazında değerlendirilir (TL'deki enflasyon yanıltmasın diye)
   const [basis, setBasisState] = useState<Basis>(savedBasis)
   const setBasis = (b: Basis) => { setBasisState(b); try { localStorage.setItem(BASIS_KEY, b) } catch { /* depolama kapalı */ } }
@@ -49,6 +50,14 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
     setState((s) => (s?.symbol === sym ? s : undefined))
     void (async () => {
       const [subject, raw, world] = await Promise.all([loadSubject(sym, basis === 'usd'), loadBars(sym), loadWorld()])
+      if (!subject) {
+        // Sembol başka bir borsa koduyla ya da yalnızca kısa kodla gelmiş olabilir: kopyadaki karşılığına geç
+        const r = await resolveSymbol(sym)
+        if (!alive) return
+        if (r && !r.known && r.matches.length === 1) { navigate('analiz/hisse/' + r.matches[0], Object.fromEntries(query), true); return }
+        setState({ symbol: sym, world, matches: r && !r.known ? r.matches : undefined, failed: !r || r.known })
+        return
+      }
       const [setups, market] = await Promise.all([
         loadSetups(sym, raw?.D, basis).catch(() => undefined),
         subject?.market ? loadMarketEvents(subject.market === 'TR' ? (subject.usd ? 'TR_USD' : 'TR') : 'US') : undefined,
@@ -58,14 +67,14 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
       if (subject) try { localStorage.setItem(LAST_KEY, sym) } catch { /* depolama kapalı */ }
     })()
     return () => { alive = false }
-  }, [sym, basis])
+  }, [sym, basis, attempt])
 
   return (
     <>
       <Picker current={sym} />
       {!sym ? <Empty />
         : !state ? <p className="an-answer" aria-live="polite">{Fmt.ticker(sym)} geçmişi yükleniyor…</p>
-          : !state.subject ? <Missing symbol={sym} />
+          : !state.subject ? <Missing symbol={sym} matches={state.matches} failed={state.failed} onRetry={() => { setState(undefined); setAttempt((n) => n + 1) }} />
             : <Result key={sym} s={state} basis={basis} onBasis={setBasis} initialEvent={query.get('e') ?? undefined} initialTf={((t) => (t === 'M' || t === 'W' || t === 'D' ? t : undefined))(query.get('tf'))} />}
     </>
   )
@@ -77,15 +86,17 @@ function Picker({ current }: { current?: string }) {
   const app = useApp()
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<SearchHit[] | undefined>()
+  const [known, setKnown] = useState<Set<string> | undefined>()
+  useEffect(() => { void loadSymbols().then((l) => { if (l) setKnown(new Set(l)) }) }, [])
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (q.trim().length < 2) { setHits(undefined); return }
     const ac = new AbortController()
-    const id = setTimeout(() => { search(q, ac.signal).then((h) => setHits(h.filter((x) => x.type !== 'economic'))).catch(() => { /* iptal */ }) }, 250)
+    const id = setTimeout(() => { search(q, ac.signal).then((h) => { const list = h.filter((x) => x.type !== 'economic'); setHits(known ? [...list.filter((x) => known.has(x.symbol.toUpperCase())), ...list.filter((x) => !known.has(x.symbol.toUpperCase()))] : list) }).catch(() => { /* iptal */ }) }, 250)
     return () => { clearTimeout(id); ac.abort() }
-  }, [q])
+  }, [q, known])
   const go = (s: string) => { setQ(''); setHits(undefined); navigate('analiz/hisse/' + s) }
-  const own = app.instruments.filter((i) => !!marketOfSubject(i.symbol) && !/XU\d|ALTIN|GLDTR|GMSTR/.test(i.symbol) && i.symbol !== current).slice(0, 6)
+  const own = app.instruments.filter((i) => !!marketOfSubject(i.symbol) && (!known || known.has(i.symbol.toUpperCase())) && !/:(IXIC|NDX|SPX|DJI)$/.test(i.symbol) && !/XU\d|ALTIN|GLDTR|GMSTR/.test(i.symbol) && i.symbol !== current).slice(0, 6)
   const quick = own.length ? own.map((i) => ({ s: i.symbol, n: Fmt.ticker(i.symbol) })) : EXAMPLES.filter((s) => s !== current).map((s) => ({ s, n: Fmt.ticker(s) }))
   return (
     <div className="st-pick" ref={box}>
@@ -98,7 +109,7 @@ function Picker({ current }: { current?: string }) {
         <ul className="st-hits" role="listbox" aria-label="Arama sonuçları">
           {hits.length === 0 && <li className="none">Sonuç yok</li>}
           {hits.slice(0, 8).map((h) => (
-            <li key={h.symbol}><button type="button" onClick={() => go(h.symbol)}><b>{h.ticker}</b><span>{h.name}</span><em>{h.exchange}</em></button></li>
+            <li key={h.symbol} className={known && !known.has(h.symbol.toUpperCase()) ? 'off' : undefined}><button type="button" onClick={() => go(h.symbol)}><b>{h.ticker}</b><span>{h.name}</span><em>{h.exchange}{known && !known.has(h.symbol.toUpperCase()) ? ', veri yok' : ''}</em></button></li>
           ))}
         </ul>
       )}
@@ -122,14 +133,25 @@ function Empty() {
   )
 }
 
-function Missing({ symbol }: { symbol: string }) {
-  return (
+function Missing({ symbol, matches, failed, onRetry }: { symbol: string; matches?: string[]; failed?: boolean; onRetry: () => void }) {
+  if (failed) return (
     <>
       <header className="an-head">
         <h2>{Fmt.ticker(symbol)}</h2>
-        <p className="an-answer">Bu sembolün geçmiş verisi kopyada yok.</p>
+        <p className="an-answer">Geçmiş veri indirilemedi.</p>
       </header>
-      <p className="an-sub">Analiz için BIST hisseleri, piyasa değeri 10 milyar doların üstündeki ABD hisseleri ve başlıca endeks, kur ve madenler hazır tutuluyor. Kopya her iş günü yenilenir; yeni halka açılan hisseler birkaç hafta içinde eklenir.</p>
+      <p className="an-sub">Bağlantı kesilmiş ya da yavaş olabilir; veri dosyası birkaç megabayttır. Yeniden dene.</p>
+      <p className="st-alarm"><button type="button" className="btn primary small" onClick={onRetry}><Icon name="refresh" />Yeniden dene</button></p>
+    </>
+  )
+  return (
+    <>
+      <header className="an-head">
+        <h2>{symbol.includes(':') ? symbol : Fmt.ticker(symbol)}</h2>
+        <p className="an-answer">{matches?.length ? 'Bu kodla birden fazla hisse var; hangisi?' : 'Bu sembolün geçmiş verisi kopyada yok.'}</p>
+      </header>
+      {matches && matches.length > 0 && <p className="st-quick">{matches.map((m) => <a key={m} href={href('analiz/hisse/' + m)}>{m.replace(':', ' : ')}</a>)}</p>}
+      <p className="an-sub">Analiz için BIST hisseleri, piyasa değeri 10 milyar doların üstündeki ABD hisseleri ve başlıca endeks, kur ve madenler hazır tutuluyor. Başka borsalardaki kayıtlar (örneğin bir ABD hissesinin başka ülkede işlem gören karşılığı) kapsam dışıdır. Kopya her iş günü yenilenir; yeni halka açılan hisseler birkaç hafta içinde eklenir.</p>
     </>
   )
 }
