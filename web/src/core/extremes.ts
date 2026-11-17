@@ -72,6 +72,23 @@ export interface MarketExtremes {
   rules: Partial<Record<RuleId, RuleStats>>
   /** Güçlü sinyalin geçmiş dönemleri (pazar genelinde) */
   episodes: Episode[]
+  /** Kurala göre işlem yapılsaydı (yalnızca pazar genişliği olan gruplarda) */
+  strategy?: Strategy
+}
+/** Strateji sınamasının bir dönemi: toplam getiri, yıllık bileşik getiri, en kötü düşüş (zirveden), piyasada kalınan gün payı */
+export interface Metrics { total: number; cagr: number; mdd: number; invested: number }
+export interface TradeStats { n: number; win: number; med: number; avg: number; worst: number; best: number }
+export interface Strategy {
+  hold: number; cost: number; start: number
+  /** Her dönem için strateji, endeksi baştan sona tutmak ve aynı günlerde hisse yerine endeksi tutmak */
+  /** mixed: normalde endekste, sinyalde sermayenin bir kısmı hisselere; strat: yalnızca sinyaller (kalan nakit); rand*: aynı günlerde rastgele hisseler; bh: yalnız endeks */
+  all: { mixed: Metrics; strat: Metrics; bh: Metrics; randMixed: Metrics; randStrat: Metrics }; pre: Strategy['all']; post: Strategy['all']
+  /** Yıl, endeks + sinyal, yalnız endeks, yalnız sinyal (yıllık getiri) */
+  years: [number, number, number, number][]
+  /** Gün numarası, endeks + sinyal ve yalnız endeks birikimi (1 = başlangıç) */
+  curve: [number, number, number][]
+  trades: TradeStats; tradesPost: TradeStats
+  variants: { hold: number; all: Metrics; post: Metrics }[]
 }
 export interface ExtremesFile { generated: number; split: number; markets: Record<string, MarketExtremes> }
 

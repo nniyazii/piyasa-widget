@@ -6,7 +6,7 @@
  */
 import { useEffect, useMemo, useState } from 'react'
 import * as Fmt from '../core/format'
-import { breadthAt, extremeScore, HORIZON_LABEL, HORIZONS, percentileOf, priceForScore, statusOf, type Block, type MarketExtremes, type RuleStats, type Status } from '../core/extremes'
+import { breadthAt, extremeScore, HORIZON_LABEL, HORIZONS, percentileOf, priceForScore, statusOf, type Block, type MarketExtremes, type Metrics, type RuleStats, type Status, type Strategy } from '../core/extremes'
 import { isStock, MACRO_ASSETS } from '../core/subject'
 import { loadExtremes, type ExtremeData } from '../data/extremes'
 import { barDate, CandleChart, type Mark } from '../ui/CandleChart'
@@ -102,6 +102,7 @@ function Result({ d }: { d: ExtremeData }) {
       {rule && <Evidence m={m} rule={rule} name={name} kind={m.breadth ? 'strong' : 'near'} />}
       {m.breadth && m.rules.alone && <Alone s={m.rules.alone} label={m.label} />}
       {m.breadth && m.episodes.length > 0 && <Episodes m={m} />}
+      {m.strategy && <StrategyView s={m.strategy} m={m} />}
 
       <CandleChart bars={b} tf="D" title={d.subject.label} marks={view.marks} defaultRange="all"
         legend={<><span><b className="cc-arrow up">▲</b>{m.breadth ? 'abartılı satış' : 'en sert düşüş'}; 3 ay sonra yukarıda</span><span><b className="cc-arrow down">▲</b>3 ay sonra aşağıda</span><span><b className="cc-arrow">▲</b>3 ay dolmadı</span></>} />
@@ -228,5 +229,90 @@ function Top({ s }: { s: RuleStats }) {
       <h3>Tepe: güvenilir bir işaret yok</h3>
       <p className="tn-say">Aynı yöntem sert yükselişlerde de sınandı. Yükselişin en sert %1’lik dilimine girdikten 1 ay sonra fiyat 10 seferin {ten(p.sig.h[1][0])} tanesinde aşağıdaydı (her zaman {ten(p.base.h[1][0])}); 3 ay sonra {ten(p.sig.h[2][0])} (her zaman {ten(p.base.h[2][0])}). Sert yükselişler çoğunlukla sürüyor; “bu kadarı fazla” denilen yer tepe çıkmıyor.</p>
     </section>
+  )
+}
+
+const pa = (v: number) => (Number.isFinite(v) ? pct(v, 1) : '—')
+const IDX_NAME: Record<string, string> = { 'ABD hisseleri': 'S&P 500', 'BIST hisseleri (dolar bazında)': 'BIST 100 (dolar)' }
+
+/** Kurala göre işlem yapılsaydı: birikim eğrisi, dönem özetleri, rastgele hisse kontrolü, yıl yıl */
+function StrategyView({ s, m }: { s: Strategy; m: MarketExtremes }) {
+  const idx = IDX_NAME[m.label] ?? 'endeks'
+  const post = s.post, all = s.all
+  const beats = post.mixed.cagr > post.bh.cagr + 0.005, randBetter = post.randMixed.cagr >= post.mixed.cagr - 0.002
+  const verdict = !beats
+    ? `Bu kural 2021 sonrasında ${idx}’u geçemedi: yıllık ${pa(post.mixed.cagr)}, ${idx} ${pa(post.bh.cagr)}.`
+    : randBetter
+      ? `Kural ${idx}’u geçti (2021 sonrası yıllık ${pa(post.mixed.cagr)}, ${idx} ${pa(post.bh.cagr)}). Ama aynı günlerde rastgele hisseler alınsaydı sonuç benzer ya da daha iyi olurdu (${pa(post.randMixed.cagr)}). Yani kazanç hisse seçiminden değil, panik anında hisse almaktan geliyor.`
+      : `Kural ${idx}’u geçti (2021 sonrası yıllık ${pa(post.mixed.cagr)}, ${idx} ${pa(post.bh.cagr)}) ve aynı günlerde rastgele hisse almaktan da iyi (${pa(post.randMixed.cagr)}).`
+  const rows: [string, (x: Strategy['all']) => Metrics, string?][] = [
+    [`${idx} + kural`, (x) => x.mixed, 'main'],
+    [`${idx} + aynı günlerde rastgele hisse`, (x) => x.randMixed],
+    [`Yalnız ${idx}`, (x) => x.bh],
+  ]
+  return (
+    <section className="an-group ex-strategy">
+      <h3>Bu kuralla yatırım yapılsaydı</h3>
+      <p className="tn-say">
+        Sermaye normalde {idx}’ta durur. Abartılı satış sinyali gelen her hisseye sermayenin 1/20’si ayrılır (aynı anda 20’den fazla sinyal varsa eşit bölünür); sinyal ertesi gün açılışta alınır, {s.hold} işlem günü (yaklaşık 3 ay) sonra satılır. Her alış ve satışta %{Fmt.number(s.cost * 100, 1)} maliyet düşülür.
+      </p>
+      <p className={'an-answer ex-verdict ' + (beats && !randBetter ? 'up' : beats ? '' : 'down')}>{verdict}</p>
+      <Curve s={s} idx={idx} />
+      <div className="mc-scroll">
+        <table className="result-table ex-table ex-strat">
+          <thead><tr><th>Portföy</th><th className="r">Yıllık getiri<span className="s">bütün dönem</span></th><th className="r">En kötü düşüş<span className="s">bütün dönem</span></th><th className="r">Yıllık getiri<span className="s">2021 sonrası</span></th><th className="r">En kötü düşüş<span className="s">2021 sonrası</span></th></tr></thead>
+          <tbody>
+            {rows.map(([label, f, cls]) => (
+              <tr key={label} className={cls}>
+                <th scope="row">{label}</th>
+                <td className="r num">{pa(f(all).cagr)}</td><td className="r num">{pa(f(all).mdd)}</td>
+                <td className="r num">{pa(f(post).cagr)}</td><td className="r num">{pa(f(post).mdd)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="tn-say tn-dim">
+        İşlemler: {Fmt.number(s.trades.n, 0)} alım; {ten(s.trades.win)}/10 tanesi kârla kapandı, ortanca {pa(s.trades.med)}; en kötü yirmide biri {pa(s.trades.worst)} ya da daha kötü.
+        {' '}2021 sonrası: {Fmt.number(s.tradesPost.n, 0)} alım, {ten(s.tradesPost.win)}/10 kârlı, ortanca {pa(s.tradesPost.med)}.
+        {' '}Tutma süresine göre yıllık getiri (bütün dönem): {s.variants.map((v) => `${v.hold === 21 ? '1 ay' : v.hold === 63 ? '3 ay' : '6 ay'} ${pa(v.all.cagr)}`).join(', ')}; {idx} {pa(all.bh.cagr)}.
+      </p>
+      <details className="an-how st-frame">
+        <summary>Yıl yıl getiri</summary>
+        <div className="mc-scroll">
+          <table className="result-table ex-table">
+            <thead><tr><th>Yıl</th><th className="r">{idx} + kural</th><th className="r">Yalnız {idx}</th><th className="r">Fark</th></tr></thead>
+            <tbody>{s.years.map(([y, a, b]) => <tr key={y}><td>{y}</td><td className="r num">{pa(a)}</td><td className="r num">{pa(b)}</td><td className={'r num ' + (a - b > 0.002 ? 'pos' : a - b < -0.002 ? 'neg' : '')}>{Math.abs(a - b) < 0.002 ? 'sinyal yok' : pa(a - b)}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </details>
+    </section>
+  )
+}
+
+function Curve({ s, idx }: { s: Strategy; idx: string }) {
+  const pts = s.curve
+  if (pts.length < 10) return null
+  const W = 720, H = 220, P = { l: 8, r: 64, t: 10, b: 22 }
+  const vals = pts.flatMap((p) => [p[1], p[2]]), lo = Math.log(Math.min(...vals)), hi = Math.log(Math.max(...vals))
+  const x = (k: number) => P.l + (k / (pts.length - 1)) * (W - P.l - P.r)
+  const y = (v: number) => P.t + (1 - (Math.log(v) - lo) / (hi - lo || 1)) * (H - P.t - P.b)
+  const line = (k: 1 | 2) => pts.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p[k]).toFixed(1)}`).join('')
+  const split = pts.findIndex((p) => p[0] * 86400 >= Date.UTC(2021, 0, 1) / 1000)
+  const years = pts.map((p, i) => [new Date(p[0] * 864e5).getUTCFullYear(), i] as const).filter((v, i, a) => i === 0 || v[0] !== a[i - 1][0]).filter((v) => v[0] % 2 === 0)
+  const last = pts[pts.length - 1]
+  return (
+    <figure className="sc ex-curve">
+      <figcaption>100 birimle başlansaydı<span>Logaritmik ölçek. Kesikli çizgi: eşiklerin seçilmediği dönemin başı (2021).</span></figcaption>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${idx} + kural ${Fmt.number(last[1] * 100, 0)}, yalnız ${idx} ${Fmt.number(last[2] * 100, 0)}`}>
+        {years.map(([yr, i]) => <g key={yr}><line className="sc-grid" x1={x(i)} x2={x(i)} y1={P.t} y2={H - P.b} /><text className="sc-tick" x={x(i)} y={H - 6} textAnchor="middle">{yr}</text></g>)}
+        {split > 0 && <line className="sc-level" x1={x(split)} x2={x(split)} y1={P.t} y2={H - P.b} />}
+        <path d={line(2)} className="ex-line idx" />
+        <path d={line(1)} className="ex-line strat" />
+        <text className="sc-tick ex-end strat" x={W - P.r + 6} y={y(last[1]) + 4}>{Fmt.number(last[1] * 100, 0)}</text>
+        <text className="sc-tick ex-end" x={W - P.r + 6} y={y(last[2]) + 4}>{Fmt.number(last[2] * 100, 0)}</text>
+      </svg>
+      <p className="sc-legend"><span><i className="k ex-k strat" />{idx} + kural</span><span><i className="k ex-k idx" />yalnız {idx}</span></p>
+    </figure>
   )
 }

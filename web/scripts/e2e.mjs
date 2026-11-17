@@ -234,6 +234,10 @@ await step('dip ve tepe: düşüşün sertliği, pazar geneli, geçmiş sonuçla
   // Panik dönemleri, tek başına düşüş uyarısı, tepe notu, grafik
   if (await page.locator('.ex-ep tbody tr').count() < 5) throw new Error('panik dönemleri eksik')
   await page.locator('.ex-alone').waitFor()
+  // Strateji sınaması: eğri, üç portföy, sonuç cümlesi
+  await page.locator('.ex-strategy .ex-curve svg path.ex-line').nth(1).waitFor({ timeout: 10000 })
+  if (await page.locator('.ex-strat tbody tr').count() !== 3) throw new Error('üç portföy satırı bekleniyordu')
+  if (!/S&P 500/.test(await page.locator('.ex-verdict').textContent())) throw new Error('strateji sonucu: ' + (await page.locator('.ex-verdict').textContent()))
   await page.locator('.ex-top', { hasText: 'güvenilir bir işaret yok' }).waitFor()
   await page.locator('.cc-plot canvas').first().waitFor({ timeout: 10000 })
   // Makro varlık: genişlik yok, kendi geçmişi

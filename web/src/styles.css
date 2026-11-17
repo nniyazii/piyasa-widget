@@ -1372,3 +1372,16 @@ button.ev-row.on { box-shadow: -12px 0 0 var(--sunken), 12px 0 0 var(--sunken); 
 .ex-alone, .ex-top { margin-top: 16px; }
 .ex-alone { border-top-color: var(--down); }
 @media (max-width: 760px) { .ex-gauges { grid-template-columns: minmax(0, 1fr); } }
+
+.ex-strategy { margin-top: 28px; }
+.ex-verdict { margin: 12px 0; max-width: 46ch; font-size: clamp(17px, 2vw, 20px); line-height: 1.35; }
+.ex-verdict.up { color: var(--up); } .ex-verdict.down { color: var(--down); }
+.ex-curve svg { max-width: 760px; }
+.ex-line { fill: none; stroke-width: 2; }
+.ex-line.strat { stroke: var(--up); stroke-width: 2.4; }
+.ex-line.idx { stroke: var(--ink-3); }
+.ex-end { font-weight: 600; } .ex-end.strat { fill: var(--up); }
+.ex-k { display: inline-block; width: 16px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.ex-k.strat { background: var(--up); } .ex-k.idx { background: var(--ink-3); }
+.ex-strat tr.main th, .ex-strat tr.main td { font-weight: 700; }
+.ex-strat th .s, .ex-strat td .s { display: block; font-weight: 400; }
