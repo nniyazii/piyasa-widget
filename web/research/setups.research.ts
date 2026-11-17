@@ -7,16 +7,17 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { it } from 'vitest'
 import { HORIZON, INDEX_OF, inRegime, PATH_DAYS, periodOf, toUsd, USDTRY, prepare, regimeMap, REGIMES, setupDays, setupKey, SETUPS, SHORT, strength, type PeriodStat, type Regime, type SetupEvidence } from '../src/core/setups'
 import { marketOf, type Bars } from '../src/core/signals'
+import { unpack as unpackV3, type Packed } from '../src/core/subject'
 
-const DIR = process.env.DATA ?? 'research/out/full'
+const DIR = process.env.DATA ?? 'research/out/v3'
 const OUT = process.env.OUT ?? 'public/data/setups.json'
-function unpack(p: [number, number[], number[], number[]?]): Bars { const t: number[] = []; let cur = p[0]; for (let i = 0; i < p[2].length; i++) { if (i > 0) cur += p[1][i - 1] * 60; t.push(cur) }; return { t, c: p[2], v: p[3] } }
+const unpack = (p: Packed): Bars | undefined => unpackV3(p)
 const NOT_STOCK = /:(XU\d+|ALTIN|GLDTR|GMSTR|ZGOLD|ISGLK)$/
 
 it('güçlü kurulumlar', () => {
   if (!existsSync(`${DIR}/D`)) throw new Error('günlük veri yok: ' + DIR)
   const daily = new Map<string, Bars>()
-  for (const f of readdirSync(`${DIR}/D`)) for (const [s, p] of Object.entries(JSON.parse(readFileSync(`${DIR}/D/${f}`, 'utf8')).bars as Record<string, [number, number[], number[], number[]?]>)) daily.set(s, unpack(p))
+  for (const f of readdirSync(`${DIR}/D`)) for (const [s, p] of Object.entries(JSON.parse(readFileSync(`${DIR}/D/${f}`, 'utf8')).bars as Record<string, Packed>)) { const b = unpack(p); if (b) daily.set(s, b) }
   type A = { n: number; hit: number; hit21: number; ret: number }
   const zero = (): A => ({ n: 0, hit: 0, hit21: 0, ret: 0 })
   const markets: Record<string, unknown> = {}

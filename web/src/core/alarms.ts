@@ -1,8 +1,10 @@
 /**
- * Alarmlar: tek bir yerden kurulan üç tür uyarı.
+ * Alarmlar: tek bir yerden kurulan uyarılar.
  *   price    Fiyat bir düzeyin altına iner ya da üstüne çıkar
  *   premium  Altın/gümüş ürünü değerinin altına iner (al sinyali) ya da bir birikim/para arzı önerisi güçlenir
- *   signal   Hissede tarihsel teyitli bir dip ya da tepe sinyali gelir
+ *   signal   Hissede pazar genelinde sınanmış güçlü bir dip ya da tepe kurulumu oluşur
+ *   outlook  Bir varlığın birleştirilmiş görünümü yön değiştirir
+ *   event    Bir varlıkta seçilen olay (grafik tezgâhındaki olaylar ya da kullanıcının tanımladığı) gerçekleşir
  * Aynı kod hem uygulamada (açıkken) hem sunucuda (GitHub Actions, uygulama kapalıyken) çalışır;
  * veriyi dışarıdan verilen kaynak (Source) getirir.
  *
@@ -13,16 +15,19 @@ import type { Advice, AdviceId } from './advice'
 import * as Fmt from './format'
 import { PREMIUM_PAIRS, type PremiumRow } from './premium'
 import { REGIME_LABEL, type StockSetups } from './setups'
-import { FILTER_LABEL, TIMEFRAMES, triggerLabel, type Analysis, type SignalStat } from './signals'
+import { customEvent, customLabel, eventDefs, prepare, sanitizeCustom, study, TF_LABEL, type CustomSpec, type EventDef, type Tf } from './study'
+import { assetInfo, isStock, type Frames } from './subject'
 
 interface Base { id: string; created: number }
 export interface PriceAlarm extends Base { type: 'price'; symbol: string; op: 'below' | 'above'; value: number }
 /** target: ürün kodu (GMSTR…), 'any' (herhangi bir ürün) ya da bir öneri kimliği */
 export interface PremiumAlarm extends Base { type: 'premium'; target: string }
-export interface SignalAlarm extends Base { type: 'signal'; symbol: string; side: 'dip' | 'top' | 'both'; level: 'confirmed' | 'promising' }
+export interface SignalAlarm extends Base { type: 'signal'; symbol: string; side: 'dip' | 'top' | 'both' }
 /** Görünüm alarmı: varlığın birleştirilmiş görüşü olumluya (up) ya da olumsuza (down) dönerse */
 export interface OutlookAlarm extends Base { type: 'outlook'; asset: string; to: 'up' | 'down' }
-export type Alarm = PriceAlarm | PremiumAlarm | SignalAlarm | OutlookAlarm
+/** Olay alarmı: varlıkta (makro kod ya da hisse) seçilen zaman diliminde olay gerçekleşirse. custom: kullanıcının tanımı; usd: BIST hissesi dolar bazında */
+export interface EventAlarm extends Base { type: 'event'; subject: string; tf: Tf; event: string; custom?: CustomSpec; usd?: boolean; /** Olayın adı (makro olaylarda tanım veriye bağlı olduğu için saklanır) */ label?: string }
+export type Alarm = PriceAlarm | PremiumAlarm | SignalAlarm | OutlookAlarm | EventAlarm
 
 export interface AlarmState {
   /** Koşul şu an sağlanıyor mu */
@@ -42,11 +47,12 @@ export interface Fired { alarm: Alarm; title: string; text: string }
 export interface Source {
   prices(symbols: string[]): Promise<Map<string, number>>
   premiums(): Promise<{ rows: PremiumRow[]; advices: Advice[]; open: boolean }>
-  analysis(symbol: string): Promise<Analysis | undefined>
   /** Görünüm: varlık kimliği → görüş (Olumlu, Hafif olumlu, Nötr, Hafif olumsuz, Olumsuz) ve güven */
   outlook?(): Promise<Record<string, { stance: string; conviction: string; name: string; why: string }> | undefined>
   /** Güçlü kurulumlar (hisse değilse undefined) */
   setups?(symbol: string): Promise<StockSetups | undefined>
+  /** Olay alarmı için varlığın mumları; makro olaylar için ek tanımlar */
+  subject?(id: string, usd: boolean): Promise<{ short: string; frames: Frames; macroDefs?: EventDef[] } | undefined>
 }
 
 export const ADVICE_TARGETS: { id: AdviceId; label: string }[] = [
@@ -68,25 +74,25 @@ const SIDE = { dip: 'dip', top: 'tepe', both: 'dip ya da tepe' }
 export function describe(a: Alarm): string {
   if (a.type === 'price') return `${code(a.symbol)} ${num(a.value)} ${a.op === 'below' ? 'altına inerse' : 'üstüne çıkarsa'}`
   if (a.type === 'outlook') return `${OUTLOOK_NAMES[a.asset] ?? a.asset} görünümü ${a.to === 'up' ? 'olumluya' : 'olumsuza'} dönerse`
-  if (a.type === 'signal') return `${code(a.symbol)} için ${a.level === 'confirmed' ? `güçlü ${SIDE[a.side]} kurulumu oluşursa` : `güçlü ${SIDE[a.side]} kurulumu ya da hisseye özgü teyitli sinyal gelirse`}`
+  if (a.type === 'signal') return `${code(a.symbol)} için güçlü ${SIDE[a.side]} kurulumu oluşursa`
+  if (a.type === 'event') return `${subjectName(a.subject)}${a.usd ? ' (dolar bazında)' : ''}, ${TF_LABEL[a.tf].toLocaleLowerCase('tr')} veride: ${eventLabel(a)}`
   if (a.target === 'any') return 'Altın ya da gümüş ürünlerinden biri değerinin altına inerse'
   const adv = ADVICE_TARGETS.find((x) => x.id === a.target)
   if (adv) return `${adv.label} güçlü sinyal verirse`
   return `${a.target} değerinin altına inerse`
 }
-export const TYPE_LABEL: Record<Alarm['type'], string> = { price: 'Fiyat', premium: 'Avantajlı fiyat', signal: 'Hisse sinyali', outlook: 'Görünüm' }
+export const TYPE_LABEL: Record<Alarm['type'], string> = { price: 'Fiyat', premium: 'Avantajlı fiyat', signal: 'Güçlü kurulum', outlook: 'Görünüm', event: 'Olay' }
+export const subjectName = (id: string) => (isStock(id) ? code(id) : assetInfo(id)?.short ?? id)
+/** Olay alarmının olay adı (tanım bulunamazsa kimliği) */
+export function eventLabel(a: Pick<EventAlarm, 'tf' | 'event' | 'custom' | 'label'>, extra: EventDef[] = []): string {
+  if (a.label) return a.label
+  if (a.custom) return a.custom.name || customLabel(a.custom)
+  return [...eventDefs(a.tf), ...extra].find((d) => d.id === a.event)?.label ?? a.event
+}
 /** Görünüm sayfasındaki varlıklar (alarm formu ve cümlesi için) */
 export const OUTLOOK_NAMES: Record<string, string> = { GOLD: 'Altın', GAUTRY: 'Gram altın', SILVER: 'Gümüş', USDTRY: 'Dolar/TL', XU100USD: 'BIST (dolar)', SPX: 'ABD borsası', OIL: 'Petrol', COPPER: 'Bakır' }
 
 const pct = (v: number) => (v > 0 ? '+' : v < 0 ? '−' : '') + '%' + Fmt.number(Math.abs(v * 100), 1)
-
-/** Alarm için sayılan kurallar: istenen düzeyde ve şu an açık olanlar */
-export function activeSignals(a: Analysis, side: SignalAlarm['side'], level: SignalAlarm['level']): SignalStat[] {
-  return a.frames.flatMap((f) => [...(side !== 'top' ? f.dips : []), ...(side !== 'dip' ? f.tops : [])])
-    .filter((s) => s.active && (s.verdict === 'confirmed' || (level === 'promising' && s.verdict === 'promising')))
-    .sort((x, y) => Number(y.verdict === 'confirmed') - Number(x.verdict === 'confirmed') || y.score - x.score)
-}
-const ruleText = (s: SignalStat) => `${TIMEFRAMES.find((t) => t.id === s.tf)!.adj} veride ${triggerLabel(s.trigger)}${s.filter === 'any' ? '' : ', ' + FILTER_LABEL[s.filter]}`
 
 interface Eval { on: boolean; now?: string; title?: string; text?: string }
 
@@ -123,7 +129,27 @@ async function evaluate(a: Alarm, src: Source, cache: { prices?: Map<string, num
     const up = o.stance === 'Olumlu' || o.stance === 'Hafif olumlu', down = o.stance === 'Olumsuz' || o.stance === 'Hafif olumsuz'
     return { on: a.to === 'up' ? up : down, now: `${o.stance.toLocaleLowerCase('tr')}${o.stance === 'Nötr' ? '' : ', güven ' + o.conviction}`, title: `${o.name} görünümü: ${o.stance.toLocaleLowerCase('tr')}`, text: `${o.name} görünümü ${o.stance.toLocaleLowerCase('tr')} oldu (güven ${o.conviction}). ${o.why}` }
   }
-  // Önce güçlü kurulumlar (pazar genelinde üç dönemde sınanmış); istenirse hisseye özgü teyitli kurallar da
+  if (a.type === 'event') {
+    const sub = await src.subject?.(a.subject, !!a.usd)
+    const bars = sub?.frames[a.tf]
+    if (!sub || !bars || bars.t.length < 60) throw new Error('geçmiş veri alınamadı')
+    const def = a.custom ? customEvent(a.custom) : [...eventDefs(a.tf), ...(sub.macroDefs ?? [])].find((d) => d.id === a.event)
+    if (!def) throw new Error('olay tanımı bulunamadı')
+    const x = prepare(bars, a.tf)
+    if (def.needsVolume && !x.v) throw new Error('bu varlıkta hacim verisi yok')
+    const st = study(x, def)
+    // Olay son iki mumdan birinde başladıysa "gerçekleşti" sayılır (son mum henüz kapanmamış olabilir)
+    const on = !!st.recent && st.recent.elapsed <= 1
+    const name = def.standalone ? def.label : `${sub.short} ${def.label}`
+    const best = st.best
+    const odds = st.view.filter((h) => h.n >= 5).map((h) => `${h.label} %${Math.round(h.up * 100)} (olağan %${Math.round(h.base * 100)})`).join(', ')
+    return {
+      on, now: on ? 'gerçekleşti' : st.onsets.length ? `son kez ${new Date(x.t[st.onsets[st.onsets.length - 1]] * 1000).toLocaleDateString('tr-TR', { month: 'short', year: 'numeric' })}` : 'hiç olmadı',
+      title: `${sub.short}: ${def.label}`,
+      text: `${name} (${TF_LABEL[a.tf].toLocaleLowerCase('tr')} veri${a.usd ? ', dolar bazında' : ''}). Geçmişte ${Math.max(0, st.onsets.length - 1)} kez oldu. Sonrasında yukarıda olma oranı: ${odds || 'örnek az'}.${best ? ` En belirgin vade ${best.label}.` : ' Hiçbir vadede olağandan belirgin biçimde ayrışmıyor.'}`,
+    }
+  }
+  // Güçlü kurulumlar (pazar genelinde üç dönemde sınanmış)
   const su = await src.setups?.(a.symbol)
   const strongNow = (su?.list ?? []).filter((x) => x.active && x.strength?.strong && (a.side === 'both' || x.setup.side === a.side))
     .sort((x, y) => (y.strength!.hit - y.strength!.base) - (x.strength!.hit - x.strength!.base))[0]
@@ -136,22 +162,8 @@ async function evaluate(a: Alarm, src: Source, cache: { prices?: Map<string, num
       text: `${code(a.symbol)}: ${strongNow.setup.label}, ${REGIME_LABEL[strongNow.regime]}. Benzer durumlarda 3 ay sonra fiyat, sınanan üç dönemin en kötüsünde bile %${Math.round(st.hit * 100)} ${what === 'dip' ? 'yukarıdaydı' : 'aşağıdaydı'} (olağan %${Math.round(st.base * 100)}).`,
     }
   }
-  if (a.level === 'confirmed') {
-    if (!su) throw new Error('kurulum verisi alınamadı (yalnızca BIST ve ABD hisselerinde çalışır)')
-    return { on: false, now: su.list.some((x) => x.strength?.strong) ? 'güçlü kurulum yok' : 'bu pazarda güçlü kurulum tanımlı değil' }
-  }
-  const an = await src.analysis(a.symbol)
-  if (!an || !an.frames.length) throw new Error('geçmiş veri alınamadı')
-  const act = activeSignals(an, a.side, 'confirmed')
-  const s = act[0]
-  if (!s) return { on: false, now: 'sinyal yok' }
-  const hits = Math.round((s.main.hit ?? 0) * s.main.n)
-  const what = `${s.side === 'dip' ? 'Dip' : 'Tepe'} sinyali`
-  return {
-    on: true, now: `${what.toLowerCase()} açık`,
-    title: `${code(a.symbol)}: ${what.toLowerCase()} geldi`,
-    text: `${code(a.symbol)}: ${what} (hisseye özgü, teyitli). Kural: ${ruleText(s)}. Geçmişte ${s.main.n} sinyalin ${hits} tanesi tuttu.${act.length > 1 ? ` Aynı anda ${act.length - 1} kural daha açık.` : ''}`,
-  }
+  if (!su) throw new Error('kurulum verisi alınamadı (yalnızca BIST ve ABD hisselerinde çalışır)')
+  return { on: false, now: su.list.some((x) => x.strength?.strong) ? 'güçlü kurulum yok' : 'bu pazarda güçlü kurulum tanımlı değil' }
 }
 
 /** Tüm alarmları bir kez kontrol eder; yeni durumları ve çalanları döndürür. */
@@ -196,7 +208,12 @@ export function sanitizeAlarms(raw: unknown): Alarm[] {
     if (x.type === 'price' && sym && (x.op === 'below' || x.op === 'above') && typeof x.value === 'number' && x.value > 0) out.push({ ...base, type: 'price', symbol: sym, op: x.op, value: x.value })
     else if (x.type === 'premium' && typeof x.target === 'string' && (x.target === 'any' || isAdvice(x.target) || PRODUCT_TARGETS.includes(x.target))) out.push({ ...base, type: 'premium', target: x.target })
     else if (x.type === 'outlook' && typeof x.asset === 'string' && x.asset in OUTLOOK_NAMES && (x.to === 'up' || x.to === 'down')) out.push({ ...base, type: 'outlook', asset: x.asset, to: x.to })
-    else if (x.type === 'signal' && sym && (x.side === 'dip' || x.side === 'top' || x.side === 'both') && (x.level === 'confirmed' || x.level === 'promising')) out.push({ ...base, type: 'signal', symbol: sym, side: x.side, level: x.level })
+    else if (x.type === 'signal' && sym && (x.side === 'dip' || x.side === 'top' || x.side === 'both')) out.push({ ...base, type: 'signal', symbol: sym, side: x.side })
+    else if (x.type === 'event' && typeof x.subject === 'string' && (x.tf === 'M' || x.tf === 'W' || x.tf === 'D') && typeof x.event === 'string' && x.event.length < 40) {
+      const subject = /^[A-Z0-9_.!]+:[A-Z0-9_.!]+$/i.test(x.subject) ? x.subject.toUpperCase() : assetInfo(x.subject)?.id
+      const custom = x.custom ? sanitizeCustom([x.custom])[0] : undefined
+      if (subject && (!x.event.startsWith('c:') || custom)) out.push({ ...base, type: 'event', subject, tf: x.tf, event: x.event, ...(custom ? { custom } : {}), ...(x.usd === true ? { usd: true } : {}), ...(typeof x.label === 'string' && x.label ? { label: x.label.replace(/[<>]/g, '').slice(0, 140) } : {}) })
+    }
   }
   return out.slice(0, 50)
 }

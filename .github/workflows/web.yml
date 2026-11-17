@@ -43,12 +43,12 @@ jobs:
         run: node scripts/snapshot.mjs dist/data "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data"
         timeout-minutes: 20
         continue-on-error: true
-      - name: Hisse analizi için pazar geneli kanıt (güçlü kurulumlar ve kuralların tüm hisselerdeki sonucu)
+      - name: Hisse analizi için pazar geneli kanıt (güçlü kurulumlar ve olayların tüm hisselerdeki sonucu)
         # Her yayında günlük kopyadan yeniden hesaplanır; olmazsa yayındaki kopya, o da yoksa depodaki dosya kalır
         run: |
-          for f in rules setups; do
-            if [ -d dist/data/bars/D ] && DATA=dist/data/bars OUT=dist/data/$f.new.json npm run $f; then mv dist/data/$f.new.json dist/data/$f.json
-            else rm -f dist/data/$f.new.json; curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/$f.json" -o dist/data/$f.new.json && mv dist/data/$f.new.json dist/data/$f.json || rm -f dist/data/$f.new.json; fi
+          for f in setups market-events; do
+            if [ -d dist/data/bars/D ] && DATA=dist/data/bars OUT=dist/data/$f.new.json npm run $f; then mv dist/data/$f.new.json dist/data/${f/market-events/events-market}.json
+            else o=${f/market-events/events-market}; rm -f dist/data/$f.new.json; curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/$o.json" -o dist/data/$f.new.json && mv dist/data/$f.new.json dist/data/$o.json || rm -f dist/data/$f.new.json; fi
           done
         timeout-minutes: 6
         continue-on-error: true

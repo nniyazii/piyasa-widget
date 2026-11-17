@@ -1,10 +1,17 @@
 /**
- * Alarmlar: tek yerden kurulan uyarılar (fiyat, avantajlı fiyat, hisse sinyali).
- *   #/alarmlar                      liste ve yeni alarm
- *   #/alarmlar?tur=sinyal&s=SEMBOL  hazır doldurulmuş (diğer sayfalardaki "haber ver" bağlantıları)
+ * Alarmlar: tek yerden kurulan uyarılar (fiyat, olay, görünüm, avantajlı fiyat, güçlü kurulum).
+ *   #/alarmlar                                  liste ve yeni alarm
+ *   #/alarmlar?tur=sinyal&s=SEMBOL              hazır doldurulmuş (diğer sayfalardaki "haber ver" bağlantıları)
+ *   #/alarmlar?tur=olay&s=GOLD&e=rsi-30&tf=W    grafik tezgâhından: bu olay olunca haber ver
  */
 import { useEffect, useState } from 'react'
 import { ADVICE_TARGETS, describe, OUTLOOK_NAMES, PRODUCT_TARGETS, TYPE_LABEL, type Alarm, type AlarmState } from '../core/alarms'
+import { macroEventDefs } from '../core/macroEvents'
+import type { World } from '../core/macro'
+import { customEvent, eventDefs, GROUP_LABEL, TF_LABEL, type EventGroup, type Tf } from '../core/study'
+import { assetInfo, isStock, MACRO_ASSETS, marketOfSubject } from '../core/subject'
+import { useCustomEvents } from '../data/custom'
+import { loadWorld } from '../data/macro'
 import type { SearchHit } from '../core/catalog'
 import * as Fmt from '../core/format'
 import { alarmActions, askNotifyPermission, getToken, loadServerState, notifyPermission, REPO, runAlarmCheck, setToken, syncAlarms, useAlarms, type LogEntry } from '../data/alarms'
@@ -15,7 +22,8 @@ import { Segmented, useToast } from '../ui/overlay'
 import { href } from '../ui/router'
 
 type Kind = Alarm['type']
-const KIND_OF: Record<string, Kind> = { fiyat: 'price', avantaj: 'premium', sinyal: 'signal', gorunum: 'outlook' }
+const KIND_OF: Record<string, Kind> = { fiyat: 'price', avantaj: 'premium', sinyal: 'signal', gorunum: 'outlook', olay: 'event' }
+const asTf = (v: string | null): Tf => (v === 'M' || v === 'D' ? v : 'W')
 const price = (v: number) => Fmt.number(v, v >= 1000 ? 0 : v >= 10 ? 2 : 4)
 
 export function Alarms({ query }: { query: URLSearchParams }) {
@@ -30,7 +38,7 @@ export function Alarms({ query }: { query: URLSearchParams }) {
         <p className="an-answer" aria-live="polite">{s.alarms.length === 0 ? 'Henüz alarm yok.' : waiting === 0 ? 'Bekleyen alarm yok; hepsi çaldı.' : `${waiting} alarm bekliyor.`}</p>
       </header>
 
-      <Composer initialKind={KIND_OF[query.get('tur') ?? ''] ?? 'price'} initialSymbol={query.get('s') ?? undefined} />
+      <Composer initialKind={KIND_OF[query.get('tur') ?? ''] ?? 'price'} initialSymbol={query.get('s') ?? undefined} initialEvent={query.get('e') ?? undefined} initialTf={asTf(query.get('tf'))} initialUsd={query.get('usd') === '1'} />
 
       {s.alarms.length > 0 && (
         <section className="an-group">
@@ -59,7 +67,8 @@ export function Alarms({ query }: { query: URLSearchParams }) {
           <li><b>Fiyat</b>: TradingView’in son fiyatı. BIST fiyatları 15 dakika gecikmelidir.</li>
           <li><b>Avantajlı fiyat</b>: Analiz bölümündeki “al sinyali” ve güçlü önerilerle aynı hesap. Ürün sinyalleri yalnızca BIST seansı içinde sayılır.</li>
           <li><b>Görünüm</b>: Analiz bölümünün açılış sayfasındaki birleştirilmiş görüş (değerleme, makro örüntü, benzer dönemler, trend) seçtiğin yöne döndüğünde çalar. Görüşler aylık veriye dayandığı için seyrek değişir.</li>
-          <li><b>Hisse sinyali</b>: Analiz › Hisse sayfasındaki güçlü kurulumlardan biri oluştuğunda çalar (pazar genelinde üç ayrı dönemde sınanmış kurulumlar; şu an yalnızca ABD hisselerinde ve dip tarafında var). Bildirimde kurulum ve geçmişteki isabeti yazar.</li>
+          <li><b>Olay</b>: grafik tezgâhındaki olaylardan biri (sert düşüş, ortalamanın kırılması, RSI’ın 30’un altına inmesi, hacimli satış, kendi tanımladığın olay…) seçtiğin varlıkta ve zaman diliminde gerçekleştiğinde çalar. Bildirimde olayın geçmişte kaç kez olduğu ve sonrasındaki yön olasılıkları yazar. Son mum kapanmadan gerçekleşen olay, mum kapanırken geri dönebilir.</li>
+          <li><b>Güçlü kurulum</b>: Analiz › Hisse sayfasındaki güçlü kurulumlardan biri oluştuğunda çalar (pazar genelinde üç ayrı dönemde sınanmış kurulumlar; şu an yalnızca ABD hisselerinde ve dip tarafında var). Bildirimde kurulum ve geçmişteki isabeti yazar.</li>
           <li>Uygulama açıkken kontrol dakikada bir yapılır. Kapalıyken GitHub 10 dakikada bir kontrol eder; GitHub’ın zamanlayıcısı yoğun saatlerde 5–20 dakika gecikebilir, bu yüzden bildirim anlık değildir.</li>
           <li>Alarmlar yatırım tavsiyesi değildir; yalnızca belirlediğin koşul gerçekleştiğinde haber verir.</li>
         </ul>
@@ -77,7 +86,15 @@ function mergeLog(a: LogEntry[], b: LogEntry[]): LogEntry[] {
 
 // ------------------------------------------------------------------ yeni alarm
 
-function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSymbol?: string }) {
+function Composer({ initialKind, initialSymbol, initialEvent, initialTf, initialUsd }: { initialKind: Kind; initialSymbol?: string; initialEvent?: string; initialTf: Tf; initialUsd: boolean }) {
+  const custom = useCustomEvents()
+  const [world, setWorld] = useState<World | undefined>()
+  useEffect(() => { void loadWorld().then(setWorld) }, [])
+  const [macroAsset, setMacroAsset] = useState<string>(initialSymbol && assetInfo(initialSymbol.toUpperCase()) ? initialSymbol.toUpperCase() : initialSymbol && isStock(initialSymbol) ? 'stock' : 'GOLD')
+  const [tf, setTf] = useState<Tf>(initialTf)
+  const [eventId, setEventId] = useState(initialEvent ?? 'rsi-30')
+  const [usd, setUsd] = useState(initialUsd)
+  useEffect(() => { if (initialKind !== 'event') return; setTf(initialTf); setUsd(initialUsd); if (initialEvent) setEventId(initialEvent); if (initialSymbol) setMacroAsset(assetInfo(initialSymbol.toUpperCase()) ? initialSymbol.toUpperCase() : 'stock') }, [initialKind, initialSymbol, initialEvent, initialTf, initialUsd])
   const toast = useToast()
   const [kind, setKind] = useState<Kind>(initialKind)
   const [symbol, setSymbol] = useState<string | undefined>(initialSymbol?.toUpperCase())
@@ -85,11 +102,10 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
   const [value, setValue] = useState('')
   const [target, setTarget] = useState('any')
   const [side, setSide] = useState<'dip' | 'top' | 'both'>('both')
-  const [level, setLevel] = useState<'confirmed' | 'promising'>('confirmed')
   const [asset, setAsset] = useState(initialSymbol && initialSymbol.toUpperCase() in OUTLOOK_NAMES ? initialSymbol.toUpperCase() : 'GOLD')
   const [to, setTo] = useState<'up' | 'down'>('up')
   const [now, setNow] = useState<number | undefined>()
-  useEffect(() => { setKind(initialKind); if (initialSymbol) { const u = initialSymbol.toUpperCase(); if (initialKind === 'outlook') { if (u in OUTLOOK_NAMES) setAsset(u) } else setSymbol(u) } }, [initialKind, initialSymbol])
+  useEffect(() => { setKind(initialKind); if (initialSymbol) { const u = initialSymbol.toUpperCase(); if (initialKind === 'outlook') { if (u in OUTLOOK_NAMES) setAsset(u) } else if (isStock(u) || initialKind !== 'event') setSymbol(u) } }, [initialKind, initialSymbol])
   useEffect(() => {
     setNow(undefined)
     if (!symbol) return
@@ -98,7 +114,10 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
     return () => { alive = false }
   }, [symbol])
   const v = Fmt.parseInput(value)
-  const ready = kind === 'premium' || kind === 'outlook' || (symbol && (kind === 'signal' || (v != null && v > 0)))
+  const subject = macroAsset === 'stock' ? symbol : macroAsset
+  const defs = [...eventDefs(tf), ...(tf === 'M' && world && macroAsset !== 'stock' ? macroEventDefs(world, assetInfo(macroAsset)?.group ?? 'global') : []), ...custom.map(customEvent)]
+  const def = defs.find((d) => d.id === eventId)
+  const ready = kind === 'premium' || kind === 'outlook' || (kind === 'event' ? !!subject && !!def : symbol && (kind === 'signal' || (v != null && v > 0)))
   // Fiyat zaten o taraftaysa alarm kurulur kurulmaz çalar: önceden söyle
   const already = kind === 'price' && now != null && v != null && (op === 'below' ? now <= v : now >= v)
   const add = () => {
@@ -106,15 +125,16 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
     const a = kind === 'price' ? alarmActions.add({ type: 'price', symbol: symbol!, op, value: v! })
       : kind === 'premium' ? alarmActions.add({ type: 'premium', target })
         : kind === 'outlook' ? alarmActions.add({ type: 'outlook', asset, to })
-        : alarmActions.add({ type: 'signal', symbol: symbol!, side, level })
+          : kind === 'event' ? alarmActions.add({ type: 'event', subject: subject!, tf, event: def!.id, label: def!.label, ...(def!.group === 'özel' ? { custom: custom.find((c) => 'c:' + c.id === def!.id) } : {}), ...(usd && macroAsset === 'stock' && marketOfSubject(subject!) === 'TR' ? { usd: true } : {}) })
+            : alarmActions.add({ type: 'signal', symbol: symbol!, side })
     toast('Alarm kuruldu: ' + describe(a))
     setValue('')
     if (notifyPermission() === 'default') void askNotifyPermission()
   }
   return (
     <section className="al-new" aria-label="Yeni alarm">
-      <Segmented value={kind} onChange={setKind} label="Alarm türü" options={[{ value: 'price', label: TYPE_LABEL.price }, { value: 'outlook', label: TYPE_LABEL.outlook }, { value: 'premium', label: TYPE_LABEL.premium }, { value: 'signal', label: TYPE_LABEL.signal }]} />
-      {kind !== 'premium' && kind !== 'outlook' && <SymbolField value={symbol} onChange={setSymbol} />}
+      <Segmented value={kind} onChange={setKind} label="Alarm türü" options={[{ value: 'price', label: TYPE_LABEL.price }, { value: 'event', label: TYPE_LABEL.event }, { value: 'outlook', label: TYPE_LABEL.outlook }, { value: 'premium', label: TYPE_LABEL.premium }, { value: 'signal', label: TYPE_LABEL.signal }]} />
+      {kind !== 'premium' && kind !== 'outlook' && (kind !== 'event' || macroAsset === 'stock') && <SymbolField value={symbol} onChange={setSymbol} />}
       <p className="cost-say al-say">
         {kind === 'price' && (
           <>
@@ -143,10 +163,24 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
             görünümü <select value={to} onChange={(e) => setTo(e.target.value as 'up' | 'down')} aria-label="Yön"><option value="up">olumluya</option><option value="down">olumsuza</option></select> dönerse haber ver.
           </>
         )}
+        {kind === 'event' && (
+          <>
+            <select value={macroAsset} onChange={(e) => setMacroAsset(e.target.value)} aria-label="Varlık">
+              {MACRO_ASSETS.map((a) => <option key={a.id} value={a.id}>{a.short}</option>)}
+              <option value="stock">{symbol && isStock(symbol) ? Fmt.ticker(symbol) + ' (hisse)' : 'Bir hisse…'}</option>
+            </select>{' '}
+            <select value={tf} onChange={(e) => setTf(e.target.value as Tf)} aria-label="Zaman dilimi">{(['M', 'W', 'D'] as Tf[]).map((t) => <option key={t} value={t}>{TF_LABEL[t].toLocaleLowerCase('tr')}</option>)}</select> veride{' '}
+            <select value={def?.id ?? ''} onChange={(e) => setEventId(e.target.value)} aria-label="Olay">
+              {!def && <option value="">olay seç</option>}
+              {(Object.keys(GROUP_LABEL) as EventGroup[]).map((g) => defs.some((d) => d.group === g) && <optgroup key={g} label={GROUP_LABEL[g]}>{defs.filter((d) => d.group === g).map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}</optgroup>)}
+            </select>{' '}
+            olayı gerçekleşirse haber ver.
+            {macroAsset === 'stock' && symbol && marketOfSubject(symbol) === 'TR' && <label className="wb-check"> <input type="checkbox" checked={usd} onChange={(e) => setUsd(e.target.checked)} /> dolar bazında</label>}
+          </>
+        )}
         {kind === 'signal' && (
           <>
             <b>{symbol ? Fmt.ticker(symbol) : 'Seçtiğim hisse'}</b> için{' '}
-            <select value={level} onChange={(e) => setLevel(e.target.value as 'confirmed' | 'promising')} aria-label="Sinyal düzeyi"><option value="confirmed">yalnızca güçlü</option><option value="promising">güçlü ya da hisseye özgü teyitli</option></select>{' '}
             <select value={side} onChange={(e) => setSide(e.target.value as 'dip' | 'top' | 'both')} aria-label="Yön"><option value="both">dip ya da tepe</option><option value="dip">dip</option><option value="top">tepe</option></select> kurulumu oluşursa haber ver.
           </>
         )}
@@ -155,7 +189,9 @@ function Composer({ initialKind, initialSymbol }: { initialKind: Kind; initialSy
         <button className="btn primary" onClick={add} disabled={!ready}><Icon name="bell" />Alarm kur</button>
         <span className="note">
           {kind === 'price' && symbol && now != null && <>Şu an {price(now)}. {already ? 'Fiyat zaten bu düzeyin ötesinde; alarm hemen çalar.' : ''}</>}
-          {kind === 'signal' && symbol && <a href={href('analiz/hisse/' + symbol)}>{Fmt.ticker(symbol)} için sinyalleri gör</a>}
+          {kind === 'signal' && symbol && <a href={href('analiz/hisse/' + symbol)}>{Fmt.ticker(symbol)} için kurulumları gör</a>}
+          {kind === 'event' && subject && def && <a href={isStock(subject) ? href('analiz/hisse/' + subject, { e: def.id }) : href('analiz', { v: subject, e: def.id })}>Bu olayın geçmişini grafikte gör</a>}
+          {kind === 'event' && <> Kendi olayını grafik tezgâhında “Kendi olayını tanımla” ile ekleyebilirsin.</>}
           {kind === 'premium' && <a href={href('analiz/urunler')}>Şu anki durumu gör</a>}
           {kind === 'outlook' && <a href={href('analiz')}>Şu anki görünümü gör</a>}
         </span>

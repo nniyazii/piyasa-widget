@@ -7,10 +7,13 @@
  */
 import { useEffect, useSyncExternalStore } from 'react'
 import { checkAlarms, newId, sanitizeAlarms, type Alarm, type Fired, type Source, type States } from '../core/alarms'
-import type { MacroData } from '../core/macro'
 import { outlookView } from '../core/outlook'
-import { analyze, type Analysis } from '../core/signals'
-import { loadBars, loadSetups, loadUniverse, withLive } from './bars'
+import { macroEventDefs } from '../core/macroEvents'
+import { world } from '../core/macro'
+import { loadMacro } from './macro'
+import { assetInfo, isStock } from '../core/subject'
+import { loadBars, loadSetups } from './bars'
+import { loadSubject } from './subjects'
 import { getPremiums, refreshPremiums } from './premium'
 import { scan } from './tv'
 
@@ -146,7 +149,6 @@ export const alarmActions = {
 
 // ------------------------------------------------------------------ uygulama açıkken kontrol
 
-const analysisCache = new Map<string, { t: number; a?: Analysis }>()
 const clientSource: Source = {
   async prices(symbols) {
     const rows = await scan('global', { symbols: { tickers: symbols }, columns: ['close'] })
@@ -159,26 +161,19 @@ const clientSource: Source = {
     return { rows: p.rows, advices: [...p.advices, ...p.money], open: p.open }
   },
   async outlook() {
-    const d = await fetch('data/macro.json', { cache: 'no-cache' }).then((r) => (r.ok ? (r.json() as Promise<MacroData>) : undefined)).catch(() => undefined)
+    const d = await loadMacro()
     if (!d) return undefined
     return Object.fromEntries(outlookView(d).list.map((o) => [o.asset.id, { stance: o.stance, conviction: o.conviction, name: o.asset.short, why: o.why }]))
   },
   async setups(symbol) {
     const data = await loadBars(symbol)
-    return loadSetups(symbol, data?.frames.D)
+    return loadSetups(symbol, data?.D)
   },
-  async analysis(symbol) {
-    // Geçmiş veri ağırdır: sembol başına 10 dakikada bir
-    const hit = analysisCache.get(symbol)
-    if (hit && Date.now() - hit.t < 10 * 60_000) return hit.a
-    const [data, uni, live] = await Promise.all([
-      loadBars(symbol),
-      loadUniverse(symbol),
-      scan('global', { symbols: { tickers: [symbol] }, columns: ['close'] }).then((r) => (typeof r[0]?.d[0] === 'number' ? (r[0].d[0] as number) : undefined)).catch(() => undefined),
-    ])
-    const a = data ? analyze(data.source === 'snapshot' ? withLive(data.frames, live) : data.frames, uni?.rules) : undefined
-    analysisCache.set(symbol, { t: Date.now(), a })
-    return a
+  async subject(id, usd) {
+    const sub = await loadSubject(id, usd)
+    if (!sub) return undefined
+    const d = isStock(id) ? undefined : await loadMacro()
+    return { short: sub.short, frames: sub.frames, macroDefs: d ? macroEventDefs(world(d), assetInfo(id)?.group ?? 'global') : undefined }
   },
 }
 

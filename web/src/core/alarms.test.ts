@@ -5,7 +5,7 @@ import { stockSetups, type SetupEvidence } from './setups'
 
 const price = (_p: number): Alarm => ({ id: 'p', created: 1, type: 'price', symbol: 'NASDAQ:SNDK', op: 'below', value: 770 })
 const src = (over: Partial<Source>): Source => ({
-  prices: async () => new Map(), premiums: async () => ({ rows: [], advices: [], open: true }), analysis: async () => undefined, ...over,
+  prices: async () => new Map(), premiums: async () => ({ rows: [], advices: [], open: true }), ...over,
 })
 
 group('alarmlar', () => {
@@ -25,7 +25,7 @@ group('alarmlar', () => {
   })
 
   it('veri alınamazsa durum korunur, alarm yeniden çalmaz', async () => {
-    const a: Alarm[] = [{ id: 's', created: 1, type: 'signal', symbol: 'BIST:THYAO', side: 'dip', level: 'confirmed' }]
+    const a: Alarm[] = [{ id: 's', created: 1, type: 'signal', symbol: 'BIST:THYAO', side: 'dip' }]
     const prev = { s: { on: true, firedAt: 5 } }
     const r = await checkAlarms(a, prev, src({}), 10)
     expect(r.fired).toHaveLength(0)
@@ -50,11 +50,11 @@ group('alarmlar', () => {
     expect(r.fired).toHaveLength(2)
   })
 
-  it('hisse sinyali: güçlü kurulum oluştuğunda çalar; istenirse hisseye özgü teyitli kural da', async () => {
+  it('hisse sinyali: güçlü kurulum oluştuğunda çalar', async () => {
     const mk = (n: number) => { const c = [100]; for (let i = 0; i < 700; i++) c.push(c.at(-1)! * (i % 2 ? 1.004 : 0.997)); for (let i = 0; i < n; i++) c.push(c.at(-1)! * 0.96); return { t: c.map((_, i) => 1.42e9 + i * 86400), c } }
     const ev = { stocks: 500, periods: [[500, 0.8, 0.6, 0.6, 0.5, 0.1, 0.02], [500, 0.78, 0.6, 0.6, 0.5, 0.1, 0.02], [500, 0.75, 0.6, 0.6, 0.5, 0.1, 0.02]] } as SetupEvidence
     const table = { 'rsi30|any': ev }
-    const a: Alarm[] = [{ id: 's', created: 1, type: 'signal', symbol: 'NASDAQ:TEST', side: 'dip', level: 'confirmed' }, { id: 't', created: 1, type: 'signal', symbol: 'NASDAQ:TEST', side: 'top', level: 'confirmed' }]
+    const a: Alarm[] = [{ id: 's', created: 1, type: 'signal', symbol: 'NASDAQ:TEST', side: 'dip' }, { id: 't', created: 1, type: 'signal', symbol: 'NASDAQ:TEST', side: 'top' }]
     let r = await checkAlarms(a, {}, src({ setups: async () => stockSetups(mk(0), undefined, table) }))
     expect(r.fired).toHaveLength(0)
     expect(r.states.s.now).toBe('güçlü kurulum yok')
@@ -84,6 +84,23 @@ group('alarmlar', () => {
     expect(sanitizeAlarms([{ id: 'x', created: 1, type: 'outlook', asset: 'GOLD', to: 'down' }, { id: 'y', created: 1, type: 'outlook', asset: 'HACK', to: 'up' }]).map((x) => x.id)).toEqual(['x'])
   })
 
+  it('olay: seçilen olay son mumlarda başladığında çalar, bildirimde olasılıklar yazar', async () => {
+    // Uzun bir yükseliş, ardından sert düşüş: RSI 30'un altına iner
+    const mk = (drop: number) => { const c = [100]; for (let i = 0; i < 400; i++) c.push(c.at(-1)! * (i % 90 > 80 ? 0.96 : i % 2 ? 1.006 : 0.998)); for (let i = 0; i < drop; i++) c.push(c.at(-1)! * 0.96); return { t: c.map((_, i) => 1.42e9 + i * 86400), o: c, h: c, l: c, c } }
+    const a: Alarm[] = [{ id: 'e', created: 1, type: 'event', subject: 'GOLD', tf: 'D', event: 'rsi-30' }]
+    const at = (drop: number) => src({ subject: async () => ({ short: 'Altın', frames: { D: mk(drop) } }) })
+    let r = await checkAlarms(a, {}, at(0))
+    expect(r.fired).toHaveLength(0)
+    expect(r.states.e.on).toBe(false)
+    let fired = 0
+    let st = {}
+    for (let k = 0; k <= 10; k++) { const q = await checkAlarms(a, st, at(k)); st = q.states; fired += q.fired.length; if (q.fired.length) { expect(q.fired[0].title).toMatch(/^Altın: RSI/); expect(q.fired[0].text).toContain('yukarıda olma oranı') } }
+    expect(fired).toBe(1)
+    expect(describe(a[0])).toContain('Altın, günlük veride')
+    const none = await checkAlarms(a, {}, src({}))
+    expect(none.states.e.error).toContain('alınamadı')
+  })
+
   it('dışarıdan gelen veri doğrulanır', () => {
     expect(sanitizeAlarms([
       { id: 'a', created: 1, type: 'price', symbol: 'nasdaq:sndk', op: 'below', value: 5 },
@@ -91,8 +108,13 @@ group('alarmlar', () => {
       { id: 'c', created: 1, type: 'premium', target: '<script>' },
       { id: 'd', created: 1, type: 'premium', target: 'm2-bist' },
       { id: 'e', created: 1, type: 'signal', symbol: 'BIST:THYAO', side: 'both', level: 'promising' },
+      { id: 'f', created: 1, type: 'event', subject: 'gold', tf: 'W', event: 'rsi-30' },
+      { id: 'g', created: 1, type: 'event', subject: 'GOLD', tf: 'W', event: 'rsi-30', label: 'RSI <b>30' },
+      { id: 'h', created: 1, type: 'event', subject: 'BIST:THYAO', tf: 'D', event: 'c:abc', usd: true, custom: { id: 'abc', name: '', trigger: { ind: 'rsi', op: 'below', level: 25 } } },
+      { id: 'i', created: 1, type: 'event', subject: 'GOLD', tf: 'X', event: 'rsi-30' },
+      { id: 'j', created: 1, type: 'event', subject: 'GOLD', tf: 'D', event: 'c:zzz' },
       null, 'x',
-    ]).map((a) => a.id)).toEqual(['a', 'd', 'e'])
+    ]).map((a) => a.id)).toEqual(['a', 'd', 'e', 'g', 'h'])
     expect(sanitizeAlarms('x')).toEqual([])
   })
 })

@@ -174,9 +174,7 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   await page.goto(BASE + '/#/listeler')
   await page.locator('.nav a', { hasText: 'Analiz' }).click()
   // Özet: soru → cevap satırları; satır ilgili sayfaya götürür
-  // Açılış: Görünüm (görüş tablosu, varlık kartları); altında pratik sorular
-  await page.locator('.ov-table tbody tr').nth(5).waitFor({ timeout: 30000 })
-  if (await page.locator('.ov-card').count() < 6) throw new Error('varlık kartları eksik')
+  // Açılış: Görünüm (grafik tezgâhı); altında pratik sorular
   await page.locator('.an-row').nth(5).waitFor({ timeout: 20000 })
   await page.locator('.an-row', { hasText: 'Değerinin altında' }).click()
   await page.locator('.prem-table tbody tr').nth(4).waitFor({ timeout: 20000 })
@@ -222,64 +220,95 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   for (const s of ['Dolar (al|sat)', 'Altın (al|sat)', 'Gram altın (al|sat)', 'BIST (al|sat)', 'Ev (al|için bekle)']) if (!money.some((t) => new RegExp('^' + s).test(t))) throw new Error('para arzı kartı yok: ' + s + ' | ' + money.join(' ¦ '))
 })
 
-await step('analiz: hisse seç, güçlü kurulumlar ve hisseye özgü kurallar', async () => {
+await step('görünüm: mum grafik tezgâhı, olay seçimi, zaman dilimi, varlıklar arası olaylar', async () => {
+  await page.goto(BASE + '/#/analiz?v=GOLD')
+  await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
+  await page.locator('.wb-odds .ev-odds').nth(3).waitFor({ timeout: 10000 })
+  if (!/Ons altın/.test(await page.locator('.wb h3').textContent())) throw new Error('varlık başlığı: ' + (await page.locator('.wb h3').textContent()))
+  // Olay seç: sayım ve dört vade güncellenir; aralık ve ortalama hareket hücrede görünür
+  await page.locator('.cc-bar .segmented').first().locator('button', { hasText: 'Haftalık' }).click()
+  await page.locator('.wb-pick select').selectOption('trend-down')
+  const count = await page.locator('.wb-count b').first().textContent()
+  if (!(Number(count) >= 3)) throw new Error('olay sayısı: ' + count)
+  if (!/aralık \d+–\d+/.test(await page.locator('.wb-odds').innerText())) throw new Error('güven aralığı görünmüyor')
+  // Zaman dilimi: günlükte vadeler değişir, RSI paneli ve dağılım şeridi var
+  await page.locator('.cc-bar .segmented').first().locator('button', { hasText: 'Günlük' }).click()
+  await page.locator('.wb-odds th', { hasText: '1 hafta' }).waitFor({ timeout: 5000 })
+  if (await page.locator('.cc-rsi:not(.hidden) canvas').count() < 1) throw new Error('RSI paneli yok')
+  await page.locator('.wb-pick select').selectOption('rsi-30')
+  const dots = page.locator('.wb-strip circle.sc-mark')
+  if (await dots.count() < 3) throw new Error('dağılım şeridi boş')
+  // Noktaya dokun: o gerçekleşmenin sonrası
+  await dots.first().click()
+  await page.locator('.wb-picked', { hasText: 'gerçekleşmesinden sonra' }).waitFor({ timeout: 3000 })
+  // Aylıkta makro olaylar listeye girer
+  await page.locator('.cc-bar .segmented').first().locator('button', { hasText: 'Aylık' }).click()
+  await page.locator('.wb-pick select optgroup[label="Makro durumların başlaması"] option').first().waitFor({ state: 'attached', timeout: 10000 })
+  // Varlık değiştir
+  await page.locator('.wb-assets .chip', { hasText: 'Petrol' }).click()
+  await page.locator('.wb h3', { hasText: 'petrol' }).waitFor({ timeout: 10000 })
+  // Varlıklar arası liste: sınama sayısı yazılır; satıra dokununca tezgâh o olaya geçer
+  const note = await page.locator('.an-group', { hasText: 'Bütün varlıklarda yakın zamanda olanlar' }).locator('.note').first().textContent()
+  if (!/olay tanımı sınandı/.test(note)) throw new Error('sınama notu: ' + note)
+  const rows = page.locator('.an-group button.ev-row.strong')
+  if (await rows.count()) {
+    const what = await rows.first().locator('.what b').textContent()
+    await rows.first().click()
+    await page.waitForFunction((w) => w.includes(document.querySelector('.wb-name')?.textContent ?? '¤'), what, { timeout: 5000 })
+  }
+  // Görüş tablosu kapalı ayrıntıda durur
+  await page.locator('.ov-state > details > summary').click()
+  await page.locator('.ov-table tbody tr').nth(5).waitFor({ timeout: 10000 })
+})
+
+await step('kendi olayım: tanımla, grafikte gör, sil', async () => {
+  await page.goto(BASE + '/#/analiz?v=GOLD')
+  await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
+  await page.locator('.wb-pick button', { hasText: 'Kendi olayını tanımla' }).click()
+  await page.locator('.wb-composer input[aria-label="Düzey"]').first().fill('35')
+  await page.locator('.wb-composer button', { hasText: 'Kaydet ve göster' }).click()
+  await page.locator('.wb-name', { hasText: '35' }).waitFor({ timeout: 5000 })
+  if (!(Number(await page.locator('.wb-count b').first().textContent()) >= 1)) throw new Error('özel olay hiç gerçekleşmemiş')
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('piyasa.olaylar.v1')).length)
+  if (stored !== 1) throw new Error('özel olay kaydedilmedi')
+  await page.locator('.wb-pick button', { hasText: 'Bu olayı sil' }).click()
+  if (await page.evaluate(() => JSON.parse(localStorage.getItem('piyasa.olaylar.v1')).length) !== 0) throw new Error('silinmedi')
+})
+
+await step('analiz: hisse seç, mum grafik, pazar geneli kanıt, güçlü kurulumlar', async () => {
   await page.goto(BASE + '/#/analiz')
   await page.locator('.an-tabs a', { hasText: 'Hisse' }).click()
   await page.locator('.st-search input').fill('thyao')
   await page.locator('.st-hits button', { hasText: 'THYAO' }).first().click()
-  await page.locator('.st-own').waitFor({ timeout: 40000 })
+  await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
   if (!/analiz\/hisse\/BIST(:|%3A)THYAO/.test(page.url())) throw new Error('adres: ' + page.url())
-  // BIST: güvenilirliği kanıtlanmış kurulum yok; sınanan kurulumlar dönem dönem listelenir
-  const tr = await page.locator('.an-answer').first().textContent()
-  // BIST varsayılan olarak dolar bazında; TL bazına geçilebilir
-  if (!/BIST hisselerinde, dolar bazında da güvenilirliği kanıtlanmış bir kurulum yok/.test(tr)) throw new Error('BIST cevabı: ' + tr)
-  if (!/dolar bazında/.test(await page.locator('.sc figcaption').first().textContent())) throw new Error('grafik dolar bazında değil')
-  await page.locator('.st-basis button', { hasText: 'TL bazında' }).click()
-  await page.locator('.an-answer', { hasText: /^BIST hisselerinde güvenilirliği/ }).waitFor({ timeout: 20000 })
-  await page.locator('.st-basis button', { hasText: 'Dolar bazında' }).click()
-  await page.locator('.an-answer', { hasText: 'dolar bazında da' }).waitFor({ timeout: 20000 })
-  // BIST'te kurulum tablosu açık gelir: dönem dönem görsel karşılaştırma; durum grafiği (fiyat, hacim, RSI)
-  if (await page.locator('.st-frame[open] > table tbody tr').first().locator('.hitbar').count() !== 3) throw new Error('dönem göstergeleri eksik')
-  if (await page.locator('.st-frame[open] > table tbody tr').count() !== 10) throw new Error('ilk 10 kurulum bekleniyordu')
-  if (!(await page.locator('.sc-vol').count())) throw new Error('hacim paneli yok')
-  // Geçmiş sinyaller grafikte işaretli; tek kurulum seçilince işaret sayısı azalır; tüm geçmişe genişletilebilir
-  const marksAll = await page.locator('.sc').first().locator('path.sc-mark').count()
-  if (marksAll < 5) throw new Error('grafikte sinyal işareti yok: ' + marksAll)
-  await page.locator('.sc-pick select').selectOption('rsi30')
-  const marksOne = await page.locator('.sc').first().locator('svg[role=img] path.sc-mark').count()
-  if (!(marksOne > 0 && marksOne < marksAll)) throw new Error('kurulum seçimi işaretleri değiştirmedi: ' + marksOne + '/' + marksAll)
-  await page.locator('.sc-controls button', { hasText: 'Tümü' }).click()
-  if (await page.locator('.sc').first().locator('svg[role=img] path.sc-mark').count() <= marksOne) throw new Error('tüm geçmişte işaret artmadı')
-  await page.locator('.sc-pick select').selectOption('all')
-  // Hisseye özgü kurallar: grafikler, dört kanıt şartı, tüm kurallar
-  await page.locator('.st-own > summary').click()
-  await page.locator('.st-own .st-table tbody tr').nth(3).waitFor({ timeout: 10000 })
-  if (await page.locator('.st-own .st-sig').count() !== 2) throw new Error('dip ve tepe bloğu bekleniyordu')
-  const sig = page.locator('.st-own .st-sig', { has: page.locator('.sc') }).first()
-  if (await sig.count()) {
-    if (await sig.locator('.sc').count() !== 2) throw new Error('iki grafik bekleniyordu')
-    if (!(await sig.locator('.sc-mark').count())) throw new Error('sinyal noktası yok')
-    await sig.locator('.sc-plot svg').first().scrollIntoViewIfNeeded()
-    const bb = await sig.locator('.sc-plot svg').first().boundingBox()
-    await page.mouse.move(bb.x + bb.width * 0.5, bb.y + bb.height * 0.4)
-    await sig.locator('.sc-tip').first().waitFor({ timeout: 3000 })
-    if (await sig.locator('.st-checks li').count() !== 4) throw new Error('dört kanıt şartı bekleniyordu')
-  }
-  const frame = page.locator('.st-own details.st-frame', { hasText: 'tüm kurallar' }).first()
-  await frame.locator('summary').click()
-  if (await frame.locator('tbody tr:not(.st-sep)').count() < 29) throw new Error('kural satırı eksik')
-  // ABD: üç güçlü kurulum, her birinde üç dönemin sonucu ve koşulların şu anki durumu
+  // BIST varsayılan olarak dolar bazında; TL'ye geçilebilir
+  if (!/dolar bazında/.test(await page.locator('.cc-ohlc b').first().textContent())) throw new Error('grafik dolar bazında değil')
+  await page.locator('.wb-basis button', { hasText: 'TL' }).click()
+  await page.waitForFunction(() => !/dolar bazında/.test(document.querySelector('.cc-ohlc b')?.textContent ?? 'dolar bazında'), null, { timeout: 20000 })
+  await page.locator('.wb-basis button', { hasText: 'Dolar bazında' }).click()
+  await page.waitForFunction(() => /dolar bazında/.test(document.querySelector('.cc-ohlc b')?.textContent ?? ''), null, { timeout: 20000 })
+  // Olay seç: hissedeki sonuç ve pazar genelindeki sonuç yan yana
+  await page.locator('.wb-pick select').selectOption('rsi-30')
+  await page.locator('.wb-market', { hasText: 'BIST hisselerinin tamamında' }).waitFor({ timeout: 10000 })
+  if (await page.locator('.wb-market .ev-odds').count() !== 4) throw new Error('pazar geneli dört vade bekleniyordu')
+  if (!/Üç dönemde/.test(await page.locator('.wb-market .note').textContent())) throw new Error('dönem dökümü yok')
+  // Güçlü kurulumlar bölümü: BIST'te kanıtlanmış kurulum yok
+  const setups = page.locator('.an-group', { hasText: 'Güçlü kurulumlar' })
+  // Cevap veriye bağlıdır: pazarda kanıtlanmış kurulum yoksa bunu söyler, varsa hissenin ona göre durumunu
+  if (!/kurulum/.test(await setups.locator('.an-sub').first().textContent())) throw new Error('BIST kurulum cevabı: ' + (await setups.locator('.an-sub').first().textContent()))
+  // ABD: güçlü kurulumlar, üç dönemin sonucu
   await page.goto(BASE + '/#/analiz/hisse/NASDAQ:AAPL')
-  await page.locator('.st-sig .st-periods').nth(2).waitFor({ timeout: 40000 })
-  const us = await page.locator('.an-answer').first().textContent()
-  if (!/güçlü|Güçlü/.test(us)) throw new Error('ABD cevabı: ' + us)
-  if (await page.locator('.st-sig .st-periods').first().locator('> div').count() !== 3) throw new Error('üç dönem bekleniyordu')
-  if (!(await page.locator('.st-checks-list li').count())) throw new Error('koşullar yok')
-  if (!/S&P 500/.test(await page.locator('.st-regime').textContent())) throw new Error('piyasa durumu yok')
-  if (!(await page.locator('.sc.path .sc-median').count())) throw new Error('ortalama seyir grafiği yok')
+  await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
+  await page.locator('.wb-pick select').selectOption('rsi-30')
+  await page.locator('.wb-market', { hasText: 'ABD hisselerinin tamamında' }).waitFor({ timeout: 10000 })
+  const us = page.locator('.an-group', { hasText: 'Güçlü kurulumlar' })
+  if (!(await us.locator('details[open]').count())) await us.locator('details > summary').first().click()
+  await us.locator('.st-sig .st-periods').nth(2).waitFor({ timeout: 20000 })
+  if (await us.locator('.st-sig .st-periods').first().locator('> div').count() !== 3) throw new Error('üç dönem bekleniyordu')
 })
 
-await step('alarmlar: fiyat, avantajlı fiyat ve hisse sinyali kur; çalan alarm bildirilir', async () => {
+await step('alarmlar: fiyat, avantajlı fiyat, olay ve güçlü kurulum kur; çalan alarm bildirilir', async () => {
   await page.goto(BASE + '/#/alarmlar')
   await page.locator('.an-answer', { hasText: 'Henüz alarm yok' }).waitFor({ timeout: 10000 })
   // Fiyat: zaten ötesinde olan düzey hemen çalar ve kapanır
@@ -291,21 +320,45 @@ await step('alarmlar: fiyat, avantajlı fiyat ve hisse sinyali kur; çalan alarm
   await page.locator('.al-row.done', { hasText: 'THYAO' }).waitFor({ timeout: 20000 })
   await page.locator('.al-log li', { hasText: 'altına indi' }).waitFor({ timeout: 5000 })
   // Avantajlı fiyat
-  await page.locator('.al-new .seg button, .al-new [role=radio], .al-new button', { hasText: 'Avantajlı fiyat' }).first().click()
+  await page.locator('.al-new button', { hasText: 'Avantajlı fiyat' }).first().click()
   await page.locator('.al-go .btn').click()
   await page.locator('.al-row', { hasText: 'değerinin altına inerse' }).waitFor({ timeout: 5000 })
-  // Hisse sinyali: Analiz › Hisse sayfasındaki bağlantı formu hazır doldurur
-  await page.goto(BASE + '/#/analiz/hisse/NASDAQ:AAPL')
-  await page.locator('.st-alarm a', { hasText: 'haber ver' }).first().click()
+  // Olay: grafik tezgâhındaki bağlantı formu hazır doldurur (varlık, zaman dilimi, olay)
+  await page.goto(BASE + '/#/analiz?v=GOLD')
+  await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
+  await page.locator('.cc-bar .segmented').first().locator('button', { hasText: 'Haftalık' }).click()
+  await page.locator('.wb-pick select').selectOption('trend-down')
+  await page.locator('.wb-side .st-alarm a', { hasText: 'haber ver' }).click()
+  await page.locator('.al-say select[aria-label="Olay"]').waitFor({ timeout: 5000 })
+  if (await page.locator('.al-say select[aria-label="Olay"]').inputValue() !== 'trend-down') throw new Error('olay hazır gelmedi')
+  if (await page.locator('.al-say select[aria-label="Varlık"]').inputValue() !== 'GOLD') throw new Error('varlık hazır gelmedi')
+  await page.locator('.al-go .btn').click()
+  await page.locator('.al-row', { hasText: 'haftalık veride' }).waitFor({ timeout: 5000 })
+  // Kontrol edilir: durum metni gelir, hata olmaz
+  await page.waitForFunction(() => { const r = [...document.querySelectorAll('.al-row')].find((x) => x.textContent.includes('haftalık veride')); return r && /son kez|gerçekleşti|hiç olmadı/.test(r.textContent) }, null, { timeout: 30000 })
+  // Güçlü kurulum
+  await page.goto(BASE + '/#/alarmlar?tur=sinyal&s=NASDAQ:AAPL')
   await page.locator('.al-say', { hasText: 'AAPL' }).waitFor({ timeout: 5000 })
   await page.locator('.al-go .btn').click()
   await page.locator('.al-row', { hasText: 'kurulumu oluşursa' }).waitFor({ timeout: 5000 })
-  if (await page.locator('.al-row').count() !== 3) throw new Error('3 alarm bekleniyordu')
+  if (await page.locator('.al-row').count() !== 4) throw new Error('4 alarm bekleniyordu')
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('piyasa.alarms.v1')).alarms.map((a) => a.type).sort().join())
-  if (saved !== 'premium,price,signal') throw new Error('kayıt: ' + saved)
+  if (saved !== 'event,premium,price,signal') throw new Error('kayıt: ' + saved)
   // Sil
   await page.locator('.al-row', { hasText: 'değerinin altına inerse' }).locator('.icon-btn').click()
-  if (await page.locator('.al-row').count() !== 2) throw new Error('silinmedi')
+  if (await page.locator('.al-row').count() !== 3) throw new Error('silinmedi')
+})
+
+await step('mobil: analiz sayfalarında yatay taşma yok', async () => {
+  const m = await ctx.newPage()
+  await m.setViewportSize({ width: 390, height: 800 })
+  for (const h of ['analiz?v=GOLD', 'analiz/hisse/BIST:THYAO', 'analiz/makro', 'alarmlar?tur=olay&s=GOLD&e=rsi-30&tf=W']) {
+    await m.goto(BASE + '/#/' + h)
+    await m.waitForTimeout(3500)
+    const over = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    if (over > 1) throw new Error(`${h}: ${over}px taşıyor`)
+  }
+  await m.close()
 })
 
 await step('sözlük: koşul çipinden terime, arama', async () => {

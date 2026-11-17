@@ -1193,14 +1193,11 @@ a.screen-item { text-decoration: none; color: inherit; }
 }
 
 /* Olaylar ve yön olasılıkları */
-.ev-answer { max-width: 34ch; font-size: clamp(20px, 2.6vw, 26px); }
-.ev-asset { margin-top: 18px; }
-.ev-asset h4 { margin: 0 0 2px; font-size: 15px; font-weight: 680; }
-.ev-asset h4 em { font-style: normal; font-weight: 400; font-size: 12.5px; color: var(--ink-3); margin-left: 6px; }
-.ev-row { border-bottom: 1px solid var(--rule-2); }
-.ev-row summary { display: grid; grid-template-columns: 78px minmax(0, 1fr) minmax(300px, 360px); gap: 6px 16px; align-items: center; padding: 10px 0; cursor: pointer; list-style: none; }
-.ev-row summary::-webkit-details-marker { display: none; }
-.ev-row summary:hover { background: var(--hover); box-shadow: -12px 0 0 var(--hover), 12px 0 0 var(--hover); }
+.ev-answer { max-width: 36ch; font-size: clamp(20px, 2.6vw, 26px); }
+.ev-row { display: grid; grid-template-columns: 96px minmax(0, 1fr) minmax(300px, 360px); gap: 6px 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--rule-2); }
+button.ev-row { width: 100%; border: 0; border-bottom: 1px solid var(--rule-2); background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+button.ev-row:hover { background: var(--hover); box-shadow: -12px 0 0 var(--hover), 12px 0 0 var(--hover); }
+button.ev-row.on { box-shadow: -12px 0 0 var(--sunken), 12px 0 0 var(--sunken); background: var(--sunken); }
 .ev-row .when { font-size: 13px; font-weight: 600; }
 .ev-row .when em, .ev-row .what em { display: block; font-style: normal; font-weight: 400; font-size: 12px; color: var(--ink-3); }
 .ev-row .what b { font-size: 14.5px; font-weight: 600; line-height: 1.35; }
@@ -1208,51 +1205,82 @@ a.screen-item { text-decoration: none; color: inherit; }
 .ev-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .ev-table th { font-size: 11.5px; font-weight: 500; color: var(--ink-3); padding: 0 4px 2px; }
 .ev-table .c { text-align: center; }
-.ev-odds { padding: 4px 6px; border-radius: 6px; }
+.ev-odds { padding: 4px 6px; border-radius: 6px; vertical-align: top; }
 .ev-odds b { display: block; font-size: 15px; font-weight: 680; }
-.ev-odds .s { display: block; font-size: 10.5px; color: var(--ink-3); white-space: nowrap; }
-.ev-odds .track { position: relative; display: block; height: 4px; margin: 3px 4px; border-radius: 2px; background: var(--sunken); }
-.ev-odds .track .f { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; background: var(--ink-3); }
+.ev-odds .s { display: block; font-size: 10.5px; line-height: 1.45; color: var(--ink-3); white-space: nowrap; }
+.ev-odds.thin .s { padding: 8px 0; }
+.ev-odds .track { position: relative; display: block; height: 6px; margin: 4px 4px; border-radius: 3px; background: var(--sunken); }
+.ev-odds .track .r { position: absolute; top: 2px; height: 2px; border-radius: 1px; background: var(--ink-4); }
+.ev-odds .track .f { position: absolute; top: 0; width: 6px; height: 6px; margin-left: -3px; border-radius: 50%; background: var(--ink-2); }
 .ev-odds .track .b { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--ink); }
-.ev-odds.up { background: var(--up-bg); } .ev-odds.up b { color: var(--up); } .ev-odds.up .track .f { background: var(--up); }
-.ev-odds.down { background: var(--down-bg); } .ev-odds.down b { color: var(--down); } .ev-odds.down .track .f { background: var(--down); }
+.ev-odds.up { background: var(--up-bg); } .ev-odds.up b { color: var(--up); } .ev-odds.up .track .f, .ev-odds.up .track .r { background: var(--up); }
+.ev-odds.down { background: var(--down-bg); } .ev-odds.down b { color: var(--down); } .ev-odds.down .track .f, .ev-odds.down .track .r { background: var(--down); }
 .ev-more { padding: 0 0 16px; max-width: 640px; }
 .k.box.up { background: var(--up); } .k.box.down { background: var(--down); }
 .sc-base.solid { stroke-dasharray: none; stroke: var(--ink-4); stroke-width: 2.25; }
-.ov-state { margin-top: 44px; padding-top: 6px; border-top: 2px solid var(--ink); }
+.ov-state { margin-top: 36px; padding-top: 6px; border-top: 2px solid var(--ink); }
 .ov-state > h3 { font-size: 15px; color: var(--ink); }
-@media (max-width: 860px) { .ev-row summary { grid-template-columns: 64px minmax(0, 1fr); } .ev-table { grid-column: 1 / -1; } }
+.ov-method { margin: 18px 0 0; padding-left: 18px; font-size: 13.5px; line-height: 1.55; color: var(--ink-2); }
+.ov-method li { margin: 6px 0; }
+@media (max-width: 860px) { .ev-row { grid-template-columns: 84px minmax(0, 1fr); } .ev-row .ev-table { grid-column: 1 / -1; } }
 
-/* Mum grafik ve tezgâh */
-.cc { margin: 0; }
+/* Mum grafik */
+.cc { margin: 14px 0 0; }
 .cc-bar { display: flex; flex-wrap: wrap; gap: 8px 12px; }
-.cc-ohlc { margin: 10px 0 6px; font-size: 12.5px; color: var(--ink-2); }
+.cc-ohlc { margin: 10px 0 6px; min-height: 1.5em; font-size: 12.5px; color: var(--ink-2); }
 .cc-ohlc b { color: var(--ink); }
 .cc-ohlc .pos { color: var(--up); } .cc-ohlc .neg { color: var(--down); }
-.cc-plot { height: 440px; border: 1px solid var(--rule-2); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.cc-plot { height: 480px; border: 1px solid var(--rule-2); border-radius: var(--radius); background: var(--surface); overflow: hidden; }
+.cc-plot.cc-rsi { height: 120px; margin-top: 6px; }
+.cc-plot.hidden { display: none; }
 .cc-arrow { font-size: 11px; color: var(--ink-3); } .cc-arrow.up { color: var(--up); } .cc-arrow.down { color: var(--down); }
-.wb-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 10px 0 14px; }
-.wb-assets { flex-wrap: wrap; }
-.wb-pick .sc-pick .select { max-width: 380px; }
-.wb-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px 28px; align-items: start; }
-.wb-side { padding-top: 4px; }
+@media (max-width: 860px) { .cc-plot { height: 360px; } .cc-plot.cc-rsi { height: 96px; } }
+
+/* Grafik tezgâhı: olay seçimi, olasılık özeti, grafik, dağılım, yakın zamandakiler */
+.wb-assets { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; }
+.wb-assets .chip.link { text-decoration: none; border-style: dashed; }
+.wb-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 10px 0 14px; }
+.wb-pick .sc-pick .select { max-width: min(420px, 78vw); }
+.wb-side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 460px); gap: 4px 28px; align-items: start; padding: 14px 16px; border-radius: var(--radius); background: var(--sunken); }
+.wb-side .wb-name, .wb-side .wb-count { grid-column: 1; }
+.wb-side .wb-odds { grid-column: 2; grid-row: 1 / span 3; }
+.wb-side .wb-hz { grid-column: 1; margin-top: 10px; }
+.wb-side .note { grid-column: 1 / -1; margin: 8px 0 0; }
+.wb-side .st-alarm { grid-column: 1 / -1; margin: 8px 0 0; }
 .wb-name { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; }
-.wb-count { margin: 8px 0 14px; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
+.wb-count { margin: 6px 0 0; font-size: 14px; line-height: 1.5; color: var(--ink-2); }
 .wb-count b { font-size: 17px; color: var(--ink); }
 .wb-odds caption { text-align: left; font-size: 12.5px; color: var(--ink-3); padding-bottom: 6px; }
-.wb-hz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 16px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.wb-odds .ev-odds .track, .wb-market .ev-odds .track { background: var(--surface); }
+.wb-odds .ev-odds b { font-size: 19px; }
+.wb-hz { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 12.5px; color: var(--ink-3); }
+.wb-hz .segmented { background: var(--surface); }
 .wb-hz .segmented button { padding: 4px 9px; font-size: 12.5px; }
-.wb .note { margin-top: 12px; }
-@media (max-width: 1100px) { .wb-grid { grid-template-columns: minmax(0, 1fr); } .cc-plot { height: 340px; } }
-
-/* Tezgâh: olay özeti üstte yatay, grafik altında tam genişlik */
-.wb-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
-.wb-side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 4px 28px; align-items: start; padding: 14px 16px; border-radius: var(--radius); background: var(--sunken); }
-.wb-side .wb-name, .wb-side .wb-count { grid-column: 1; }
-.wb-side .wb-odds { grid-column: 2; grid-row: 1 / span 2; }
-.wb-side .wb-hz { grid-column: 2; margin-top: 8px; }
-.wb-side .note { grid-column: 1 / -1; margin-top: 8px; }
-.wb-count { margin: 6px 0 0; }
-.wb-odds .ev-odds .track { background: var(--surface); }
-.cc-plot { height: 480px; }
-@media (max-width: 860px) { .wb-side { grid-template-columns: minmax(0, 1fr); } .wb-side .wb-odds, .wb-side .wb-hz { grid-column: 1; grid-row: auto; } .cc-plot { height: 360px; } }
+.wb-hz .segmented button[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
+.wb-picked { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: 10px 0 0; padding: 8px 12px; border-left: 3px solid var(--brass); background: var(--sunken); font-size: 13.5px; }
+.wb-picked .pos { color: var(--up); } .wb-picked .neg { color: var(--down); }
+.wb-strip { margin-top: 14px; }
+.wb-strip svg { max-width: 720px; }
+.wb-strip .sc-mark { cursor: pointer; }
+.wb-strip .sc-mark.pick { fill: var(--brass); stroke: var(--ink); }
+.wb-market { margin: 16px 0 0; padding: 12px 16px; border: 1px solid var(--rule-2); border-radius: var(--radius); }
+.wb-market > b { display: block; margin-bottom: 8px; font-size: 14px; }
+.wb-market .ev-table { max-width: 460px; }
+.wb-market .note { margin: 8px 0 0; }
+.wb-recent { margin-top: 26px; }
+.wb-recent h4 { margin: 22px 0 4px; font-size: 15px; font-weight: 680; }
+.wb-recent h4:first-child { margin-top: 0; }
+.wb-composer { margin: 0 0 14px; padding: 12px 16px; border: 1px dashed var(--rule); border-radius: var(--radius); }
+.wb-composer .cost-say { margin: 0 0 6px; line-height: 2.1; }
+.wb-composer .note { margin: 0 0 10px; }
+.wb-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2); white-space: nowrap; }
+.wb-basis { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 12px 0 0; }
+.wb-basis .note { margin: 0; flex: 1; min-width: 240px; }
+.wb .note { margin-top: 10px; }
+@media (max-width: 860px) {
+  .wb-side { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  .wb-side .wb-odds, .wb-side .wb-hz { grid-column: 1; grid-row: auto; }
+  .wb-side .wb-odds { margin-top: 10px; }
+  .wb-odds .ev-odds { padding: 4px 2px; }
+  .wb-odds .ev-odds .s { font-size: 10px; }
+}

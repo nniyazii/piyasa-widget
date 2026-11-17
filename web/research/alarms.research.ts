@@ -12,9 +12,10 @@ import { checkAlarms, sanitizeAlarms, type Source, type States } from '../src/co
 import { bistOpen, type Series } from '../src/core/premium'
 import { buildPremiums, PREMIUM_QUOTES, PREMIUM_SYMBOLS } from '../src/core/premiums'
 import { INDEX_OF, stockSetups, tableKey, toUsd, USDTRY, type SetupTable } from '../src/core/setups'
-import type { MacroData } from '../src/core/macro'
+import { world, type MacroData } from '../src/core/macro'
+import { macroEventDefs } from '../src/core/macroEvents'
 import { outlookView } from '../src/core/outlook'
-import { analyze, marketOf, type Bars, type Timeframe, type Universe } from '../src/core/signals'
+import { assetInfo, convertFrames, framesFromFile, GRAM, IN_USD, isStock, marketOfSubject, toMonthly, unpack, type CandleFile, type Frames, type Packed } from '../src/core/subject'
 
 const env = process.env
 const BASE = (env.DATA_BASE ?? 'https://nniyazii.github.io/piyasa-widget/data').replace(/\/$/, '')
@@ -36,26 +37,26 @@ function unpackDaily(p: PackedDaily): Series | undefined {
   for (let i = 0; i < n; i++) { if (i > 0) d += p[1][i - 1]; days[i] = d; const c = p[2][i]; close[i] = c == null ? last : c; if (c != null) last = c }
   return { days, close }
 }
-function unpackBars(p: [number, number[], number[], number[]?] | undefined): Bars | undefined {
-  if (!p || !p[2]?.length) return undefined
-  const t: number[] = []
-  let cur = p[0]
-  for (let i = 0; i < p[2].length; i++) { if (i > 0) cur += p[1][i - 1] * 60; t.push(cur) }
-  return { t, c: p[2], v: p[3] }
-}
-
-let rules: Promise<{ markets: Record<string, { rules: Universe }> } | undefined> | undefined
-
 let setupFile: Promise<{ markets: Record<string, { setups: SetupTable }> } | undefined> | undefined
-const dailyOf = async (symbol: string) => unpackBars(((await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[], number[]?]>> }).bars.D)
+let macroFile: Promise<MacroData | undefined> | undefined
+const macro = () => (macroFile ??= json<MacroData>(`${BASE}/macro.json`).catch(() => undefined))
+const barCache = new Map<string, Promise<{ W?: ReturnType<typeof unpack>; D?: ReturnType<typeof unpack> }>>()
+/** Hissenin haftalık ve günlük mumları (TradingView'den, canlı) */
+const barsOf = (symbol: string) => {
+  if (!barCache.has(symbol)) barCache.set(symbol, (symbolBars(symbol) as Promise<{ bars: Partial<Record<'W' | 'D', Packed>> }>).then((r) => ({ W: unpack(r.bars.W), D: unpack(r.bars.D) })))
+  return barCache.get(symbol)!
+}
+const dailyOf = async (symbol: string) => (await barsOf(symbol)).D
+const candleCache = new Map<string, Promise<Frames | undefined>>()
+const candles = (id: string) => { if (!candleCache.has(id)) candleCache.set(id, json<CandleFile>(`${BASE}/candles/${id}.json`).then(framesFromFile).catch(() => undefined)); return candleCache.get(id)! }
 
 const source: Source = {
   async outlook() {
-    const d = await json<MacroData>(`${BASE}/macro.json`).catch(() => undefined)
+    const d = await macro()
     return d ? Object.fromEntries(outlookView(d).list.map((o) => [o.asset.id, { stance: o.stance, conviction: o.conviction, name: o.asset.short, why: o.why }])) : undefined
   },
   async setups(symbol) {
-    const m = marketOf(symbol)
+    const m = marketOfSubject(symbol)
     if (!m) return undefined
     setupFile ??= json<{ markets: Record<string, { setups: SetupTable }> }>(`${BASE}/setups.json`).catch(() => undefined)
     // BIST hisseleri dolar bazında değerlendirilir (uygulamadaki varsayılanla aynı)
@@ -75,13 +76,21 @@ const source: Source = {
     const b = buildPremiums(price, series, long)
     return { rows: b.rows, advices: [...b.advices, ...b.money], open: bistOpen() }
   },
-  async analysis(symbol) {
-    const r = (await symbolBars(symbol)) as { bars: Partial<Record<Timeframe, [number, number[], number[], number[]?]>> }
-    const frames: Partial<Record<Timeframe, Bars>> = {}
-    for (const tf of ['W', 'D', 'H4', 'H1'] as Timeframe[]) { const b = unpackBars(r.bars[tf]); if (b) frames[tf] = b }
-    rules ??= json<{ markets: Record<string, { rules: Universe }> }>(`${BASE}/rules.json`).catch(() => undefined)
-    const m = marketOf(symbol)
-    return Object.keys(frames).length ? analyze(frames, m ? (await rules)?.markets[m]?.rules : undefined) : undefined
+  async subject(id, usd) {
+    if (!isStock(id)) {
+      const a = assetInfo(id)
+      if (!a) return undefined
+      let frames = await candles(a.source ?? a.id)
+      if (!frames) return undefined
+      if (a.via) { const fx = await candles('USDTRY'); if (!fx) return undefined; frames = convertFrames(frames, fx, a.via === 'gram' ? GRAM : IN_USD) }
+      const d = await macro()
+      return { short: a.short, frames, macroDefs: d ? macroEventDefs(world(d), a.group) : undefined }
+    }
+    const b = await barsOf(id)
+    if (!b.W && !b.D) return undefined
+    let frames: Frames = { W: b.W, D: b.D, M: toMonthly(b.W) }
+    if (usd && marketOfSubject(id) === 'TR') { const fx = await candles('USDTRY'); if (!fx) return undefined; frames = convertFrames(frames, fx, IN_USD) }
+    return { short: id.split(':').pop()!, frames }
   },
 }
 

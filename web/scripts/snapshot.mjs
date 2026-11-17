@@ -139,15 +139,15 @@ try {
   for (const [k, v] of Object.entries(candles)) writeFileSync(join(OUT, 'candles', `${k}.json`), JSON.stringify(v))
   console.log(`candles: ${Object.keys(candles).length} varlık`)
 } catch (e) { console.log(`candles alınamadı (${e.message}); önceki kopya kalır`) }
-// Hisse analizi için derin geçmiş (haftalık, günlük, 4 saatlik, saatlik), parçalara bölünmüş.
+// Hisse analizi için derin geçmiş (haftalık ve günlük mumlar), parçalara bölünmüş.
 // Yayındaki kopya 20 saatten yeniyse yeniden çekilmez, olduğu gibi taşınır (her yayında TradingView'a yüklenmemek için).
 try {
-  const { DEEP, SHARDS, deepBars, shardOf } = await import('../server/bars.mjs')
+  const { DEEP, SHARDS, BARS_VERSION, deepBars, shardOf } = await import('../server/bars.mjs')
   // Hisseler, hazır listedeki semboller ve sık bakılan birkaç gösterge
   const all = [...new Set([...bist, ...us, ...misc, 'BITSTAMP:BTCUSD', 'BITSTAMP:ETHUSD', 'FX:EURUSD', 'TVC:DXY', 'FX:UKOIL', 'NASDAQ:IXIC', 'DJ:DJI'])]
   const prevMeta = BASE ? await fetch(`${BASE}/bars/meta.json`).then((x) => (x.ok ? x.json() : undefined)).catch(() => undefined) : undefined
-  // Sürüm 2: günlük veride hacim var (eski kopya taşınmaz, yeniden çekilir)
-  const VERSION = 2
+  // Sürüm değişince eski kopya taşınmaz, yeniden çekilir (sürüm 3: haftalık ve günlük mumlar, hacim)
+  const VERSION = BARS_VERSION
   const fresh = prevMeta && Date.now() - prevMeta.generated < 20 * 3600_000 && prevMeta.shards === SHARDS && prevMeta.version === VERSION
   const nn = (i) => String(i).padStart(2, '0')
   const counts = {}

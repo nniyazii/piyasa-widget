@@ -34,8 +34,8 @@ export async function macroSeries() {
 
 /** Mum grafikler için açılış/yüksek/düşük/kapanış: aylık (1968'den), haftalık (~19 yıl), günlük (~6 yıl) */
 export const CANDLE_ASSETS = ['GOLD', 'SILVER', 'OIL', 'COPPER', 'SPX', 'XU100', 'USDTRY', 'DXY', 'GAS', 'NDX', 'BTC']
-const CANDLE_TF = { M: { res: '1M', count: 720 }, W: { res: '1W', count: 1000 }, D: { res: '1D', count: 1500 } }
-/** { KOD: { M|W|D: [[zaman (sn), açılış, yüksek, düşük, kapanış], …] } } */
+const CANDLE_TF = { M: { res: '1M', count: 720 }, W: { res: '1W', count: 1500 }, D: { res: '1D', count: 3000 } }
+/** { KOD: { M|W|D: [[zaman (sn), açılış, yüksek, düşük, kapanış, hacim?], …] } } */
 export async function macroCandles() {
   const out = {}
   const sig = (v) => Number(v.toPrecision(6))
@@ -44,7 +44,8 @@ export async function macroCandles() {
     for (const k of CANDLE_ASSETS) {
       const bars = r.get(MACRO_SYMBOLS[k])
       if (!bars?.length) continue
-      ;(out[k] ??= {})[tf] = bars.filter((b) => b.c > 0 && b.o > 0).map((b) => [b.t, sig(b.o), sig(b.h), sig(b.l), sig(b.c)])
+      const hasV = bars.some((b) => b.v > 0)
+      ;(out[k] ??= {})[tf] = bars.filter((b) => b.c > 0 && b.o > 0).map((b) => (hasV ? [b.t, sig(b.o), sig(b.h), sig(b.l), sig(b.c), b.v > 0 ? Number(b.v.toPrecision(3)) : 0] : [b.t, sig(b.o), sig(b.h), sig(b.l), sig(b.c)]))
     }
   }
   if (!out.GOLD?.M) throw new Error('mum verisi alınamadı')
