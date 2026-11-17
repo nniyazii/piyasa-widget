@@ -1320,3 +1320,30 @@ button.ev-row.on { box-shadow: -12px 0 0 var(--sunken), 12px 0 0 var(--sunken); 
 .vc.up b { color: var(--up); } .vc.down b { color: var(--down); } .vc.thin b { color: var(--ink-4); }
 .vc.up em { color: var(--up); } .vc.down em { color: var(--down); }
 @media (max-width: 560px) { .vc em { max-width: 16ch; margin-left: auto; } .wb-card { padding: 14px; } }
+
+/* Tepe ve taban */
+.tn-scales { margin: 12px 0 0; }
+.tn-answer { margin: 18px 0 14px; max-width: 30ch; font-size: clamp(21px, 2.8vw, 28px); }
+.tn-answer.up { color: var(--up); } .tn-answer.down { color: var(--down); }
+.tn-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 6px; }
+.tn-card { padding: 14px 16px 12px; border-radius: var(--radius); background: var(--sunken); border-top: 4px solid var(--ink-4); }
+.tn-card.up { border-top-color: var(--up); } .tn-card.down { border-top-color: var(--down); }
+.tn-card h3 { margin: 0 0 6px; font-size: 17px; font-weight: 700; }
+.tn-card.up h3 { color: var(--up); } .tn-card.down h3 { color: var(--down); }
+.tn-say { margin: 8px 0 0; font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
+.tn-say b { color: var(--ink); font-size: 16px; }
+.tn-dim { font-size: 13.5px; color: var(--ink-3); }
+.tn-meter { position: relative; height: 8px; margin: 10px 0 2px; border-radius: 4px; background: var(--surface); overflow: hidden; }
+.tn-meter i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: var(--ink-3); }
+.tn-card.up .tn-meter i { background: var(--up); } .tn-card.down .tn-meter i { background: var(--down); }
+.tn-meter b { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink); }
+.tn-meter-note { margin: 0; font-size: 11px; color: var(--ink-3); }
+.tn-test { margin: 10px 0 0; padding-top: 10px; border-top: 1px solid var(--rule-2); font-size: 13px; line-height: 1.5; color: var(--ink-2); }
+.tn-why { margin-top: 10px; font-size: 13px; }
+.tn-why summary { cursor: pointer; color: var(--ink-2); font-weight: 600; }
+.tn-table { margin-top: 8px; font-size: 12.5px; }
+.tn-table td:first-child { white-space: normal; }
+.tn-dir { display: block; font-size: 10.5px; font-weight: 650; }
+.tn-dir.pro { color: var(--up); } .tn-dir.con { color: var(--down); }
+.linklike { border: 0; background: none; padding: 0; font: inherit; font-weight: 650; color: var(--ink-2); cursor: pointer; }
+@media (max-width: 760px) { .tn-cards { grid-template-columns: minmax(0, 1fr); } .tn-scales button { padding: 5px 8px; font-size: 12.5px; } }

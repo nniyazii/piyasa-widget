@@ -81,7 +81,7 @@ export function StockAnalysis({ symbol }: { symbol?: string }) {
 
 // ------------------------------------------------------------------ hisse seçimi
 
-function Picker({ current }: { current?: string }) {
+export function Picker({ current, onPick }: { current?: string; /** Verilirse seçim buraya bildirilir (yoksa Hisse sayfasına gidilir) */ onPick?: (symbol: string) => void }) {
   const app = useApp()
   const [q, setQ] = useState('')
   const [hits, setHits] = useState<SearchHit[] | undefined>()
@@ -94,7 +94,7 @@ function Picker({ current }: { current?: string }) {
     const id = setTimeout(() => { search(q, ac.signal).then((h) => { const list = h.filter((x) => x.type !== 'economic'); setHits(known ? [...list.filter((x) => known.has(x.symbol.toUpperCase())), ...list.filter((x) => !known.has(x.symbol.toUpperCase()))] : list) }).catch(() => { /* iptal */ }) }, 250)
     return () => { clearTimeout(id); ac.abort() }
   }, [q, known])
-  const go = (s: string) => { setQ(''); setHits(undefined); navigate('analiz/hisse/' + s) }
+  const go = (s: string) => { setQ(''); setHits(undefined); if (onPick) onPick(s); else navigate('analiz/hisse/' + s) }
   const own = app.instruments.filter((i) => !!marketOfSubject(i.symbol) && (!known || known.has(i.symbol.toUpperCase())) && !/:(IXIC|NDX|SPX|DJI)$/.test(i.symbol) && !/XU\d|ALTIN|GLDTR|GMSTR/.test(i.symbol) && i.symbol !== current).slice(0, 6)
   const quick = own.length ? own.map((i) => ({ s: i.symbol, n: Fmt.ticker(i.symbol) })) : EXAMPLES.filter((s) => s !== current).map((s) => ({ s, n: Fmt.ticker(s) }))
   return (
@@ -112,7 +112,7 @@ function Picker({ current }: { current?: string }) {
           ))}
         </ul>
       )}
-      {!hits && <p className="st-quick">{quick.map((x) => <a key={x.s} href={href('analiz/hisse/' + x.s)}>{x.n}</a>)}</p>}
+      {!hits && <p className="st-quick">{quick.map((x) => (onPick ? <button key={x.s} type="button" className="linklike" onClick={() => onPick(x.s)}>{x.n}</button> : <a key={x.s} href={href('analiz/hisse/' + x.s)}>{x.n}</a>))}</p>}
     </div>
   )
 }

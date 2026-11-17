@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import * as Fmt from '../core/format'
 import type { OHLCV, Tf } from '../core/study'
 
-export interface Mark { index: number; outcome: 'up' | 'down' | 'open'; label?: string }
+export interface Mark { index: number; outcome: 'up' | 'down' | 'open'; label?: string; /** Tepe işareti: mumun üstünde, aşağı ok */ top?: boolean }
 const RANGES: { id: string; label: string; years?: number }[] = [{ id: '0.5', label: '6 ay', years: 0.5 }, { id: '1', label: '1 yıl', years: 1 }, { id: '3', label: '3 yıl', years: 3 }, { id: '10', label: '10 yıl', years: 10 }, { id: 'all', label: 'Tümü' }]
 const DEFAULT_RANGE: Record<Tf, string> = { M: 'all', W: '10', D: '1' }
 const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -20,13 +20,15 @@ const dateFmt = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short
 const monthFmt = new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
 export const barDate = (tf: Tf, t: number) => (tf === 'M' ? monthFmt : dateFmt).format(t * 1000)
 
-export function CandleChart({ bars, tf, title, marks, selected, onPick, ma, maLabel, rsi, controls }: {
+export function CandleChart({ bars, tf, title, marks, selected, onPick, ma, maLabel, rsi, controls, legend, defaultRange }: {
+  /** İşaretlerin açıklaması (verilmezse olay açıklaması) ve açılıştaki aralık */
+  legend?: ReactNode; defaultRange?: string
   bars: OHLCV; tf: Tf; title: string; marks: Mark[]; selected?: number; onPick?: (index: number) => void
   ma?: number[]; maLabel?: string; rsi?: number[]; controls?: ReactNode
 }) {
   const el = useRef<HTMLDivElement>(null), el2 = useRef<HTMLDivElement>(null)
   const api = useRef<{ chart: IChartApi; candles: ISeriesApi<'Candlestick'>; avg: ISeriesApi<'Line'>; vol: ISeriesApi<'Histogram'>; chart2: IChartApi; rsi: ISeriesApi<'Line'> } | null>(null)
-  const [range, setRange] = useState(DEFAULT_RANGE[tf])
+  const [range, setRange] = useState(defaultRange ?? DEFAULT_RANGE[tf])
   const [hover, setHover] = useState<number | undefined>()
   const pick = useRef(onPick); pick.current = onPick
   const marksRef = useRef(marks); marksRef.current = marks
@@ -35,7 +37,7 @@ export function CandleChart({ bars, tf, title, marks, selected, onPick, ma, maLa
   const hasVol = !!bars.v?.some((x) => x > 0)
   const hasRsi = !!rsi
 
-  useEffect(() => { setRange(DEFAULT_RANGE[tf]) }, [tf])
+  useEffect(() => { setRange(defaultRange ?? DEFAULT_RANGE[tf]) }, [tf, defaultRange])
 
   // Grafikler bir kez kurulur; tema değişince renkler yenilenir
   useEffect(() => {
@@ -110,7 +112,7 @@ export function CandleChart({ bars, tf, title, marks, selected, onPick, ma, maLa
     for (const m of [...marks].sort((x, y) => x.index - y.index)) {
       if (m.index < 0 || m.index >= n) continue
       const sel = m.index === selected
-      out.push({ time: bars.t[m.index] as UTCTimestamp, position: 'belowBar', shape: 'arrowUp', size: sel ? 2.2 : 1.3, color: sel ? css('--ink') : m.outcome === 'up' ? css('--up') : m.outcome === 'down' ? css('--down') : css('--ink-3'), text: m.label })
+      out.push({ time: bars.t[m.index] as UTCTimestamp, position: m.top ? 'aboveBar' : 'belowBar', shape: m.top ? 'arrowDown' : 'arrowUp', size: sel ? 2.2 : 1.3, color: sel ? css('--ink') : m.outcome === 'up' ? css('--up') : m.outcome === 'down' ? css('--down') : css('--ink-3'), text: m.label })
     }
     return out
   }, [bars, marks, selected, n])
@@ -135,7 +137,8 @@ export function CandleChart({ bars, tf, title, marks, selected, onPick, ma, maLa
       <div className="cc-plot" ref={el} role="img" aria-label={`${title} mum grafiği; ${marks.length} olay işaretli`} />
       <div className={'cc-plot cc-rsi' + (hasRsi ? '' : ' hidden')} ref={el2} aria-hidden />
       <p className="sc-legend">
-        {marks.length > 0 && <><span><b className="cc-arrow up">▲</b>olay; sonrasında fiyat yukarıda</span><span><b className="cc-arrow down">▲</b>aşağıda</span><span><b className="cc-arrow">▲</b>henüz belli değil</span></>}
+        {legend}
+        {!legend && marks.length > 0 && <><span><b className="cc-arrow up">▲</b>olay; sonrasında fiyat yukarıda</span><span><b className="cc-arrow down">▲</b>aşağıda</span><span><b className="cc-arrow">▲</b>henüz belli değil</span></>}
         {maLabel && <span><i className="k ma" />{maLabel}</span>}
         {hasRsi && <span>alt panel: RSI</span>}
       </p>

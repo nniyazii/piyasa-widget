@@ -14,6 +14,7 @@
     "research": "vitest run -c vitest.research.config.ts",
     "outlook": "vitest run -c vitest.research.config.ts research/outlook-export.research.ts --disable-console-intercept",
     "setups": "vitest run -c vitest.research.config.ts research/setups.research.ts --disable-console-intercept",
+    "pivots": "vitest run -c vitest.research.config.ts research/pivots.research.ts --disable-console-intercept",
     "market-events": "vitest run -c vitest.research.config.ts research/market-events.research.ts --disable-console-intercept",
     "alarms": "vitest run -c vitest.research.config.ts research/alarms.research.ts --disable-console-intercept"
   },

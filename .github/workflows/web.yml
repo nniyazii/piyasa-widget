@@ -52,6 +52,13 @@ jobs:
           done
         timeout-minutes: 6
         continue-on-error: true
+      - name: Tepe ve taban örüntüsü (pazar genelinde öğrenme ve geriye dönük sınama)
+        # Günlük kopyadan yeniden öğrenilir; olmazsa yayındaki kopya, o da yoksa depodaki dosya kalır
+        run: |
+          if [ -d dist/data/bars/D ] && [ -f dist/data/candles/VIX.json ] && DATA=dist/data/bars CANDLES=dist/data/candles OUT=dist/data/pivots.new.json npm run pivots; then mv dist/data/pivots.new.json dist/data/pivots.json
+          else rm -f dist/data/pivots.new.json; curl -fsSL "https://raw.githubusercontent.com/${{ github.repository }}/gh-pages/data/pivots.json" -o dist/data/pivots.new.json && mv dist/data/pivots.new.json dist/data/pivots.json || rm -f dist/data/pivots.new.json; fi
+        timeout-minutes: 8
+        continue-on-error: true
       - name: Görünümün hazır hâli (Android uygulaması için)
         run: |
           if [ -f dist/data/macro.json ] && DATA=dist/data/macro.json OUT=dist/data/outlook.new.json npm run outlook; then mv dist/data/outlook.new.json dist/data/outlook.json; else rm -f dist/data/outlook.new.json; fi

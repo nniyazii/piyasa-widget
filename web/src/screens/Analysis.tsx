@@ -15,7 +15,7 @@ import { FUND_BUY, METALS, TYPICAL_DAYS, type PremiumRow } from '../core/premium
 import { chartUrl } from '../core/tradingview'
 import { refreshPremiums, usePremiums, type PremiumState } from '../data/premium'
 import { Icon } from '../ui/Icon'
-import { href } from '../ui/router'
+import { href, useRoute } from '../ui/router'
 import { bestRoute, CostCompare } from './CostCompare'
 import { Macro } from './Macro'
 import { Outlook, OutlookLine } from './Outlook'
@@ -23,9 +23,11 @@ import { Outlook, OutlookLine } from './Outlook'
 /** Para arzı değerlendirmesinin Görünüm'deki varlığı */
 const OUTLOOK_OF: Record<string, string> = { 'm2-usdtry': 'USDTRY', 'm2-gold-usd': 'GOLD', 'm2-gold-try': 'GAUTRY', 'm2-bist': 'XU100USD' }
 import { StockAnalysis } from './StockAnalysis'
+import { Turning } from './Turning'
 
 const TABS = [
-  { path: '', label: 'Görünüm' },
+  { path: '', label: 'Tepe ve taban' },
+  { path: 'olaylar', label: 'Olaylar' },
   { path: 'makro', label: 'Makro' },
   { path: 'para-arzi', label: 'Para arzı' },
   { path: 'birikim', label: 'Birikim' },
@@ -40,7 +42,9 @@ const tl = (v?: number, d = 2) => (v == null ? '—' : Fmt.number(v, d) + ' ₺'
 
 export function Analysis({ tab, arg }: { tab?: string; arg?: string }) {
   const s = usePremiums()
-  const current = TABS.find((t) => t.path === (tab ?? '')) ?? TABS[0]
+  const { query } = useRoute()
+  // Eski bağlantılar (#/analiz?v=…&e=olay) Olaylar sayfasına düşer
+  const current = TABS.find((t) => t.path === (tab ?? (query.has('e') ? 'olaylar' : ''))) ?? TABS[0]
   // Dar ekranda sekmeler kayar: seçili olan görünür kalsın
   useEffect(() => { document.querySelector('.an-tabs a[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }, [current])
   return (
@@ -50,7 +54,8 @@ export function Analysis({ tab, arg }: { tab?: string; arg?: string }) {
       </nav>
       {current.path === 'hisse' ? <StockAnalysis symbol={arg} />
         : current.path === 'makro' ? <Macro />
-        : current.path === '' ? <Outlook practical={s.rows.length || s.advices.length ? <Overview s={s} /> : undefined} />
+        : current.path === '' ? <Turning />
+        : current.path === 'olaylar' ? <Outlook practical={s.rows.length || s.advices.length ? <Overview s={s} /> : undefined} />
         : !s.rows.length && !s.advices.length
         ? <p className="an-answer" aria-live="polite">{s.error ?? 'Fiyatlar alınıyor…'}</p>
         : current.path === 'urunler' ? <Products s={s} />

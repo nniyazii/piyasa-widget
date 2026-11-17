@@ -191,7 +191,7 @@ private fun OutlookHead(o: OutlookData) {
 private fun EventCard(e: OutlookEvent) {
     val up = Color(0xFF0B7A4B); val down = Color(0xFFC2362F)
     val context = androidx.compose.ui.platform.LocalContext.current
-    Column(Modifier.fillMaxWidth().clickable(enabled = e.id.isNotEmpty()) { WebActivity.open(context, "analiz?v=${e.id}&e=${android.net.Uri.encode(e.event)}&tf=${e.tf}") }.padding(horizontal = 16.dp, vertical = 10.dp)) {
+    Column(Modifier.fillMaxWidth().clickable(enabled = e.id.isNotEmpty()) { WebActivity.open(context, "analiz/olaylar?v=${e.id}&e=${android.net.Uri.encode(e.event)}&tf=${e.tf}") }.padding(horizontal = 16.dp, vertical = 10.dp)) {
         Text("${e.date} (${e.ago}); ${e.frame.lowercase()} veri; önceden ${e.times} kez", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(if (e.macro) "${e.text} → ${e.asset}" else e.text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
         Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
@@ -213,9 +213,9 @@ private fun EventCard(e: OutlookEvent) {
 private fun FullAnalysisLinks() {
     val context = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        androidx.compose.material3.Button(onClick = { WebActivity.open(context, "analiz") }, modifier = Modifier.fillMaxWidth()) { Text("Mum grafikte incele: olaylar ve yön olasılıkları") }
+        androidx.compose.material3.Button(onClick = { WebActivity.open(context, "analiz") }, modifier = Modifier.fillMaxWidth()) { Text("Tepe ve taban: şu an bir dönüş mü oluşuyor?") }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
-            listOf("Hisse" to "analiz/hisse", "Makro" to "analiz/makro", "Alarmlar" to "alarmlar").forEach { (label, path) ->
+            listOf("Olaylar" to "analiz/olaylar", "Hisse" to "analiz/hisse", "Alarmlar" to "alarmlar").forEach { (label, path) ->
                 androidx.compose.material3.OutlinedButton(onClick = { WebActivity.open(context, path) }, modifier = Modifier.weight(1f)) { Text(label, maxLines = 1) }
             }
         }

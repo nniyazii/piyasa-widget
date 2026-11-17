@@ -45,7 +45,7 @@ export function OutlookLine({ asset, prefix }: { asset: string; prefix?: string 
   const val = o.layers.find((l) => l.id === 'deger')
   return (
     <p className="ov-line">
-      {prefix ?? `${o.asset.short}: bütün kanıtlarla görünüm`} <a className={'ov-stance ' + TONE[o.stance]} href={href('analiz')}>{o.stance}</a>
+      {prefix ?? `${o.asset.short}: bütün kanıtlarla görünüm`} <a className={'ov-stance ' + TONE[o.stance]} href={href('analiz/olaylar')}>{o.stance}</a>
       {o.stance !== 'Nötr' && <span> güven {o.conviction}</span>}
       {!prefix && val && val.vote !== 0 && <span>. Değerleme bu varlıkta geçmişte {val.counts ? 'ayırt edici olmuş; görüşe katılıyor' : 'ayırt edici olmamış; görüşe katılmıyor'}.</span>}
     </p>

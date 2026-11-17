@@ -281,6 +281,41 @@
     ]
    },
    {
+    "id": "tepe-taban",
+    "term": "Tepe ve taban (dönüş) incelemesi",
+    "aka": [
+     "tepe",
+     "taban",
+     "dip",
+     "tavan",
+     "dönüş",
+     "hassasiyet",
+     "taban adayı",
+     "tepe adayı",
+     "tetik fiyatı",
+     "geriye dönük sınama",
+     "backtest"
+    ],
+    "short": "Bir varlığın tarihsel tepe ve tabanlarında göstergelerin ve makro ortamın nasıl olduğundan çıkarılan örüntünün bugüne uygulanması: bugün bir taban ya da tepe oluşumu mu?",
+    "body": [
+     "Taban, günün en düşüğünün hem geriye doğru bir pencerenin hem de ileriye doğru bir teyit süresinin en düşüğü olduğu gündür; tepe bunun tersidir. Pencere altı hassasiyette seçilir: aylık (21 işlem günü), 3 aylık, 6 aylık, 1 yıllık, 5 yıllık ve tüm zamanlar. Kaba hassasiyet yalnızca büyük dönüşleri sayar.",
+     "Bir taban ancak teyit süresi dolunca kesinleşir (aylıkta 21, 3 aylıkta 63, 6 aylık ve 1 yıllıkta 126, daha uzunlarda 252 işlem günü). O güne kadar “henüz teyit edilmemiş” adaydır: fiyat daha aşağı inerse taban olmaktan çıkar.",
+     "Örüntü pazar genelinde öğrenilir: ABD hisseleri, BIST hisseleri (dolar bazında) ve makro varlıklar ayrı ayrı. Geçmişteki bütün dönüşlerin çevresindeki günlerde 28 ölçüye bakılır: RSI (kısa ve uzun), Bollinger konumu, 50 ve 200 günlük ortalamaya uzaklık, son 5 gün, 1 ay ve 3 ayın hareketi, pencerenin en düşüğüne ve en yükseğine uzaklık, oynaklık artışı, RSI uyumsuzluğu, MACD, mum fitilleri, art arda günler, hacim; makro tarafta pazar endeksinin durumu, VIX, dolar endeksi, ABD 10 yıllık faizi ve BIST için Dolar/TL. İstatistiksel model (lojistik regresyon) bu ölçülerin hangisinin dönüş günlerini diğer günlerden ne kadar ayırdığını bulur.",
+     "Model bugün için bir olasılık verir: bugünün bir dönüş gününün birkaç gün yakınında ve fiyatının ona yakın olma olasılığı. Bu olasılık rastgele bir günün olasılığıyla karşılaştırılır; 5 katını geçince “aday”, 2 katını geçince “belirti” denir.",
+     "Geriye dönük sınama: model 2021 öncesinin verisiyle öğrenildi, 2021 Temmuz’dan sonraki hiç görmediği dönemde ölçüldü. Kasım 2026 verisiyle ABD hisselerinde 3 aylık taban için: “aday” denen günlerin %19’u gerçekten bir tabanın yakınındaydı (rastgele gün %2,9), gerçek tabanların %74’ü yakalandı ve aday günlerden 3 ay sonra fiyat %63 oranında yukarıdaydı (bütün günlerde %56). Tepelerde sonuç daha zayıf: ABD’de aday tepe günlerinden sonra fiyat diğer günlerden farklı davranmadı; BIST’te dolar bazında 1 yıllık tepe adaylarından 3 ay sonra fiyat %40 oranında yukarıdaydı (bütün günlerde %46).",
+     "Hangi fiyatta: bugün aday değilse, diğer her şey aynı kalıp bugün hangi fiyattan kapanılsaydı adaylık eşiğinin aşılacağı hesaplanır. Fiyata günler içinde yavaşça gelinirse göstergeler farklı oluşacağı için bu yaklaşık bir düzeydir.",
+     "Ne zaman: dönüşün zamanı önceden bilinemez. Sayfa bunun yerine varlığın geçmişte kaç kez dönüş yaptığını, iki dönüş arasında tipik olarak kaç işlem günü geçtiğini ve son dönüşten bu yana geçen süreyi verir.",
+     "Sınırı: “aday” günlerin çoğu gerçek dönüş günü değildir; fiyat aday olduktan sonra daha da düşebilir. Model dönüşü önceden bilmez, dönüşlerin tipik koşullarının oluşup oluşmadığını söyler. 5 yıllık ve tüm zamanlar hassasiyetinde örnek az olduğu için tabanlarda sınama yapılamaz."
+    ],
+    "example": "Altın 16 Kasım 2026’da 3 aylık taban adayıydı: modelin verdiği olasılık %24, rastgele bir günün olasılığı %2,8. Makro varlıklarda sınama döneminde bu düzeydeki günlerin %24’ü gerçekten bir 3 aylık tabanın yakınındaydı.",
+    "inApp": "Analiz bölümünün açılış sayfası. Varlık ya da hisse ve hassasiyet seçilir; sayfa tek cümleyle sonucu, taban ve tepe için ayrı ayrı olasılığı, adaylık için gereken fiyatı, sınama sonucunu ve grafikte bütün tarihsel tepe ve tabanları gösterir.",
+    "related": [
+     "olay-incelemesi",
+     "rsi",
+     "guvenilirlik"
+    ]
+   },
+   {
     "id": "olay-incelemesi",
     "term": "Olay incelemesi (yön olasılığı)",
     "aka": [

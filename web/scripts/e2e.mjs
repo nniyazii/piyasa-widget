@@ -25,7 +25,7 @@ async function step(name, fn) {
     console.log('✓', name)
   } catch (e) {
     failed++
-    console.log('✗', name, '\n   ', e.message.split('\n')[0])
+    console.log('✗', name, '\n   ', e.message.split('\n').slice(0, process.env.E2E_VERBOSE ? 6 : 1).join('\n    '))
     await page.screenshot({ path: `e2e-fail-${failed}.png` }).catch(() => {})
   }
 }
@@ -175,6 +175,7 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   await page.locator('.nav a', { hasText: 'Analiz' }).click()
   // Özet: soru → cevap satırları; satır ilgili sayfaya götürür
   // Açılış: Görünüm (grafik tezgâhı); altında pratik sorular
+  await page.locator('.an-tabs a', { hasText: 'Olaylar' }).click()
   await page.locator('.an-row').nth(5).waitFor({ timeout: 20000 })
   await page.locator('.an-row', { hasText: 'Değerinin altında' }).click()
   await page.locator('.prem-table tbody tr').nth(4).waitFor({ timeout: 20000 })
@@ -220,9 +221,40 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   for (const s of ['Dolar (al|sat)', 'Altın (al|sat)', 'Gram altın (al|sat)', 'BIST (al|sat)', 'Ev (al|için bekle)']) if (!money.some((t) => new RegExp('^' + s).test(t))) throw new Error('para arzı kartı yok: ' + s + ' | ' + money.join(' ¦ '))
 })
 
+await step('tepe ve taban: hassasiyet seçimi, sonuç, tetik fiyatı, sınama, grafikte dönüşler', async () => {
+  await page.goto(BASE + '/#/analiz?v=GOLD&h=Q')
+  await page.locator('.tn-cards .tn-card').nth(1).waitFor({ timeout: 40000 })
+  if (!/Altın/.test(await page.locator('.tn-answer').textContent())) throw new Error('cevap: ' + (await page.locator('.tn-answer').textContent()))
+  if (await page.locator('.tn-scales button').count() !== 6) throw new Error('altı hassasiyet bekleniyordu')
+  // İki kart: taban ve tepe; olasılık, rastgele günle karşılaştırma ve sınama cümlesi
+  for (const i of [0, 1]) {
+    const t = await page.locator('.tn-card').nth(i).innerText()
+    if (!/olma olasılığı %[\d,]+\. Rastgele bir günde bu olasılık %[\d,]+/.test(t)) throw new Error('olasılık cümlesi yok: ' + t.slice(0, 120))
+    if (!/Sınama \(2021 sonrası|sınama güvenilir bir sonuç vermedi/.test(t)) throw new Error('sınama cümlesi yok')
+    if (!/geçmişte \d+ kez 3 aylık (taban|tepe) yaptı/.test(t)) throw new Error('geçmiş dönüş sayısı yok')
+  }
+  // Aday olmayan tarafta ya tetik fiyatı ya da fiyatın tek başına yetmediği yazar
+  const cards = await page.locator('.tn-card').allInnerTexts()
+  if (!cards.some((t) => /Aday sayılması için fiyatın yaklaşık|Fiyat tek başına|: aday/.test(t))) throw new Error('tetik fiyatı cümlesi yok')
+  // Örüntü tablosu: şimdi, dönüşlerde genelde, her zaman
+  await page.locator('.tn-why > summary').first().click()
+  if (await page.locator('.tn-why[open] .tn-table tbody tr').count() < 2) throw new Error('örüntü tablosu boş')
+  // Grafik ve hassasiyet değişimi; adres güncellenir
+  await page.locator('.cc-plot canvas').first().waitFor({ timeout: 10000 })
+  await page.locator('.tn-scales button', { hasText: '1 yıllık' }).click()
+  await page.waitForFunction(() => /h=Y/.test(location.hash), null, { timeout: 5000 })
+  await page.locator('.tn-card', { hasText: '1 yıllık taban bölgesinde' }).waitFor({ timeout: 10000 })
+  // Hisse: arama ile seç; BIST dolar bazında
+  await page.locator('.st-search input').fill('thyao')
+  await page.locator('.st-hits button', { hasText: 'THYAO' }).first().click()
+  await page.locator('.tn-answer', { hasText: 'THYAO' }).waitFor({ timeout: 40000 })
+  if (!/dolar bazında/.test(await page.locator('.cc-ohlc b').first().textContent())) throw new Error('BIST dolar bazında değil')
+  if (!/BIST hisseleri/.test(await page.locator('.tn-test').first().textContent())) throw new Error('BIST modeli kullanılmadı')
+})
+
 await step('görünüm: tek cümlelik sonuç, vade kutuları, mum grafik, ayrıntı kapalı', async () => {
   const tfBtn = (t) => page.locator('.wb-pick .segmented button', { hasText: t })
-  await page.goto(BASE + '/#/analiz?v=GOLD')
+  await page.goto(BASE + '/#/analiz/olaylar?v=GOLD')
   await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
   if ((await page.locator('.wb-assets .chip[aria-pressed=true]').textContent()) !== 'Altın') throw new Error('seçili varlık Altın değil')
   // Olay seç: düz cümle (kaç seferin kaçında yukarıda, her zaman), sonuç etiketi ve dört vade kutusu
@@ -266,7 +298,7 @@ await step('görünüm: tek cümlelik sonuç, vade kutuları, mum grafik, ayrın
 })
 
 await step('kendi olayım: tanımla, grafikte gör, sil', async () => {
-  await page.goto(BASE + '/#/analiz?v=GOLD')
+  await page.goto(BASE + '/#/analiz/olaylar?v=GOLD')
   await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
   await page.locator('.wb .st-alarm button', { hasText: 'Kendi olayını tanımla' }).click()
   await page.locator('.wb-composer input[aria-label="Düzey"]').first().fill('35')
@@ -282,6 +314,8 @@ await step('kendi olayım: tanımla, grafikte gör, sil', async () => {
 await step('analiz: hisse seç, mum grafik, pazar geneli kanıt, güçlü kurulumlar', async () => {
   await page.goto(BASE + '/#/analiz')
   await page.locator('.an-tabs a', { hasText: 'Hisse' }).click()
+  await page.locator('.an-tabs a[aria-current=page]', { hasText: 'Hisse' }).waitFor({ timeout: 5000 })
+  await page.locator('.tn-scales').waitFor({ state: 'detached', timeout: 5000 })
   await page.locator('.st-search input').fill('thyao')
   await page.locator('.st-hits button', { hasText: 'THYAO' }).first().click()
   await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
@@ -338,7 +372,7 @@ await step('alarmlar: fiyat, avantajlı fiyat, olay ve güçlü kurulum kur; ça
   await page.locator('.al-go .btn').click()
   await page.locator('.al-row', { hasText: 'değerinin altına inerse' }).waitFor({ timeout: 5000 })
   // Olay: grafik tezgâhındaki bağlantı formu hazır doldurur (varlık, zaman dilimi, olay)
-  await page.goto(BASE + '/#/analiz?v=GOLD')
+  await page.goto(BASE + '/#/analiz/olaylar?v=GOLD')
   await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
   await page.locator('.wb-pick .segmented button', { hasText: 'Haftalık' }).click()
   await page.locator('.wb-pick select').selectOption('trend-down')
@@ -366,7 +400,7 @@ await step('alarmlar: fiyat, avantajlı fiyat, olay ve güçlü kurulum kur; ça
 await step('mobil: analiz sayfalarında yatay taşma yok', async () => {
   const m = await ctx.newPage()
   await m.setViewportSize({ width: 390, height: 800 })
-  for (const h of ['analiz?v=GOLD', 'analiz/hisse/BIST:THYAO', 'analiz/makro', 'alarmlar?tur=olay&s=GOLD&e=rsi-30&tf=W']) {
+  for (const h of ['analiz?v=GOLD&h=Q', 'analiz?v=BIST:THYAO&h=Y', 'analiz/olaylar?v=GOLD', 'analiz/hisse/BIST:THYAO', 'analiz/makro', 'alarmlar?tur=olay&s=GOLD&e=rsi-30&tf=W']) {
     await m.goto(BASE + '/#/' + h)
     await m.waitForTimeout(3500)
     const over = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)

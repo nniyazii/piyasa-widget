@@ -18,7 +18,7 @@ export interface Subject {
 }
 
 const raw = new Map<string, Promise<Frames | undefined>>()
-function candles(id: string): Promise<Frames | undefined> {
+export function candles(id: string): Promise<Frames | undefined> {
   if (!raw.has(id)) raw.set(id, fetch(`data/candles/${id}.json`, { cache: 'no-cache' }).then((r) => (r.ok ? (r.json() as Promise<CandleFile>) : undefined)).then((f) => (f ? framesFromFile(f) : undefined)).catch(() => undefined))
   return raw.get(id)!
 }

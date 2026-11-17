@@ -37,7 +37,7 @@ function View({ m, generated }: { m: MacroView; generated: number }) {
             : 'Şu an belirgin bir makro örüntü yok.'}
         </p>
       </header>
-      <p className="an-sub">Bu sayfa <a href={href('analiz')}>Görünüm</a>’ün iki kanıtını ayrıntılı gösterir: makro örüntüler ve benzer dönemler.</p>
+      <p className="an-sub">Bu sayfa <a href={href('analiz/olaylar')}>Olaylar</a>’ün iki kanıtını ayrıntılı gösterir: makro örüntüler ve benzer dönemler.</p>
       <p className="an-sub">
         Bugünkü tablo en çok <b>{list(top3)}</b> dönemlerine benziyor. Şu an geçerli {m.activeConditions.length} makro durum var
         {m.activeConditions.length ? <>: {list(m.activeConditions.map((c) => `“${c.label}”`))}</> : ''}. Aşağıda her varlık için bu durumların ve benzer dönemlerin geçmişte neyle sonuçlandığı var; sonuçlar {HORIZON} ay sonrası içindir.
