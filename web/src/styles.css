@@ -1385,3 +1385,10 @@ button.ev-row.on { box-shadow: -12px 0 0 var(--sunken), 12px 0 0 var(--sunken); 
 .ex-k.strat { background: var(--up); } .ex-k.idx { background: var(--ink-3); }
 .ex-strat tr.main th, .ex-strat tr.main td { font-weight: 700; }
 .ex-strat th .s, .ex-strat td .s { display: block; font-weight: 400; }
+
+/* Endeks: ne zaman alınır */
+.ix-now .ex-gauge .tn-say { margin-top: 6px; }
+.ix-levels { margin-top: 10px; font-size: 13px; }
+.ix-levels tr.hit td { color: var(--down); font-weight: 600; }
+.ix-strat th[scope=row], .ix-eps td { white-space: normal; }
+.ex-table td .s { display: block; font-size: 11px; color: var(--ink-3); font-weight: 400; }

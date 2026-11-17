@@ -57,7 +57,7 @@ class WebActivity : ComponentActivity() {
     companion object {
         const val BASE = "https://nniyazii.github.io/piyasa-widget/"
         private const val EXTRA_PATH = "path"
-        /** path: web uygulamasındaki sayfa, örn. "analiz?v=GOLD&e=rsi-30&tf=W", "analiz/hisse", "alarmlar" */
+        /** path: web uygulamasındaki sayfa, örn. "analiz/olaylar?v=GOLD&e=rsi-30&tf=W", "analiz/hisse", "alarmlar" */
         fun open(context: Context, path: String) = context.startActivity(Intent(context, WebActivity::class.java).putExtra(EXTRA_PATH, path))
     }
 }

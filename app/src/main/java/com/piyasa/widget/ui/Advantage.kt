@@ -213,7 +213,7 @@ private fun EventCard(e: OutlookEvent) {
 private fun FullAnalysisLinks() {
     val context = androidx.compose.ui.platform.LocalContext.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) {
-        androidx.compose.material3.Button(onClick = { WebActivity.open(context, "analiz") }, modifier = Modifier.fillMaxWidth()) { Text("Tepe ve taban: şu an bir dönüş mü oluşuyor?") }
+        androidx.compose.material3.Button(onClick = { WebActivity.open(context, "analiz") }, modifier = Modifier.fillMaxWidth()) { Text("S&P 500 ve Nasdaq: ne zaman alınır?") }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
             listOf("Olaylar" to "analiz/olaylar", "Hisse" to "analiz/hisse", "Alarmlar" to "alarmlar").forEach { (label, path) ->
                 androidx.compose.material3.OutlinedButton(onClick = { WebActivity.open(context, path) }, modifier = Modifier.weight(1f)) { Text(label, maxLines = 1) }

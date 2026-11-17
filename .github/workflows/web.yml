@@ -52,6 +52,11 @@ jobs:
           done
         timeout-minutes: 6
         continue-on-error: true
+      - name: Endeks dipleri ve alım zamanlaması (S&P 500, Nasdaq 100)
+        run: |
+          if [ -f dist/data/candles/SPX.json ] && [ -f dist/data/macro.json ] && CANDLES=dist/data/candles MACRO=dist/data/macro.json OUT=dist/data/index-dips.new.json npm run index-dips; then mv dist/data/index-dips.new.json dist/data/index-dips.json; else rm -f dist/data/index-dips.new.json; fi
+        timeout-minutes: 4
+        continue-on-error: true
       - name: Abartılı satış sınaması (pazar genelinde, 2021 öncesi eşikler, sonrası sınama)
         run: |
           if [ -d dist/data/bars/D ] && DATA=dist/data/bars CANDLES=dist/data/candles OUT=dist/data/extremes.new.json npm run extremes; then mv dist/data/extremes.new.json dist/data/extremes.json

@@ -221,8 +221,22 @@ await step('analiz: özet, ürünler, nereden almalı, birikim, para arzı', asy
   for (const s of ['Dolar (al|sat)', 'Altın (al|sat)', 'Gram altın (al|sat)', 'BIST (al|sat)', 'Ev (al|için bekle)']) if (!money.some((t) => new RegExp('^' + s).test(t))) throw new Error('para arzı kartı yok: ' + s + ' | ' + money.join(' ¦ '))
 })
 
-await step('dip ve tepe: düşüşün sertliği, pazar geneli, geçmiş sonuçlar, panik dönemleri', async () => {
-  await page.goto(BASE + '/#/analiz?v=NASDAQ:NVDA')
+await step('endeks: bugün, düzeyler, toplu para, bekleme kuralları, bütün düşüşler', async () => {
+  await page.goto(BASE + '/#/analiz')
+  await page.locator('.ix-now .ex-gauge').nth(1).waitFor({ timeout: 30000 })
+  if (!/Her ay düzenli al|Düşüşü beklemek/.test(await page.locator('.tn-answer').textContent())) throw new Error('cevap: ' + (await page.locator('.tn-answer').textContent()))
+  if (await page.locator('.ix-levels tbody tr').count() !== 3) throw new Error('üç düzey bekleniyordu')
+  if (!/10 seferin \d+ tanesinde yukarıdaydı/.test(await page.locator('.ix-now').innerText())) throw new Error('bugünkü durumdan sonrası yok')
+  if (await page.locator('.ix-strat tbody tr').count() < 5) throw new Error('bekleme kuralları eksik')
+  if (await page.locator('.ix-eps tbody tr').count() < 8) throw new Error('düşüş listesi eksik')
+  await page.locator('.cc-plot canvas').first().waitFor({ timeout: 20000 })
+  await page.locator('.wb-head .segmented button', { hasText: 'Nasdaq' }).click()
+  await page.waitForFunction(() => /e=NDX/.test(location.hash), null, { timeout: 5000 })
+  await page.locator('.ix-now h3', { hasText: 'Nasdaq 100' }).waitFor({ timeout: 10000 })
+})
+
+await step('hisse dipleri: düşüşün sertliği, pazar geneli, geçmiş sonuçlar, panik dönemleri', async () => {
+  await page.goto(BASE + '/#/analiz/hisse-dip?v=NASDAQ:NVDA')
   await page.locator('.ex-gauge').nth(1).waitFor({ timeout: 40000 })
   if (!/NVDA/.test(await page.locator('.tn-answer').textContent())) throw new Error('cevap: ' + (await page.locator('.tn-answer').textContent()))
   if (!/hisselerin %[\d,]+’i aşırı satılmış/.test(await page.locator('.ex-gauge').nth(1).innerText())) throw new Error('pazar genişliği yok')
@@ -314,9 +328,9 @@ await step('kendi olayım: tanımla, grafikte gör, sil', async () => {
 
 await step('analiz: hisse seç, mum grafik, pazar geneli kanıt, güçlü kurulumlar', async () => {
   await page.goto(BASE + '/#/analiz')
-  await page.locator('.an-tabs a', { hasText: 'Hisse' }).click()
+  await page.locator('.an-tabs a', { hasText: /^Hisse$/ }).click()
   await page.locator('.an-tabs a[aria-current=page]', { hasText: 'Hisse' }).waitFor({ timeout: 5000 })
-  await page.locator('.ex-gauges').waitFor({ state: 'detached', timeout: 5000 })
+  await page.locator('.ix-now').waitFor({ state: 'detached', timeout: 5000 })
   await page.locator('.st-search input').fill('thyao')
   await page.locator('.st-hits button', { hasText: 'THYAO' }).first().click()
   await page.locator('.wb .cc-plot canvas').first().waitFor({ timeout: 40000 })
@@ -401,7 +415,7 @@ await step('alarmlar: fiyat, avantajlı fiyat, olay ve güçlü kurulum kur; ça
 await step('mobil: analiz sayfalarında yatay taşma yok', async () => {
   const m = await ctx.newPage()
   await m.setViewportSize({ width: 390, height: 800 })
-  for (const h of ['analiz?v=GOLD', 'analiz?v=BIST:THYAO', 'analiz?v=NASDAQ:NVDA', 'analiz/olaylar?v=GOLD', 'analiz/hisse/BIST:THYAO', 'analiz/makro', 'alarmlar?tur=olay&s=GOLD&e=rsi-30&tf=W']) {
+  for (const h of ['analiz', 'analiz?e=NDX', 'analiz/hisse-dip?v=BIST:THYAO', 'analiz/hisse-dip?v=NASDAQ:NVDA', 'analiz/olaylar?v=GOLD', 'analiz/hisse/BIST:THYAO', 'analiz/makro', 'alarmlar?tur=olay&s=GOLD&e=rsi-30&tf=W']) {
     await m.goto(BASE + '/#/' + h)
     await m.waitForTimeout(3500)
     const over = await m.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)

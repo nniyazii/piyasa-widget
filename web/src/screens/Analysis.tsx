@@ -24,9 +24,11 @@ import { Outlook, OutlookLine } from './Outlook'
 const OUTLOOK_OF: Record<string, string> = { 'm2-usdtry': 'USDTRY', 'm2-gold-usd': 'GOLD', 'm2-gold-try': 'GAUTRY', 'm2-bist': 'XU100USD' }
 import { StockAnalysis } from './StockAnalysis'
 import { Extremes } from './Extremes'
+import { IndexBuy } from './IndexBuy'
 
 const TABS = [
-  { path: '', label: 'Dip ve tepe' },
+  { path: '', label: 'Endeks: ne zaman alınır' },
+  { path: 'hisse-dip', label: 'Hisse dipleri' },
   { path: 'olaylar', label: 'Olaylar' },
   { path: 'makro', label: 'Makro' },
   { path: 'para-arzi', label: 'Para arzı' },
@@ -44,7 +46,7 @@ export function Analysis({ tab, arg }: { tab?: string; arg?: string }) {
   const s = usePremiums()
   const { query } = useRoute()
   // Eski bağlantılar (#/analiz?v=…&e=olay) Olaylar sayfasına düşer
-  const current = TABS.find((t) => t.path === (tab ?? (query.has('e') ? 'olaylar' : ''))) ?? TABS[0]
+  const current = TABS.find((t) => t.path === (tab ?? (query.has('e') && !/^(SPX|NDX)$/i.test(query.get('e') ?? '') ? 'olaylar' : query.has('v') && !query.has('e') ? 'hisse-dip' : ''))) ?? TABS[0]
   // Dar ekranda sekmeler kayar: seçili olan görünür kalsın
   useEffect(() => { document.querySelector('.an-tabs a[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }) }, [current])
   return (
@@ -54,7 +56,8 @@ export function Analysis({ tab, arg }: { tab?: string; arg?: string }) {
       </nav>
       {current.path === 'hisse' ? <StockAnalysis symbol={arg} />
         : current.path === 'makro' ? <Macro />
-        : current.path === '' ? <Extremes />
+        : current.path === '' ? <IndexBuy />
+        : current.path === 'hisse-dip' ? <Extremes />
         : current.path === 'olaylar' ? <Outlook practical={s.rows.length || s.advices.length ? <Overview s={s} /> : undefined} />
         : !s.rows.length && !s.advices.length
         ? <p className="an-answer" aria-live="polite">{s.error ?? 'Fiyatlar alınıyor…'}</p>

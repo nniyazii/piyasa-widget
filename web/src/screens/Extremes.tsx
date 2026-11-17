@@ -1,6 +1,6 @@
 /**
- * Analiz › Dip ve tepe (açılış sayfası): satış abartıldı mı, dönüşe yakın bir yerde miyiz?
- *   #/analiz?v=NASDAQ:NVDA       #/analiz?v=GOLD
+ * Analiz › Hisse dipleri: satış abartıldı mı, dönüşe yakın bir yerde miyiz?
+ *   #/analiz/hisse-dip?v=NASDAQ:NVDA       #/analiz/hisse-dip?v=GOLD
  * Hissenin düşüşünün sertliği (kendi oynaklığına göre) ve pazar genelindeki satış birlikte okunur. Her sonuç
  * geçmişteki bütün benzer anların sonucu ve dönem dönem dökümüyle verilir (core/extremes.ts, data/extremes.json).
  */

@@ -148,6 +148,21 @@ export const GLOSSARY: TermGroup[] = [
         related: ['rsi', 'olay-incelemesi'],
       },
       {
+        id: 'endeks-alim', term: 'Endeks ne zaman alınır (düzenli alım ve düşüş bekleme)', aka: ['S&P 500', 'Nasdaq 100', 'QQQ', 'SPY', 'VOO', 'düzenli alım', 'DCA', 'düşüşte al', 'buy the dip', 'toplu para', 'zirveden düşüş', 'resesyon'],
+        short: 'S&P 500 ya da Nasdaq 100 için her ay düzenli almanın, düşüşü bekleyip almanın ve birikmiş parayı hemen yatırmanın geçmişteki sonuçları.',
+        body: [
+          'Soru: endeks fonu (SPY, VOO, QQQ) biriktiren biri her ay düzenli mi almalı, yoksa parayı nakitte tutup bir düşüş mü beklemeli?',
+          'Sınama: S&P 500 1967’den, Nasdaq 100 1985’ten aylık kapanışlarla. Her başlangıç ayı ayrı bir yatırımcı gibi alınır, 10 ve 20 yıl sonraki birikim karşılaştırılır. Nakit 3 aylık ABD hazine faizi kazanır; endekse yaklaşık temettü eklenir.',
+          'Sonuç (Kasım 2026 verisiyle): S&P 500’de düşüşü bekleyen kuralların hiçbiri 20 yıllık dönemlerin yarısında bile düzenli alımı geçemedi (%10–24). Nasdaq’ta “%20 düşüşü bekle” hiçbir 20 yıllık dönemde geçemedi.',
+          'Neden: düşüşten sonra getiri gerçekten yüksektir (S&P zirveden %20 aşağıdayken 12 ay sonra 10 seferin 9’unda yukarıda, herhangi bir ayda 10’da 7–8). Ama bu düşüşler seyrek gelir; beklerken kaçan yükseliş, düşüşte kazanılandan daha pahalıya gelir.',
+          'Birikmiş para: hepsini hemen yatırmak, 12 aya yaymayı ve %10 düşüş beklemeyi 5 yıllık dönemlerin yaklaşık üçte ikisinde geçti.',
+          'Makro örüntü: zirveden %20 düşüşte işsizlik artmıyorsa toparlanma hızlı oldu; işsizlik artıyorsa (resesyon) düşüş genellikle derinleşti. Diplerde VIX, kredi farkı ve işsizlik belirgin biçimde yüksek, RSI düşüktü; ama bu değerler dipten önce de uzun süre aynı kalabildiği için dibin yerini tek başına göstermez.',
+          'Sınırı: sonuçlar ABD’nin güçlü 60 yılına dayanır; uzun bir durgunlukta (Japonya 1990 sonrası gibi) düşüşte almak daha değerli olabilir. Vergi, döviz ve fon giderleri hesaba katılmadı.',
+        ],
+        inApp: 'Analiz bölümünün açılış sayfası. Endeksin bugünkü yeri, zirveden %10, %20 ve %30 düzeyleri, geçmişte bu durumdan sonra ne olduğu, bütün düşüşlerin dökümü ve bekleme kurallarının düzenli alımla karşılaştırması.',
+        related: ['abartili-satis', 'olay-incelemesi'],
+      },
+      {
         id: 'abartili-satis', term: 'Abartılı satış (dibe yakın bölge)', aka: ['abartılı satış', 'aşırı satış', 'panik satışı', 'dip', 'taban', 'tepe', 'tavan', 'dönüş', 'kapitülasyon', 'pazar genişliği', 'geriye dönük sınama', 'backtest'],
         short: 'Hem hissenin kendi oynaklığına göre çok sert düştüğü hem de pazarın genelinde panik satışı olduğu anlar. Geçmişte bu anlardan sonra fiyat çoğunlukla toparlandı.',
         body: [
