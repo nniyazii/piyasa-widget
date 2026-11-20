@@ -1,0 +1,358 @@
+{
+ "generated": 1795189741146,
+ "years": 3,
+ "scores": {
+  "[\"BIST\",\"USD\",\"\",false,true,[[\"PRICE\",\"LTE\",\"LOW_5Y\",10]]]": {
+   "id": "d_bist_5y_usd",
+   "name": "5 yıllık dibe yakın BIST ($)",
+   "rel": {
+    "months": 36,
+    "episodes": 5346,
+    "edge1m": 0.0007961780777955967,
+    "edge3m": 0.021188597571650144,
+    "t1m": 0.09927305729625378,
+    "t3m": 0.6062330298986296,
+    "lookahead": false,
+    "consistency": 0.5882352941176471,
+    "score": 55,
+    "label": "Orta"
+   },
+   "portfolios": {
+    "list": -0.11353206763137935,
+    "hold1m": 0.13893976713384193,
+    "hold3m": 0.19549241743318824,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"CHANGE\",\"GTE\",\"\",4],[\"MCAP\",\"GT\",\"\",5000000000]]]": {
+   "id": "d_bist_movers",
+   "name": "Günün yıldızları (BIST)",
+   "rel": {
+    "months": 36,
+    "episodes": 17625,
+    "edge1m": -0.004566255799809284,
+    "edge3m": -0.0009221681117272514,
+    "t1m": -0.5382016630967678,
+    "t3m": -0.030185740326412264,
+    "lookahead": false,
+    "consistency": 0.5882352941176471,
+    "score": 44,
+    "label": "Zayıf"
+   },
+   "portfolios": {
+    "list": 8.284936834446698,
+    "hold1m": -0.17874687502311415,
+    "hold3m": -0.08245346220843786,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"RSI\",\"LT\",\"\",35],[\"MCAP\",\"GT\",\"\",50000000000],[\"PRICE\",\"GT\",\"SMA200\",0]]]": {
+   "id": "d_bist_oversold_big",
+   "name": "Yükselen trendde aşırı satılmış BIST devleri",
+   "rel": {
+    "months": 33,
+    "episodes": 308,
+    "edge1m": -0.021245338711473393,
+    "edge3m": -0.006773684407219488,
+    "t1m": -1.324907710651701,
+    "t3m": -0.13014284102329754,
+    "lookahead": false,
+    "consistency": 0.5483870967741935,
+    "score": 37,
+    "label": "Zayıf"
+   },
+   "portfolios": {
+    "list": -0.9485929259567698,
+    "hold1m": -0.7033968267811569,
+    "hold3m": -0.2738176756295646,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"PE\",\"LT\",\"\",10],[\"PE\",\"GT\",\"\",0],[\"PRICE\",\"GT\",\"SMA200\",0],[\"SMA50\",\"GT\",\"SMA200\",0],[\"MCAP\",\"GT\",\"\",10000000000]]]": {
+   "id": "d_bist_trend_cheap",
+   "name": "Trendde ve ucuz (BIST)",
+   "rel": {
+    "months": 36,
+    "episodes": 844,
+    "edge1m": -0.00998773081782446,
+    "edge3m": -0.02830497300284187,
+    "t1m": -1.5896586114838311,
+    "t3m": -1.2831934269376548,
+    "lookahead": false,
+    "consistency": 0.4117647058823529,
+    "score": 25,
+    "label": "Güvenilmez"
+   },
+   "portfolios": {
+    "list": -0.17263001787557886,
+    "hold1m": -0.1717056422004598,
+    "hold3m": -0.03275428425911697,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"PRICE\",\"GTE\",\"HIGH_52W\",-5],[\"MCAP\",\"GT\",\"\",20000000000]]]": {
+   "id": "d_bist_52w_high",
+   "name": "Zirveye yakın BIST hisseleri",
+   "rel": {
+    "months": 36,
+    "episodes": 2444,
+    "edge1m": 0.0215617776407603,
+    "edge3m": 0.023355992217640818,
+    "t1m": 3.0232987893696386,
+    "t3m": 0.8328316620122461,
+    "lookahead": false,
+    "consistency": 0.5294117647058824,
+    "score": 76,
+    "label": "Güçlü"
+   },
+   "portfolios": {
+    "list": 4.383549320676944,
+    "hold1m": 0.7801305203445967,
+    "hold3m": 0.009164943470811648,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"US\",\"LOCAL\",\"\",false,true,[[\"PRICE\",\"LTE\",\"LOW_52W\",25],[\"MCAP\",\"GT\",\"\",100000000000]]]": {
+   "id": "d_us_megacap_dip",
+   "name": "Düşüşteki ABD devleri",
+   "rel": {
+    "months": 36,
+    "episodes": 1193,
+    "edge1m": 0.002371163769765995,
+    "edge3m": -0.0051933932118905166,
+    "t1m": 0.54877547220858,
+    "t3m": -0.34625649170931655,
+    "lookahead": false,
+    "consistency": 0.4411764705882353,
+    "score": 38,
+    "label": "Zayıf"
+   },
+   "portfolios": {
+    "list": 0.15520573118569092,
+    "hold1m": 0.3708912737192325,
+    "hold3m": 0.39126341247613694,
+    "bench": 0.5780106830511567
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"PE\",\"LTE\",\"PE_5Y_AVG\",-40],[\"PE\",\"GT\",\"\",0],[\"MCAP\",\"GT\",\"\",50000000000]]]": {
+   "id": "d_bist_pe_hist_cheap",
+   "name": "Tarihine göre ucuzlamış BIST devleri",
+   "rel": {
+    "months": 29,
+    "episodes": 112,
+    "edge1m": 0.004206965849799986,
+    "edge3m": 0.03266217172887615,
+    "t1m": 0.2247450588415738,
+    "t3m": 0.5377239203491347,
+    "lookahead": false,
+    "consistency": 0.6428571428571429,
+    "score": 60,
+    "label": "Orta"
+   },
+   "portfolios": {
+    "list": -0.1669285032781711,
+    "hold1m": 0.29537854971955335,
+    "hold3m": -0.03372936867124732,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"US\",\"LOCAL\",\"\",false,true,[[\"PE\",\"LTE\",\"PE_5Y_AVG\",-25],[\"PE\",\"GT\",\"\",0],[\"MCAP\",\"GT\",\"\",50000000000],[\"PRICE\",\"GT\",\"SMA200\",0]]]": {
+   "id": "d_us_pe_hist_cheap",
+   "name": "Tarihine göre ucuz, trendi yukarı ABD devleri",
+   "rel": {
+    "months": 35,
+    "episodes": 382,
+    "edge1m": 0.004830769246918045,
+    "edge3m": -0.006409822217328694,
+    "t1m": 0.767933956698136,
+    "t3m": -0.2682532467775814,
+    "lookahead": false,
+    "consistency": 0.42424242424242425,
+    "score": 39,
+    "label": "Zayıf"
+   },
+   "portfolios": {
+    "list": 0.4915777167982067,
+    "hold1m": 0.35769179043668076,
+    "hold3m": 0.48873115187189753,
+    "bench": 0.5780106830511567
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"FWD_PE\",\"LTE\",\"PE\",-30],[\"FWD_PE\",\"GT\",\"\",0],[\"PE\",\"GT\",\"\",0],[\"PE\",\"LT\",\"\",15],[\"MCAP\",\"GT\",\"\",20000000000]]]": {
+   "id": "d_bist_fwd_growth",
+   "name": "Kârı artması beklenen ucuz BIST",
+   "rel": {
+    "months": 34,
+    "episodes": 195,
+    "edge1m": 0.027147148021554515,
+    "edge3m": 0.04160135776408937,
+    "t1m": 2.267077340108157,
+    "t3m": 0.89401446179438,
+    "lookahead": true,
+    "consistency": 0.5625,
+    "score": 55,
+    "label": "Orta"
+   },
+   "portfolios": {
+    "list": 1.2867130250059655,
+    "hold1m": 1.9550200250857848,
+    "hold3m": 1.5358736876054775,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"PB\",\"LT\",\"\",1],[\"PB\",\"GT\",\"\",0],[\"ROE\",\"GT\",\"\",10],[\"MCAP\",\"GT\",\"\",30000000000]]]": {
+   "id": "d_bist_below_book",
+   "name": "Defter değerinin altında, kârlı BIST",
+   "rel": {
+    "months": 32,
+    "episodes": 152,
+    "edge1m": 0.031700669598451234,
+    "edge3m": 0.030157874031012846,
+    "t1m": 2.206265226396394,
+    "t3m": 0.8287667779828258,
+    "lookahead": false,
+    "consistency": 0.5333333333333333,
+    "score": 69,
+    "label": "Orta"
+   },
+   "portfolios": {
+    "list": 0.8127084244017553,
+    "hold1m": 1.0924846418810739,
+    "hold3m": 0.8373432215994399,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"DIV_YIELD\",\"GTE\",\"\",4],[\"MCAP\",\"GT\",\"\",20000000000]]]": {
+   "id": "d_bist_dividend",
+   "name": "Yüksek temettü verimli BIST",
+   "rel": {
+    "months": 36,
+    "episodes": 307,
+    "edge1m": 0.02129787927069065,
+    "edge3m": 0.049175780923841665,
+    "t1m": 1.9698133004448632,
+    "t3m": 1.2710120788807149,
+    "lookahead": false,
+    "consistency": 0.6176470588235294,
+    "score": 78,
+    "label": "Güçlü"
+   },
+   "portfolios": {
+    "list": 0.38948419934510925,
+    "hold1m": 1.2766225503385544,
+    "hold3m": 0.9491697837662945,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"US\",\"LOCAL\",\"\",false,true,[[\"ROE\",\"GT\",\"\",15],[\"NET_MARGIN\",\"GT\",\"\",15],[\"DEBT_EQ\",\"LT\",\"\",1],[\"PE\",\"GT\",\"\",0],[\"PE\",\"LT\",\"\",35],[\"MCAP\",\"GT\",\"\",100000000000]]]": {
+   "id": "d_us_quality",
+   "name": "Kaliteli ve makul fiyatlı ABD devleri",
+   "rel": {
+    "months": 36,
+    "episodes": 186,
+    "edge1m": 0.014033800153458679,
+    "edge3m": 0.009159720850667378,
+    "t1m": 1.8534048470411872,
+    "t3m": 0.31306054211896533,
+    "lookahead": false,
+    "consistency": 0.5294117647058824,
+    "score": 62,
+    "label": "Orta"
+   },
+   "portfolios": {
+    "list": 0.4959523301708555,
+    "hold1m": 1.3909032421062952,
+    "hold3m": 0.9028758924485776,
+    "bench": 0.5780106830511567
+   }
+  },
+  "[\"US\",\"LOCAL\",\"\",false,true,[[\"RSI\",\"LT\",\"\",40],[\"PRICE\",\"GT\",\"SMA200\",0],[\"EPS_CAGR_5Y\",\"GT\",\"\",20],[\"MCAP\",\"GT\",\"\",50000000000]]]": {
+   "id": "d_us_growth_dip",
+   "name": "Büyüyen, trendde geri çekilen ABD devleri",
+   "rel": {
+    "months": 34,
+    "episodes": 497,
+    "edge1m": 0.02688696317283705,
+    "edge3m": 0.0872543692252275,
+    "t1m": 3.2828834786857013,
+    "t3m": 1.3796310800841065,
+    "lookahead": false,
+    "consistency": 0.65625,
+    "score": 93,
+    "label": "Güçlü"
+   },
+   "portfolios": {
+    "list": -0.19148232027047318,
+    "hold1m": 0.9906735801084374,
+    "hold3m": 1.263380271925326,
+    "bench": 0.5780106830511567
+   }
+  },
+  "[\"BIST\",\"USD\",\"\",false,true,[[\"PRICE\",\"GTE\",\"HIGH_52W\",-5],[\"MCAP\",\"GT\",\"\",5000000000]]]": {
+   "id": "d_bist_usd_high",
+   "name": "Dolar bazında zirvesindeki BIST",
+   "rel": {
+    "months": 36,
+    "episodes": 4671,
+    "edge1m": 0.01426074913382743,
+    "edge3m": 0.027618556669811965,
+    "t1m": 1.7810421755509012,
+    "t3m": 0.945425542200769,
+    "lookahead": false,
+    "consistency": 0.6176470588235294,
+    "score": 74,
+    "label": "Güçlü"
+   },
+   "portfolios": {
+    "list": 4.527750276162949,
+    "hold1m": 0.6670773522755422,
+    "hold3m": 0.13561335065807456,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"BIST\",\"LOCAL\",\"\",false,true,[[\"PB\",\"LT\",\"\",1.5],[\"PB\",\"GT\",\"\",0],[\"PRICE\",\"GT\",\"SMA50\",0],[\"MCAP\",\"GT\",\"\",30000000000]]]": {
+   "id": "d_bist_pb_trend",
+   "name": "Defter değerine yakın, yükselen BIST",
+   "rel": {
+    "months": 36,
+    "episodes": 1608,
+    "edge1m": 0.008822230730013658,
+    "edge3m": 0.020888887743139874,
+    "t1m": 2.9190834168165507,
+    "t3m": 1.2844475747224002,
+    "lookahead": false,
+    "consistency": 0.6176470588235294,
+    "score": 86,
+    "label": "Güçlü"
+   },
+   "portfolios": {
+    "list": 0.5823499682470403,
+    "hold1m": 0.47879109316223634,
+    "hold3m": 0.6799619516136468,
+    "bench": 0.400803134009617
+   }
+  },
+  "[\"US\",\"LOCAL\",\"\",false,true,[[\"PB\",\"LT\",\"\",2],[\"PB\",\"GT\",\"\",0],[\"PRICE\",\"GT\",\"SMA200\",0],[\"MCAP\",\"GT\",\"\",100000000000]]]": {
+   "id": "d_us_pb_trend",
+   "name": "Defter değerine göre makul, trendde ABD devleri",
+   "rel": {
+    "months": 36,
+    "episodes": 333,
+    "edge1m": 0.012818110757905008,
+    "edge3m": 0.04377243078762021,
+    "t1m": 1.726614427082823,
+    "t3m": 1.5086085161345473,
+    "lookahead": false,
+    "consistency": 0.6470588235294118,
+    "score": 81,
+    "label": "Güçlü"
+   },
+   "portfolios": {
+    "list": 0.4954124406750462,
+    "hold1m": 0.704071763700687,
+    "hold3m": 1.1557332479905527,
+    "bench": 0.5780106830511567
+   }
+  }
+ }
+}
